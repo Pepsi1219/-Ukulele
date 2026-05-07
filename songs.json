@@ -6,136 +6,506 @@
       "mp3": "songs/lenka-the-show.mp3",
       "bpm": 100,
       "lyrics": [
-        {"time": 0, "text": "[Intro]"},
-        {"time": 4, "text": "I'm just a little bit caught in the middle"},
-        {"time": 7.5, "text": "Life is a maze and love is a riddle"},
-        {"time": 10.5, "text": "I don't know where to go, can't do it alone"},
-        {"time": 13.5, "text": "I've tried, and I don't know why"},
-        {"time": 17, "text": "Slow it down, make it stop"},
-        {"time": 19.5, "text": "Or else my heart is going to pop"},
-        {"time": 22.5, "text": "'Cause it's too much, yeah it's a lot"},
-        {"time": 25, "text": "To be something I'm not"},
-        {"time": 28, "text": "I'm a fool out of love"},
-        {"time": 30.5, "text": "'Cause I just can't get enough"},
-        {"time": 34, "text": "[Chorus]"},
-        {"time": 35, "text": "I'm just a little bit caught in the middle"},
-        {"time": 38.5, "text": "Life is a maze and love is a riddle"},
-        {"time": 41.5, "text": "I don't know where to go, can't do it alone"},
-        {"time": 44.5, "text": "I've tried, and I don't know why"},
-        {"time": 48, "text": "I'm just a little bit lost in the middle"},
-        {"time": 51.5, "text": "I'm not a girl, not yet a woman"},
-        {"time": 54.5, "text": "All I need is time, a moment that is mine"},
-        {"time": 58, "text": "While I'm in between"},
-        {"time": 61, "text": "[Verse 2]"},
-        {"time": 62, "text": "I'm just a little bit sick of the secrets"},
-        {"time": 65.5, "text": "Standing alone on a stage, I regret it"},
-        {"time": 68.5, "text": "I don't know where to go, can't do it alone"},
-        {"time": 71.5, "text": "I've tried, and I don't know why"},
-        {"time": 75, "text": "Slow it down, make it stop"},
-        {"time": 77.5, "text": "Or else my heart is going to pop"},
-        {"time": 80.5, "text": "'Cause it's too much, yeah it's a lot"},
-        {"time": 83.5, "text": "To be something I'm not"},
-        {"time": 86, "text": "I'm a fool out of love"},
-        {"time": 88.5, "text": "'Cause I just can't get enough"},
-        {"time": 92, "text": "[Chorus]"},
-        {"time": 93, "text": "I'm just a little bit caught in the middle"},
-        {"time": 96.5, "text": "Life is a maze and love is a riddle"},
-        {"time": 99.5, "text": "I don't know where to go, can't do it alone"},
-        {"time": 102.5, "text": "I've tried, and I don't know why"},
-        {"time": 106, "text": "I'm just a little bit lost in the middle"},
-        {"time": 109.5, "text": "I'm not a girl, not yet a woman"},
-        {"time": 112.5, "text": "All I need is time, a moment that is mine"},
-        {"time": 116, "text": "While I'm in between"},
-        {"time": 120, "text": "[Bridge]"},
-        {"time": 121, "text": "I don't know where to go, can't do it alone"},
-        {"time": 124, "text": "I've tried, and I don't know why"},
-        {"time": 127, "text": "I don't know why"},
-        {"time": 130, "text": "[Outro]"},
-        {"time": 131, "text": "I'm just a little bit caught in the middle"},
-        {"time": 134.5, "text": "Life is a maze and love is a riddle"},
-        {"time": 137.5, "text": "I don't know where to go, can't do it alone"},
-        {"time": 140.5, "text": "I've tried, and I don't know why"},
-        {"time": 144, "text": "I'm just a little bit lost in the middle"}
+        {
+          "time": 0,
+          "text": "[Intro]"
+        },
+        {
+          "time": 4,
+          "text": "ใส่เนื้อเพลงบรรทัดที่ 1"
+        },
+        {
+          "time": 7.5,
+          "text": "ใส่เนื้อเพลงบรรทัดที่ 2"
+        },
+        {
+          "time": 10.5,
+          "text": "ใส่เนื้อเพลงบรรทัดที่ 3"
+        },
+        {
+          "time": 13.5,
+          "text": "ใส่เนื้อเพลงบรรทัดที่ 4"
+        },
+        {
+          "time": 17,
+          "text": "ใส่เนื้อเพลงบรรทัดที่ 5"
+        },
+        {
+          "time": 19.5,
+          "text": "ใส่เนื้อเพลงบรรทัดที่ 6"
+        },
+        {
+          "time": 22.5,
+          "text": "ใส่เนื้อเพลงบรรทัดที่ 7"
+        },
+        {
+          "time": 25,
+          "text": "ใส่เนื้อเพลงบรรทัดที่ 8"
+        },
+        {
+          "time": 28,
+          "text": "ใส่เนื้อเพลงบรรทัดที่ 9"
+        },
+        {
+          "time": 30.5,
+          "text": "ใส่เนื้อเพลงบรรทัดที่ 10"
+        },
+        {
+          "time": 34,
+          "text": "[Chorus]"
+        },
+        {
+          "time": 35,
+          "text": "ใส่เนื้อเพลงท่อน Chorus บรรทัดที่ 1"
+        },
+        {
+          "time": 38.5,
+          "text": "ใส่เนื้อเพลงท่อน Chorus บรรทัดที่ 2"
+        },
+        {
+          "time": 41.5,
+          "text": "ใส่เนื้อเพลงท่อน Chorus บรรทัดที่ 3"
+        },
+        {
+          "time": 44.5,
+          "text": "ใส่เนื้อเพลงท่อน Chorus บรรทัดที่ 4"
+        },
+        {
+          "time": 48,
+          "text": "ใส่เนื้อเพลงท่อน Chorus บรรทัดที่ 5"
+        },
+        {
+          "time": 51.5,
+          "text": "ใส่เนื้อเพลงท่อน Chorus บรรทัดที่ 6"
+        },
+        {
+          "time": 54.5,
+          "text": "ใส่เนื้อเพลงท่อน Chorus บรรทัดที่ 7"
+        },
+        {
+          "time": 58,
+          "text": "ใส่เนื้อเพลงท่อน Chorus บรรทัดที่ 8"
+        },
+        {
+          "time": 61,
+          "text": "[Verse 2]"
+        },
+        {
+          "time": 62,
+          "text": "ใส่เนื้อเพลง Verse 2 บรรทัดที่ 1"
+        },
+        {
+          "time": 65.5,
+          "text": "ใส่เนื้อเพลง Verse 2 บรรทัดที่ 2"
+        },
+        {
+          "time": 68.5,
+          "text": "ใส่เนื้อเพลง Verse 2 บรรทัดที่ 3"
+        },
+        {
+          "time": 71.5,
+          "text": "ใส่เนื้อเพลง Verse 2 บรรทัดที่ 4"
+        },
+        {
+          "time": 75,
+          "text": "ใส่เนื้อเพลง Verse 2 บรรทัดที่ 5"
+        },
+        {
+          "time": 77.5,
+          "text": "ใส่เนื้อเพลง Verse 2 บรรทัดที่ 6"
+        },
+        {
+          "time": 80.5,
+          "text": "ใส่เนื้อเพลง Verse 2 บรรทัดที่ 7"
+        },
+        {
+          "time": 83.5,
+          "text": "ใส่เนื้อเพลง Verse 2 บรรทัดที่ 8"
+        },
+        {
+          "time": 86,
+          "text": "ใส่เนื้อเพลง Verse 2 บรรทัดที่ 9"
+        },
+        {
+          "time": 88.5,
+          "text": "ใส่เนื้อเพลง Verse 2 บรรทัดที่ 10"
+        },
+        {
+          "time": 92,
+          "text": "[Chorus]"
+        },
+        {
+          "time": 93,
+          "text": "ใส่เนื้อเพลง Chorus รอบ 2 บรรทัดที่ 1"
+        },
+        {
+          "time": 96.5,
+          "text": "ใส่เนื้อเพลง Chorus รอบ 2 บรรทัดที่ 2"
+        },
+        {
+          "time": 99.5,
+          "text": "ใส่เนื้อเพลง Chorus รอบ 2 บรรทัดที่ 3"
+        },
+        {
+          "time": 102.5,
+          "text": "ใส่เนื้อเพลง Chorus รอบ 2 บรรทัดที่ 4"
+        },
+        {
+          "time": 106,
+          "text": "ใส่เนื้อเพลง Chorus รอบ 2 บรรทัดที่ 5"
+        },
+        {
+          "time": 109.5,
+          "text": "ใส่เนื้อเพลง Chorus รอบ 2 บรรทัดที่ 6"
+        },
+        {
+          "time": 112.5,
+          "text": "ใส่เนื้อเพลง Chorus รอบ 2 บรรทัดที่ 7"
+        },
+        {
+          "time": 116,
+          "text": "ใส่เนื้อเพลง Chorus รอบ 2 บรรทัดที่ 8"
+        },
+        {
+          "time": 120,
+          "text": "[Bridge]"
+        },
+        {
+          "time": 121,
+          "text": "ใส่เนื้อเพลง Bridge บรรทัดที่ 1"
+        },
+        {
+          "time": 124,
+          "text": "ใส่เนื้อเพลง Bridge บรรทัดที่ 2"
+        },
+        {
+          "time": 127,
+          "text": "ใส่เนื้อเพลง Bridge บรรทัดที่ 3"
+        },
+        {
+          "time": 130,
+          "text": "[Outro]"
+        },
+        {
+          "time": 131,
+          "text": "ใส่เนื้อเพลง Outro บรรทัดที่ 1"
+        },
+        {
+          "time": 134.5,
+          "text": "ใส่เนื้อเพลง Outro บรรทัดที่ 2"
+        },
+        {
+          "time": 137.5,
+          "text": "ใส่เนื้อเพลง Outro บรรทัดที่ 3"
+        },
+        {
+          "time": 140.5,
+          "text": "ใส่เนื้อเพลง Outro บรรทัดที่ 4"
+        },
+        {
+          "time": 144,
+          "text": "ใส่เนื้อเพลง Outro บรรทัดที่ 5"
+        }
       ],
       "chords": [
-        {"time": 0, "chord": "C"},
-        {"time": 2, "chord": "G"},
-        {"time": 4, "chord": "Am"},
-        {"time": 5.5, "chord": "F"},
-        {"time": 7.5, "chord": "C"},
-        {"time": 9, "chord": "G"},
-        {"time": 10.5, "chord": "F"},
-        {"time": 13.5, "chord": "C"},
-        {"time": 17, "chord": "G"},
-        {"time": 18.5, "chord": "Am"},
-        {"time": 20, "chord": "F"},
-        {"time": 22.5, "chord": "C"},
-        {"time": 24, "chord": "G"},
-        {"time": 25, "chord": "Am"},
-        {"time": 26.5, "chord": "F"},
-        {"time": 28, "chord": "G"},
-        {"time": 30.5, "chord": "C"},
-        {"time": 35, "chord": "G"},
-        {"time": 37, "chord": "Am"},
-        {"time": 38.5, "chord": "F"},
-        {"time": 41.5, "chord": "C"},
-        {"time": 43, "chord": "G"},
-        {"time": 44.5, "chord": "F"},
-        {"time": 48, "chord": "C"},
-        {"time": 50, "chord": "G"},
-        {"time": 51.5, "chord": "Am"},
-        {"time": 53, "chord": "F"},
-        {"time": 54.5, "chord": "C"},
-        {"time": 56, "chord": "G"},
-        {"time": 58, "chord": "Am"},
-        {"time": 59.5, "chord": "F"},
-        {"time": 62, "chord": "C"},
-        {"time": 64, "chord": "G"},
-        {"time": 65.5, "chord": "Am"},
-        {"time": 67, "chord": "F"},
-        {"time": 68.5, "chord": "C"},
-        {"time": 70, "chord": "G"},
-        {"time": 71.5, "chord": "F"},
-        {"time": 75, "chord": "G"},
-        {"time": 76.5, "chord": "Am"},
-        {"time": 78, "chord": "F"},
-        {"time": 80.5, "chord": "C"},
-        {"time": 82, "chord": "G"},
-        {"time": 83.5, "chord": "Am"},
-        {"time": 85, "chord": "F"},
-        {"time": 86, "chord": "G"},
-        {"time": 88.5, "chord": "C"},
-        {"time": 93, "chord": "G"},
-        {"time": 95, "chord": "Am"},
-        {"time": 96.5, "chord": "F"},
-        {"time": 99.5, "chord": "C"},
-        {"time": 101, "chord": "G"},
-        {"time": 102.5, "chord": "F"},
-        {"time": 106, "chord": "C"},
-        {"time": 108, "chord": "G"},
-        {"time": 109.5, "chord": "Am"},
-        {"time": 111, "chord": "F"},
-        {"time": 112.5, "chord": "C"},
-        {"time": 114, "chord": "G"},
-        {"time": 116, "chord": "Am"},
-        {"time": 117.5, "chord": "F"},
-        {"time": 121, "chord": "C"},
-        {"time": 122.5, "chord": "G"},
-        {"time": 124, "chord": "Am"},
-        {"time": 125.5, "chord": "F"},
-        {"time": 127, "chord": "G"},
-        {"time": 131, "chord": "C"},
-        {"time": 133, "chord": "G"},
-        {"time": 134.5, "chord": "Am"},
-        {"time": 136, "chord": "F"},
-        {"time": 137.5, "chord": "C"},
-        {"time": 139, "chord": "G"},
-        {"time": 140.5, "chord": "F"},
-        {"time": 144, "chord": "C"}
+        {
+          "time": 0,
+          "chord": "C"
+        },
+        {
+          "time": 2,
+          "chord": "G"
+        },
+        {
+          "time": 4,
+          "chord": "Am"
+        },
+        {
+          "time": 5.5,
+          "chord": "F"
+        },
+        {
+          "time": 7.5,
+          "chord": "C"
+        },
+        {
+          "time": 9,
+          "chord": "G"
+        },
+        {
+          "time": 10.5,
+          "chord": "F"
+        },
+        {
+          "time": 13.5,
+          "chord": "C"
+        },
+        {
+          "time": 17,
+          "chord": "G"
+        },
+        {
+          "time": 18.5,
+          "chord": "Am"
+        },
+        {
+          "time": 20,
+          "chord": "F"
+        },
+        {
+          "time": 22.5,
+          "chord": "C"
+        },
+        {
+          "time": 24,
+          "chord": "G"
+        },
+        {
+          "time": 25,
+          "chord": "Am"
+        },
+        {
+          "time": 26.5,
+          "chord": "F"
+        },
+        {
+          "time": 28,
+          "chord": "G"
+        },
+        {
+          "time": 30.5,
+          "chord": "C"
+        },
+        {
+          "time": 35,
+          "chord": "G"
+        },
+        {
+          "time": 37,
+          "chord": "Am"
+        },
+        {
+          "time": 38.5,
+          "chord": "F"
+        },
+        {
+          "time": 41.5,
+          "chord": "C"
+        },
+        {
+          "time": 43,
+          "chord": "G"
+        },
+        {
+          "time": 44.5,
+          "chord": "F"
+        },
+        {
+          "time": 48,
+          "chord": "C"
+        },
+        {
+          "time": 50,
+          "chord": "G"
+        },
+        {
+          "time": 51.5,
+          "chord": "Am"
+        },
+        {
+          "time": 53,
+          "chord": "F"
+        },
+        {
+          "time": 54.5,
+          "chord": "C"
+        },
+        {
+          "time": 56,
+          "chord": "G"
+        },
+        {
+          "time": 58,
+          "chord": "Am"
+        },
+        {
+          "time": 59.5,
+          "chord": "F"
+        },
+        {
+          "time": 62,
+          "chord": "C"
+        },
+        {
+          "time": 64,
+          "chord": "G"
+        },
+        {
+          "time": 65.5,
+          "chord": "Am"
+        },
+        {
+          "time": 67,
+          "chord": "F"
+        },
+        {
+          "time": 68.5,
+          "chord": "C"
+        },
+        {
+          "time": 70,
+          "chord": "G"
+        },
+        {
+          "time": 71.5,
+          "chord": "F"
+        },
+        {
+          "time": 75,
+          "chord": "G"
+        },
+        {
+          "time": 76.5,
+          "chord": "Am"
+        },
+        {
+          "time": 78,
+          "chord": "F"
+        },
+        {
+          "time": 80.5,
+          "chord": "C"
+        },
+        {
+          "time": 82,
+          "chord": "G"
+        },
+        {
+          "time": 83.5,
+          "chord": "Am"
+        },
+        {
+          "time": 85,
+          "chord": "F"
+        },
+        {
+          "time": 86,
+          "chord": "G"
+        },
+        {
+          "time": 88.5,
+          "chord": "C"
+        },
+        {
+          "time": 93,
+          "chord": "G"
+        },
+        {
+          "time": 95,
+          "chord": "Am"
+        },
+        {
+          "time": 96.5,
+          "chord": "F"
+        },
+        {
+          "time": 99.5,
+          "chord": "C"
+        },
+        {
+          "time": 101,
+          "chord": "G"
+        },
+        {
+          "time": 102.5,
+          "chord": "F"
+        },
+        {
+          "time": 106,
+          "chord": "C"
+        },
+        {
+          "time": 108,
+          "chord": "G"
+        },
+        {
+          "time": 109.5,
+          "chord": "Am"
+        },
+        {
+          "time": 111,
+          "chord": "F"
+        },
+        {
+          "time": 112.5,
+          "chord": "C"
+        },
+        {
+          "time": 114,
+          "chord": "G"
+        },
+        {
+          "time": 116,
+          "chord": "Am"
+        },
+        {
+          "time": 117.5,
+          "chord": "F"
+        },
+        {
+          "time": 121,
+          "chord": "C"
+        },
+        {
+          "time": 122.5,
+          "chord": "G"
+        },
+        {
+          "time": 124,
+          "chord": "Am"
+        },
+        {
+          "time": 125.5,
+          "chord": "F"
+        },
+        {
+          "time": 127,
+          "chord": "G"
+        },
+        {
+          "time": 131,
+          "chord": "C"
+        },
+        {
+          "time": 133,
+          "chord": "G"
+        },
+        {
+          "time": 134.5,
+          "chord": "Am"
+        },
+        {
+          "time": 136,
+          "chord": "F"
+        },
+        {
+          "time": 137.5,
+          "chord": "C"
+        },
+        {
+          "time": 139,
+          "chord": "G"
+        },
+        {
+          "time": 140.5,
+          "chord": "F"
+        },
+        {
+          "time": 144,
+          "chord": "C"
+        }
       ]
-    }
-  ]
-},
+    },
     {
       "id": "286e8a9b-aaaa-bbbb-cccc-def012345678",
       "title": "Simple Island Strum",
