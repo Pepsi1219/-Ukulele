@@ -7,15 +7,11 @@
       "bpm": 123,
       "lyrics": [
         {
-          "time": 0.09,
-          "section": "Intro"
-        },
-        {
-          "time": 15.7,
+          "time": 0.1,
           "section": "Verse 1"
         },
         {
-          "time": 15.7,
+          "time": 0.5,
           "line": [
             {
               "chord": "C",
@@ -24,7 +20,7 @@
           ]
         },
         {
-          "time": 19.57,
+          "time": 4.0,
           "line": [
             {
               "chord": "G",
@@ -33,7 +29,7 @@
           ]
         },
         {
-          "time": 23.5,
+          "time": 8.0,
           "line": [
             {
               "chord": "Am",
@@ -42,7 +38,7 @@
           ]
         },
         {
-          "time": 27.38,
+          "time": 12.0,
           "line": [
             {
               "chord": "F",
