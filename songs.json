@@ -4,78 +4,621 @@
       "id": "lenka-the-show",
       "title": "The Show - Lenka",
       "mp3": "songs/lenka-the-show.mp3",
-      "bpm": 100,
+      "bpm": 123,
       "lyrics": [
-        { "time": 0,   "section": "Verse 1" },
-        { "time": 0,   "line": [{ "chord": "C",  "lyric": "I'm just a little bit caught in the middle" }] },
-        { "time": 4,   "line": [{ "chord": "G",  "lyric": "Life is a maze and love is a riddle" }] },
-        { "time": 8,   "line": [{ "chord": "Am", "lyric": "I don't know where to go, can't do it alone" }] },
-        { "time": 12,  "line": [{ "chord": "F",  "lyric": "I've tried,              " }, { "chord": "C", "lyric": "and I don't know why..." }] },
-        { "time": 16,  "line": [{ "chord": "C",  "lyric": "Slow it down, " }, { "chord": "G", "lyric": "make it stop" }] },
-        { "time": 19,  "line": [{ "chord": "Am", "lyric": "Or else my heart is going to pop" }] },
-        { "time": 22,  "line": [{ "chord": "C",  "lyric": "'Cause it's too much, " }, { "chord": "G", "lyric": "yeah it's a lot" }] },
-        { "time": 25,  "line": [{ "chord": "Am", "lyric": "To be something " }, { "chord": "F", "lyric": "I'm not" }] },
-        { "time": 28,  "line": [{ "chord": "C",  "lyric": "I'm a fool " }, { "chord": "G", "lyric": "out of love" }] },
-        { "time": 31,  "line": [{ "chord": "Am", "lyric": "'Cause I just " }, { "chord": "F", "lyric": "can't get enough..." }] },
-
-        { "time": 35,  "section": "Chorus" },
-        { "time": 47,  "line": [{ "chord": "C",  "lyric": "I'm just a little bit caught in the middle" }] },
-        { "time": 51,  "line": [{ "chord": "G",  "lyric": "Life is a maze and love is a riddle" }] },
-        { "time": 55,  "line": [{ "chord": "Am", "lyric": "I don't know where to go, can't do it alone" }] },
-        { "time": 59,  "line": [{ "chord": "F",  "lyric": "I've tried,              " }, { "chord": "C", "lyric": "and I don't know why." }] },
-        { "time": 63,  "line": [{ "chord": "C",  "lyric": "I'm just a little girl " }, { "chord": "G", "lyric": "lost in the moment" }] },
-        { "time": 67,  "line": [{ "chord": "Am", "lyric": "I'm so scared " }, { "chord": "F", "lyric": "but I don't show it" }] },
-        { "time": 71,  "line": [{ "chord": "C",  "lyric": "I can't figure it out, " }, { "chord": "G", "lyric": "it's bringing me down" }] },
-        { "time": 75,  "line": [{ "chord": "Am", "lyric": "I know I've got " }, { "chord": "F", "lyric": "to let it go..." }] },
-        { "time": 79,  "line": [{ "chord": "G",  "lyric": "And just enjoy " }, { "chord": "C", "lyric": "the show" }] },
-
-        { "time": 84,  "section": "Verse 2" },
-        { "time": 86,  "line": [{ "chord": "C",  "lyric": "The sun is hot " }, { "chord": "G", "lyric": "in the sky" }] },
-        { "time": 90,  "line": [{ "chord": "Am", "lyric": "Just like a " }, { "chord": "F", "lyric": "giant spotlight" }] },
-        { "time": 94,  "line": [{ "chord": "C",  "lyric": "The people " }, { "chord": "G", "lyric": "follow the signs" }] },
-        { "time": 98,  "line": [{ "chord": "Am", "lyric": "And synchronise " }, { "chord": "F", "lyric": "in time" }] },
-        { "time": 102, "line": [{ "chord": "C",  "lyric": "It's a joke, " }, { "chord": "G", "lyric": "nobody knows" }] },
-        { "time": 106, "line": [{ "chord": "Am", "lyric": "They've got a ticket " }, { "chord": "F", "lyric": "to the show...." }] },
-
-        { "time": 111, "section": "Chorus" },
-        { "time": 123, "line": [{ "chord": "C",  "lyric": "I'm just a little bit caught in the middle" }] },
-        { "time": 127, "line": [{ "chord": "G",  "lyric": "Life is a maze and love is a riddle" }] },
-        { "time": 131, "line": [{ "chord": "Am", "lyric": "I don't know where to go, can't do it alone" }] },
-        { "time": 135, "line": [{ "chord": "F",  "lyric": "I've tried,              " }, { "chord": "C", "lyric": "and I don't know why." }] },
-        { "time": 139, "line": [{ "chord": "C",  "lyric": "I'm just a little girl " }, { "chord": "G", "lyric": "lost in the moment" }] },
-        { "time": 143, "line": [{ "chord": "Am", "lyric": "I'm so scared " }, { "chord": "F", "lyric": "but I don't show it" }] },
-        { "time": 147, "line": [{ "chord": "C",  "lyric": "I can't figure it out, " }, { "chord": "G", "lyric": "it's bringing me down" }] },
-        { "time": 151, "line": [{ "chord": "Am", "lyric": "I know I've got " }, { "chord": "F", "lyric": "to let it go..." }] },
-        { "time": 155, "line": [{ "chord": "G",  "lyric": "And just enjoy " }, { "chord": "C", "lyric": "the show" }] },
-
-        { "time": 160, "section": "Break" },
-        { "time": 162, "line": [{ "chord": "C",  "lyric": "Oh~" }] },
-        { "time": 166, "line": [{ "chord": "F",  "lyric": "And just enjoy " }, { "chord": "G", "lyric": "the show oh~" }] },
-
-        { "time": 172, "section": "Chorus" },
-        { "time": 184, "line": [{ "chord": "C",  "lyric": "I'm just a little bit caught in the middle" }] },
-        { "time": 188, "line": [{ "chord": "G",  "lyric": "Life is a maze and love is a riddle" }] },
-        { "time": 192, "line": [{ "chord": "Am", "lyric": "I don't know where to go, can't do it alone" }] },
-        { "time": 196, "line": [{ "chord": "F",  "lyric": "I've tried,              " }, { "chord": "C", "lyric": "and I don't know why." }] },
-        { "time": 200, "line": [{ "chord": "C",  "lyric": "I'm just a little girl " }, { "chord": "G", "lyric": "lost in the moment" }] },
-        { "time": 204, "line": [{ "chord": "Am", "lyric": "I'm so scared " }, { "chord": "F", "lyric": "but I don't show it" }] },
-        { "time": 208, "line": [{ "chord": "C",  "lyric": "I can't figure it out, " }, { "chord": "G", "lyric": "it's bringing me down" }] },
-        { "time": 212, "line": [{ "chord": "Am", "lyric": "I know I've got " }, { "chord": "F", "lyric": "to let it go..." }] },
-        { "time": 216, "line": [{ "chord": "G",  "lyric": "And just enjoy " }, { "chord": "C", "lyric": "the show" }] },
-
-        { "time": 221, "section": "Outro" },
-        { "time": 223, "line": [{ "chord": "C",  "lyric": "Da dum dee dum " }, { "chord": "G", "lyric": "da dum dee dum" }] },
-        { "time": 227, "line": [{ "chord": "Am", "lyric": "just enjoy " }, { "chord": "F", "lyric": "the show" }] },
-        { "time": 231, "line": [{ "chord": "C",  "lyric": "Da dum dee dum " }, { "chord": "G", "lyric": "da dum dee dum" }] },
-        { "time": 235, "line": [{ "chord": "Am", "lyric": "just enjoy " }, { "chord": "F", "lyric": "the show" }] },
-        { "time": 239, "line": [{ "chord": "C",  "lyric": "I want " }, { "chord": "G", "lyric": "my money back" }] },
-        { "time": 242, "line": [{ "chord": "Am", "lyric": "I want " }, { "chord": "F", "lyric": "my money back" }] },
-        { "time": 245, "line": [{ "chord": "C",  "lyric": "I want " }, { "chord": "G", "lyric": "my money back" }] },
-        { "time": 248, "line": [{ "chord": "Am", "lyric": "just enjoy " }, { "chord": "F", "lyric": "the show" }] },
-        { "time": 252, "line": [{ "chord": "C",  "lyric": "I want " }, { "chord": "G", "lyric": "my money back" }] },
-        { "time": 255, "line": [{ "chord": "Am", "lyric": "I want " }, { "chord": "F", "lyric": "my money back" }] },
-        { "time": 258, "line": [{ "chord": "C",  "lyric": "I want " }, { "chord": "G", "lyric": "my money back" }] },
-        { "time": 261, "line": [{ "chord": "Am", "lyric": "just enjoy " }, { "chord": "F", "lyric": "the show" }] }
+        {
+          "time": 0.09,
+          "section": "Intro"
+        },
+        {
+          "time": 15.7,
+          "section": "Verse 1"
+        },
+        {
+          "time": 15.7,
+          "line": [
+            {
+              "chord": "C",
+              "lyric": "I'm just a little bit caught in the middle"
+            }
+          ]
+        },
+        {
+          "time": 19.57,
+          "line": [
+            {
+              "chord": "G",
+              "lyric": "Life is a maze and love is a riddle"
+            }
+          ]
+        },
+        {
+          "time": 23.5,
+          "line": [
+            {
+              "chord": "Am",
+              "lyric": "I don't know where to go, can't do it alone"
+            }
+          ]
+        },
+        {
+          "time": 27.38,
+          "line": [
+            {
+              "chord": "F",
+              "lyric": "I've tried,                  "
+            },
+            {
+              "chord": "C",
+              "lyric": "and I don't know why..."
+            }
+          ]
+        },
+        {
+          "time": 31.3,
+          "line": [
+            {
+              "chord": "C",
+              "lyric": "Slow it down, "
+            },
+            {
+              "chord": "G",
+              "lyric": "make it stop"
+            }
+          ]
+        },
+        {
+          "time": 33.25,
+          "line": [
+            {
+              "chord": "Am",
+              "lyric": "Or else my heart is going to pop"
+            }
+          ]
+        },
+        {
+          "time": 35.2,
+          "line": [
+            {
+              "chord": "C",
+              "lyric": "'Cause it's too much, "
+            },
+            {
+              "chord": "G",
+              "lyric": "yeah it's a lot"
+            }
+          ]
+        },
+        {
+          "time": 37.15,
+          "line": [
+            {
+              "chord": "Am",
+              "lyric": "To be something "
+            },
+            {
+              "chord": "F",
+              "lyric": "I'm not"
+            }
+          ]
+        },
+        {
+          "time": 39.1,
+          "line": [
+            {
+              "chord": "C",
+              "lyric": "I'm a fool "
+            },
+            {
+              "chord": "G",
+              "lyric": "out of love"
+            }
+          ]
+        },
+        {
+          "time": 41.05,
+          "line": [
+            {
+              "chord": "Am",
+              "lyric": "'Cause I just "
+            },
+            {
+              "chord": "F",
+              "lyric": "can't get enough..."
+            }
+          ]
+        },
+        {
+          "time": 46.9,
+          "section": "Chorus"
+        },
+        {
+          "time": 46.9,
+          "line": [
+            {
+              "chord": "C",
+              "lyric": "I'm just a little bit caught in the middle"
+            }
+          ]
+        },
+        {
+          "time": 50.81,
+          "line": [
+            {
+              "chord": "G",
+              "lyric": "Life is a maze and love is a riddle"
+            }
+          ]
+        },
+        {
+          "time": 54.71,
+          "line": [
+            {
+              "chord": "Am",
+              "lyric": "I don't know where to go, can't do it alone"
+            }
+          ]
+        },
+        {
+          "time": 58.63,
+          "line": [
+            {
+              "chord": "F",
+              "lyric": "I've tried,                  "
+            },
+            {
+              "chord": "C",
+              "lyric": "and I don't know why."
+            }
+          ]
+        },
+        {
+          "time": 62.53,
+          "line": [
+            {
+              "chord": "C",
+              "lyric": "I'm just a little girl "
+            },
+            {
+              "chord": "G",
+              "lyric": "lost in the moment"
+            }
+          ]
+        },
+        {
+          "time": 66.43,
+          "line": [
+            {
+              "chord": "Am",
+              "lyric": "I'm so scared "
+            },
+            {
+              "chord": "F",
+              "lyric": "but I don't show it"
+            }
+          ]
+        },
+        {
+          "time": 70.33,
+          "line": [
+            {
+              "chord": "C",
+              "lyric": "I can't figure it out, "
+            },
+            {
+              "chord": "G",
+              "lyric": "it's bringing me down"
+            }
+          ]
+        },
+        {
+          "time": 74.23,
+          "line": [
+            {
+              "chord": "Am",
+              "lyric": "I know I've got "
+            },
+            {
+              "chord": "F",
+              "lyric": "to let it go..."
+            }
+          ]
+        },
+        {
+          "time": 78.14,
+          "line": [
+            {
+              "chord": "G",
+              "lyric": "And just enjoy "
+            },
+            {
+              "chord": "C",
+              "lyric": "the show"
+            }
+          ]
+        },
+        {
+          "time": 85.94,
+          "section": "Verse 2"
+        },
+        {
+          "time": 85.94,
+          "line": [
+            {
+              "chord": "C",
+              "lyric": "The sun is hot "
+            },
+            {
+              "chord": "G",
+              "lyric": "in the sky"
+            }
+          ]
+        },
+        {
+          "time": 87.7,
+          "line": [
+            {
+              "chord": "Am",
+              "lyric": "Just like a "
+            },
+            {
+              "chord": "F",
+              "lyric": "giant spotlight"
+            }
+          ]
+        },
+        {
+          "time": 89.77,
+          "line": [
+            {
+              "chord": "C",
+              "lyric": "The people "
+            },
+            {
+              "chord": "G",
+              "lyric": "follow the signs"
+            }
+          ]
+        },
+        {
+          "time": 91.79,
+          "line": [
+            {
+              "chord": "Am",
+              "lyric": "And synchronise "
+            },
+            {
+              "chord": "F",
+              "lyric": "in time"
+            }
+          ]
+        },
+        {
+          "time": 93.74,
+          "line": [
+            {
+              "chord": "C",
+              "lyric": "It's a joke, "
+            },
+            {
+              "chord": "G",
+              "lyric": "nobody knows"
+            }
+          ]
+        },
+        {
+          "time": 95.69,
+          "line": [
+            {
+              "chord": "Am",
+              "lyric": "They've got a ticket "
+            },
+            {
+              "chord": "F",
+              "lyric": "to the show...."
+            }
+          ]
+        },
+        {
+          "time": 123.02,
+          "section": "Chorus"
+        },
+        {
+          "time": 123.02,
+          "line": [
+            {
+              "chord": "C",
+              "lyric": "I'm just a little bit caught in the middle"
+            }
+          ]
+        },
+        {
+          "time": 126.92,
+          "line": [
+            {
+              "chord": "G",
+              "lyric": "Life is a maze and love is a riddle"
+            }
+          ]
+        },
+        {
+          "time": 130.82,
+          "line": [
+            {
+              "chord": "Am",
+              "lyric": "I don't know where to go, can't do it alone"
+            }
+          ]
+        },
+        {
+          "time": 134.72,
+          "line": [
+            {
+              "chord": "F",
+              "lyric": "I've tried,                  "
+            },
+            {
+              "chord": "C",
+              "lyric": "and I don't know why."
+            }
+          ]
+        },
+        {
+          "time": 138.62,
+          "line": [
+            {
+              "chord": "C",
+              "lyric": "I'm just a little girl "
+            },
+            {
+              "chord": "G",
+              "lyric": "lost in the moment"
+            }
+          ]
+        },
+        {
+          "time": 142.52,
+          "line": [
+            {
+              "chord": "Am",
+              "lyric": "I'm so scared "
+            },
+            {
+              "chord": "F",
+              "lyric": "but I don't show it"
+            }
+          ]
+        },
+        {
+          "time": 146.43,
+          "line": [
+            {
+              "chord": "C",
+              "lyric": "I can't figure it out, "
+            },
+            {
+              "chord": "G",
+              "lyric": "it's bringing me down"
+            }
+          ]
+        },
+        {
+          "time": 150.33,
+          "line": [
+            {
+              "chord": "Am",
+              "lyric": "I know I've got "
+            },
+            {
+              "chord": "F",
+              "lyric": "to let it go..."
+            }
+          ]
+        },
+        {
+          "time": 154.23,
+          "line": [
+            {
+              "chord": "G",
+              "lyric": "And just enjoy "
+            },
+            {
+              "chord": "C",
+              "lyric": "the show"
+            }
+          ]
+        },
+        {
+          "time": 160.08,
+          "section": "Break"
+        },
+        {
+          "time": 160.08,
+          "line": [
+            {
+              "chord": "C",
+              "lyric": "Oh~"
+            }
+          ]
+        },
+        {
+          "time": 164,
+          "line": [
+            {
+              "chord": "F",
+              "lyric": "And just enjoy "
+            },
+            {
+              "chord": "G",
+              "lyric": "the show oh~"
+            }
+          ]
+        },
+        {
+          "time": 185.46,
+          "section": "Chorus"
+        },
+        {
+          "time": 185.46,
+          "line": [
+            {
+              "chord": "C",
+              "lyric": "I'm just a little bit caught in the middle"
+            }
+          ]
+        },
+        {
+          "time": 189.36,
+          "line": [
+            {
+              "chord": "G",
+              "lyric": "Life is a maze and love is a riddle"
+            }
+          ]
+        },
+        {
+          "time": 193.26,
+          "line": [
+            {
+              "chord": "Am",
+              "lyric": "I don't know where to go, can't do it alone"
+            }
+          ]
+        },
+        {
+          "time": 197.16,
+          "line": [
+            {
+              "chord": "F",
+              "lyric": "I've tried,                  "
+            },
+            {
+              "chord": "C",
+              "lyric": "and I don't know why."
+            }
+          ]
+        },
+        {
+          "time": 201.06,
+          "line": [
+            {
+              "chord": "C",
+              "lyric": "I'm just a little girl "
+            },
+            {
+              "chord": "G",
+              "lyric": "lost in the moment"
+            }
+          ]
+        },
+        {
+          "time": 204.96,
+          "line": [
+            {
+              "chord": "Am",
+              "lyric": "I'm so scared "
+            },
+            {
+              "chord": "F",
+              "lyric": "but I don't show it"
+            }
+          ]
+        },
+        {
+          "time": 208.84,
+          "line": [
+            {
+              "chord": "C",
+              "lyric": "I can't figure it out, "
+            },
+            {
+              "chord": "G",
+              "lyric": "it's bringing me down"
+            }
+          ]
+        },
+        {
+          "time": 212.76,
+          "line": [
+            {
+              "chord": "Am",
+              "lyric": "I know I've got "
+            },
+            {
+              "chord": "F",
+              "lyric": "to let it go..."
+            }
+          ]
+        },
+        {
+          "time": 216.67,
+          "line": [
+            {
+              "chord": "G",
+              "lyric": "And just enjoy "
+            },
+            {
+              "chord": "C",
+              "lyric": "the show"
+            }
+          ]
+        },
+        {
+          "time": 222.52,
+          "section": "Outro"
+        },
+        {
+          "time": 222.52,
+          "line": [
+            {
+              "chord": "C",
+              "lyric": "Da dum dee dum "
+            },
+            {
+              "chord": "G",
+              "lyric": "da dum dee dum"
+            }
+          ]
+        },
+        {
+          "time": 224.51,
+          "line": [
+            {
+              "chord": "Am",
+              "lyric": "just enjoy "
+            },
+            {
+              "chord": "F",
+              "lyric": "the show"
+            }
+          ]
+        },
+        {
+          "time": 226.46,
+          "line": [
+            {
+              "chord": "C",
+              "lyric": "Da dum dee dum "
+            },
+            {
+              "chord": "G",
+              "lyric": "da dum dee dum"
+            }
+          ]
+        },
+        {
+          "time": 228.41,
+          "line": [
+            {
+              "chord": "Am",
+              "lyric": "just enjoy "
+            },
+            {
+              "chord": "F",
+              "lyric": "the show"
+            }
+          ]
+        }
       ]
     }
   ]
