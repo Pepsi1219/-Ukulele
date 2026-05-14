@@ -1,0 +1,53 @@
+[
+  { "time": 0.0,  "section": "Intro" },
+  { "time": 1.0, "line": [{ "chord": "C " }, { "chord": "Am " }, { "chord": "Dm " }, { "chord": "G" }] },
+  
+  { "time": 5.5, "section": "Verse 1" },
+
+  { "time": 10.5, "line": [{ "lyric": "Can I call you " }, { "chord": "G", "lyric": "baby? Can you be my " }, { "chord": "Am", "lyric": "friend?" }] },
+  { "time": 16.0, "line": [{ "lyric": "Can you be my " }, { "chord": "Dm", "lyric": "lover up until the very " }, { "chord": "G", "lyric": "end?" }] },
+  { "time": 21.6, "line": [{ "chord": "C",  "lyric": "Let me show you " }, { "chord": "C", "lyric": "love, oh, no " }, { "chord": "Am", "lyric": "pretend" }] },
+  { "time": 26.0, "line": [{ "lyric": "Stick by my " }, { "chord": "Dm", "lyric": "side even when the world is caving " }, { "chord": "G", "lyric": "in, yeah" }] },
+
+  { "time": 30.0,  "section": "Pre-Chorus" },
+  { "time": 31.5, "line": [{ "lyric": "Oh, oh, oh, " }, { "chord": "C", "lyric": "don't, don't you " }, { "chord": "Am", "lyric": "worry" }] },
+  { "time": 37.0, "line": [{ "lyric": "I'll be " }, { "chord": "Dm", "lyric": "there whenever you " }, { "chord": "G", "lyric": "want me" }] },
+
+  { "time": 42.0, "section": "Chorus" },
+  { "time": 42.0, "line": [{ "lyric": "I need some" }, { "chord": "C", "lyric": "body who can love me at my " }, { "chord": "Am", "lyric": "worst" }] },
+  { "time": 47.1, "line": [{ "lyric": "Know I'm not " }, { "chord": "Dm", "lyric": "perfect, but I hope you see my " }, { "chord": "G", "lyric": "worth" }] },
+  { "time": 52.0, "line": [{ "lyric": "'Cause it's only " }, { "chord": "C", "lyric": "you, nobody new, I put you " }, { "chord": "Am", "lyric": "first" }] },
+  { "time": 58.0, "line": [{ "lyric": "'And for " }, { "chord": "Dm", "lyric": "you, girl, I swear I'd do the wors" }, { "chord": "G", "lyric": "t" }] },
+
+  { "time": 63.5, "section": "Post-Chorus" },
+  { "time": 63.7, "line": [{ "chord": "C", "lyric": "Ooh, ooh-oo"}, { "chord": "Am", "lyric": "h" }] },
+  { "time": 67.7, "line": [{ "lyric": "Ooh-ooh-" }, { "chord": "Dm", "lyric": "ooh, ooh-ooh-ooh-oo" }, { "chord": "G", "lyric": "h"}] },
+
+  { "time": 72.0, "section": "Verse 2" },
+  { "time": 73.0, "line": [{ "lyric": "If you stay " }, { "chord": "C", "lyric": "forever, let me hold your " }, { "chord": "Am", "lyric": "hand" }] },
+  { "time": 78.7, "line": [{ "lyric": "I can fill those " }, { "chord": "Dm", "lyric": "places in your heart no one else " }, { "chord": "C", "lyric": "can" }] },
+  { "time": 83.7, "line": [{ "lyric": "Let me show you " }, { "chord": "C ", "lyric": "love, oh, no " }, { "chord": "Am", "lyric": "pretend, yeah" }] },
+  { "time": 89.0, "line": [{ "lyric": "I'll be right " }, { "chord": "Dm", "lyric": "here, baby, you know it's sink or" }, { "chord": "G", "lyric": " swim" }] },
+
+  { "time": 92.0,  "section": "Pre-Chorus" },
+  { "time": 94.0, "line": [{ "lyric": "Oh, oh, oh, " }, { "chord": "C", "lyric": "don't, don't you " }, { "chord": "Am", "lyric": "worry" }] },
+  { "time": 99.5, "line": [{ "lyric": "I'll be " }, { "chord": "Dm", "lyric": "there whenever you " }, { "chord": "G", "lyric": "want me" }] },
+
+  { "time": 102.0,"section": "Chorus" },
+  { "time": 104.5, "line": [{ "lyric": "I need some" }, { "chord": "C", "lyric": "body who can love me at my " }, { "chord": "Am", "lyric": "worst" }] },
+  { "time": 110.0, "line": [{ "lyric": "Know I'm not " }, { "chord": "Dm", "lyric": "perfect, but I hope you see my " }, { "chord": "G", "lyric": "worth" }] },
+  { "time": 115.0, "line": [{ "lyric": "'Cause it's only " }, { "chord": "C", "lyric": "you, nobody new, I put you " }, { "chord": "Am", "lyric": "first" }] },
+  { "time": 121.0, "line": [{ "lyric": "'And for " }, { "chord": "Dm", "lyric": "you, girl, I swear I'd do the wors" }, { "chord": "G", "lyric": "t" }] },
+
+  { "time": 122.0,"section": "Post-Chorus" },
+  { "time": 126.4,"line": [{ "chord": "C", "lyric": "Ooh," }, {"lyric": "ooh-ooh-" }, { "chord": "Am", "lyric": "ooh-ooh-ooh, ooh- " }] },
+  { "time": 132.0,"line": [{ "chord": "Dm", "lyric": "ooh-ooh-ooh Ooh-ooh-ooh, ooh," }] },
+  { "time": 136.0,"line": [{ "chord": "G", "lyric": "ooh-ooh" },{ "lyric": " Ooh-ooh-" }, { "chord": "C", "lyric": "ooh, ooh-ooh-ooh-ooh-oo" }, { "chord": "Am", "lyric": "h" }] },
+  { "time": 142.0,"line": [{ "lyric": "Ooh-ooh-" }, { "chord": "Dm", "lyric": "ooh, ooh-ooh-ooh-ooh-o" }, { "chord": "G", "lyric": "oh" }] },
+
+  { "time": 145.4,"section": "Outro" },
+  { "time": 147.0, "line": [{ "lyric": "I need some" }, { "chord": "C", "lyric": "body who can love me at my " }, { "chord": "Am", "lyric": "worst" }] },
+  { "time": 152.0, "line": [{ "lyric": "Know I'm not " }, { "chord": "Dm", "lyric": "perfect, but I hope you see my " }, { "chord": "G", "lyric": "worth" }] },
+  { "time": 157.0, "line": [{ "lyric": "'Cause it's only " }, { "chord": "C", "lyric": "you, nobody new, I put you " }, { "chord": "Am", "lyric": "first" }] },
+  { "time": 163.0, "line": [{ "lyric": "'And for " }, { "chord": "Dm", "lyric": "you, girl, I swear I'd do the" }, { "chord": "G", "lyric": "worst" }] }
+]

@@ -1,49 +1,41 @@
 <!DOCTYPE html>
-<html lang="th">
+<html lang="th" data-theme="dark">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
   <title>Ukulele Practice App</title>
 
-  <!-- Google Fonts: Inter -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link
-    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
-    rel="stylesheet"
-  />
-
-  <!-- Font Awesome 6 -->
-  <link
-    rel="stylesheet"
-    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
-  />
-
-  <!-- CSS หลัก -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 
 <body>
   <div class="app-shell">
+
     <!-- Header -->
     <header class="app-header">
       <div>
         <p class="eyebrow">Ukulele Practice Studio</p>
-        <h1>
-          <i class="fa-solid fa-guitar"></i>
-          ซ้อมอูคูเลเล่
-        </h1>
+        <h1><i class="fa-solid fa-guitar"></i> ซ้อมอูคูเลเล่</h1>
       </div>
 
-      <button id="openAdminBtn" class="icon-btn secondary" type="button">
-        <i class="fa-solid fa-gear"></i>
-        Admin
-      </button>
+      <div class="header-actions">
+        <button id="themeToggleBtn" class="icon-btn secondary" type="button" aria-label="Toggle theme">
+          <i class="fa-solid fa-moon" id="themeIcon"></i>
+        </button>
+        <button id="openAdminBtn" class="icon-btn secondary" type="button">
+          <i class="fa-solid fa-gear"></i>
+          Admin
+        </button>
+      </div>
     </header>
 
     <!-- Main Layout -->
     <main class="main-grid">
+
       <!-- Left Panel: Player -->
       <section class="panel player-panel">
         <div class="section-title">
@@ -51,13 +43,11 @@
           <span id="loadStatus" class="status-pill">กำลังโหลดข้อมูล...</span>
         </div>
 
-        <!-- เลือกเพลง -->
         <label class="field-label" for="songSelect">เลือกเพลง</label>
         <select id="songSelect" class="select-input">
           <option value="">กำลังโหลด...</option>
         </select>
 
-        <!-- เพลงปัจจุบัน -->
         <div class="now-playing">
           <div class="album-art">
             <i class="fa-solid fa-music"></i>
@@ -68,67 +58,51 @@
           </div>
         </div>
 
-        <!-- Controls -->
         <div class="controls">
           <button id="playPauseBtn" class="control-btn primary" type="button" disabled>
             <i class="fa-solid fa-play"></i>
           </button>
-
           <button id="stopBtn" class="control-btn" type="button" disabled>
             <i class="fa-solid fa-stop"></i>
           </button>
         </div>
 
-        <!-- Timeline -->
         <div class="timeline-wrap">
           <div class="time-row">
             <span id="currentTime">00:00</span>
             <span id="durationTime">00:00</span>
           </div>
-
           <div id="progressTrack" class="progress-track" role="slider" tabindex="0">
             <div id="progressFill" class="progress-fill"></div>
             <div id="progressThumb" class="progress-thumb"></div>
           </div>
         </div>
 
-        <!-- Speed -->
         <div class="speed-section">
           <label class="field-label">Speed Control</label>
           <div id="speedButtons" class="speed-buttons">
-            <button class="chip" data-speed="0.5" type="button">0.5x</button>
+            <button class="chip" data-speed="0.5"  type="button">0.5x</button>
             <button class="chip" data-speed="0.75" type="button">0.75x</button>
-            <button class="chip active" data-speed="1" type="button">1.0x</button>
+            <button class="chip active" data-speed="1"  type="button">1.0x</button>
             <button class="chip" data-speed="1.25" type="button">1.25x</button>
-            <button class="chip" data-speed="1.5" type="button">1.5x</button>
+            <button class="chip" data-speed="1.5"  type="button">1.5x</button>
           </div>
-          <p class="hint">
-            ใช้ HTML5 Audio ผ่าน Howler และตั้งค่า preserve pitch เพื่อให้ปรับความเร็วโดยเสียงไม่เพี้ยนใน browser ที่รองรับ
-          </p>
+          <p class="hint">Howler.js + preserve pitch — ปรับความเร็วโดยเสียงไม่เพี้ยนใน browser ที่รองรับ</p>
         </div>
 
-        <!-- Metronome -->
         <div class="metronome-card">
           <div class="metronome-head">
             <div>
               <p class="muted">Metronome</p>
               <h3><span id="bpmValue">100</span> BPM</h3>
             </div>
-
             <button id="metroToggleBtn" class="icon-btn" type="button">
               <i class="fa-solid fa-play"></i>
               เปิด
             </button>
           </div>
 
-          <input
-            id="bpmSlider"
-            class="range-input"
-            type="range"
-            min="30"
-            max="200"
-            value="100"
-          />
+          <input id="bpmSlider" class="range-input" type="range" min="30" max="200" value="100" />
 
           <div class="metro-visual-wrap">
             <div id="metroVisual" class="metro-visual"></div>
@@ -137,7 +111,7 @@
         </div>
       </section>
 
-      <!-- Center Panel: Chords -->
+      <!-- Center Panel: Chord + Character -->
       <section class="panel chord-panel">
         <div class="section-title">
           <h2>คอร์ดอูคูเลเล่</h2>
@@ -145,12 +119,102 @@
         </div>
 
         <div class="chord-stage">
+          <!-- Chord badge -->
           <div id="chordDisplay" class="chord-display">
-            <span class="empty-state">เลือกเพลงแล้วกด Play เพื่อเริ่มซ้อม</span>
+            <span class="empty-state">เลือกเพลงแล้วกด Play</span>
+          </div>
+
+          <!-- Dancing character -->
+          <div id="danceCharWrap" class="dance-char-wrap">
+            <svg class="dancer-svg" viewBox="0 0 200 265" xmlns="http://www.w3.org/2000/svg">
+
+              <!-- Shadow -->
+              <ellipse class="char-shadow" cx="100" cy="257" rx="48" ry="9"/>
+
+              <!-- Left leg -->
+              <g class="dancer-leg dancer-leg-left" style="transform-box:fill-box;transform-origin:top center">
+                <rect class="char-clothes" x="72" y="182" width="24" height="62" rx="12"/>
+                <ellipse class="char-shoe" cx="84" cy="244" rx="27" ry="12"/>
+              </g>
+
+              <!-- Right leg -->
+              <g class="dancer-leg dancer-leg-right" style="transform-box:fill-box;transform-origin:top center">
+                <rect class="char-clothes" x="104" y="182" width="24" height="62" rx="12"/>
+                <ellipse class="char-shoe" cx="116" cy="244" rx="27" ry="12"/>
+              </g>
+
+              <!-- Body group (bounces together) -->
+              <g class="dancer-body" style="transform-box:fill-box;transform-origin:bottom center">
+
+                <!-- Torso -->
+                <rect class="char-clothes" x="60" y="95" width="80" height="96" rx="28"/>
+
+                <!-- Left arm -->
+                <g class="dancer-arm dancer-arm-left" style="transform-box:fill-box;transform-origin:right center">
+                  <rect class="char-clothes" x="10" y="108" width="54" height="22" rx="11"/>
+                  <circle class="char-skin" cx="8" cy="119" r="13"/>
+                </g>
+
+                <!-- Right arm + ukulele -->
+                <g class="dancer-arm dancer-arm-right" style="transform-box:fill-box;transform-origin:left center">
+                  <rect class="char-clothes" x="136" y="108" width="54" height="22" rx="11"/>
+                  <!-- Ukulele body (figure-8) -->
+                  <ellipse class="char-uke-body" cx="198" cy="128" rx="12" ry="13"/>
+                  <ellipse class="char-uke-body" cx="198" cy="148" rx="14" ry="15"/>
+                  <!-- Uke neck -->
+                  <rect class="char-uke-neck" x="195" y="105" width="6" height="25" rx="3"/>
+                  <!-- Uke tuning pegs -->
+                  <rect class="char-uke-neck" x="201" y="108" width="8" height="3" rx="1.5"/>
+                  <rect class="char-uke-neck" x="201" y="114" width="8" height="3" rx="1.5"/>
+                  <!-- Uke strings -->
+                  <line class="char-uke-string" x1="194" y1="118" x2="194" y2="157"/>
+                  <line class="char-uke-string" x1="197" y1="118" x2="197" y2="157"/>
+                  <line class="char-uke-string" x1="200" y1="118" x2="200" y2="157"/>
+                  <line class="char-uke-string" x1="203" y1="118" x2="203" y2="157"/>
+                  <!-- Sound hole -->
+                  <circle cx="198" cy="148" r="5" class="char-uke-hole"/>
+                </g>
+
+                <!-- Head -->
+                <g class="dancer-head" style="transform-box:fill-box;transform-origin:bottom center">
+                  <circle class="char-skin" cx="100" cy="60" r="44"/>
+
+                  <!-- Hair spikes -->
+                  <path class="char-hair" d="M 70 40 Q 77 15 84 40 Z"/>
+                  <path class="char-hair" d="M 88 33 Q 100 6 112 33 Z"/>
+                  <path class="char-hair" d="M 116 40 Q 123 15 130 40 Z"/>
+
+                  <!-- Left eye -->
+                  <g class="dancer-eye-l" style="transform-box:fill-box;transform-origin:center">
+                    <circle cx="84" cy="58" r="9" fill="white"/>
+                    <circle class="char-pupil" cx="86" cy="60" r="5.5"/>
+                    <circle cx="88" cy="56" r="2.5" fill="white"/>
+                  </g>
+                  <!-- Right eye -->
+                  <g class="dancer-eye-r" style="transform-box:fill-box;transform-origin:center">
+                    <circle cx="116" cy="58" r="9" fill="white"/>
+                    <circle class="char-pupil" cx="118" cy="60" r="5.5"/>
+                    <circle cx="120" cy="56" r="2.5" fill="white"/>
+                  </g>
+
+                  <!-- Smile -->
+                  <path class="char-mouth" d="M 85 74 Q 100 91 115 74" stroke-width="3.5" stroke-linecap="round" fill="none"/>
+
+                  <!-- Blush -->
+                  <ellipse cx="72" cy="70" rx="10" ry="7" fill="#f87171" opacity="0.4"/>
+                  <ellipse cx="128" cy="70" rx="10" ry="7" fill="#f87171" opacity="0.4"/>
+                </g>
+
+              </g>
+
+              <!-- Floating music notes -->
+              <text class="dancer-note note-1" x="148" y="52" font-size="22">♪</text>
+              <text class="dancer-note note-2" x="20" y="65" font-size="16">♫</text>
+              <text class="dancer-note note-3" x="156" y="90" font-size="14">♩</text>
+
+            </svg>
           </div>
         </div>
-
-        <div id="upcomingChords" class="upcoming-chords"></div>
       </section>
 
       <!-- Right Panel: Lyrics -->
@@ -159,11 +223,11 @@
           <h2>เนื้อเพลง</h2>
           <span class="status-pill">Auto Scroll</span>
         </div>
-
         <div id="lyricsContainer" class="lyrics-container">
           <p class="empty-state">ยังไม่มีเนื้อเพลง</p>
         </div>
       </section>
+
     </main>
   </div>
 
@@ -175,41 +239,34 @@
           <p class="eyebrow">Admin Panel</p>
           <h2 id="adminTitle">จัดการลิสต์เพลง</h2>
         </div>
-
         <button id="closeAdminBtn" class="icon-btn secondary" type="button" aria-label="ปิดหน้าต่าง Admin">
           <i class="fa-solid fa-xmark"></i>
         </button>
       </div>
 
       <div class="admin-layout">
-        <!-- รายการเพลง -->
         <aside class="admin-song-list">
           <button id="newSongBtn" class="full-btn primary" type="button">
             <i class="fa-solid fa-plus"></i>
             เพิ่มเพลงใหม่
           </button>
-
           <div id="adminSongList" class="admin-list"></div>
         </aside>
 
-        <!-- ฟอร์มแก้ไข -->
         <section class="admin-editor">
           <div class="form-grid">
             <div>
               <label class="field-label" for="adminId">ID</label>
               <input id="adminId" class="text-input" type="text" readonly />
             </div>
-
             <div>
               <label class="field-label" for="adminTitleInput">ชื่อเพลง</label>
               <input id="adminTitleInput" class="text-input" type="text" placeholder="ชื่อเพลง" />
             </div>
-
             <div>
               <label class="field-label" for="adminMp3">MP3 Path</label>
               <input id="adminMp3" class="text-input" type="text" placeholder="songs/song-name.mp3" />
             </div>
-
             <div>
               <label class="field-label" for="adminBpm">BPM เริ่มต้น</label>
               <input id="adminBpm" class="text-input" type="number" min="30" max="200" value="100" />
@@ -217,37 +274,24 @@
           </div>
 
           <label class="field-label" for="adminLyrics">Lyrics JSON Array</label>
-          <textarea
-            id="adminLyrics"
-            class="json-textarea"
-            spellcheck="false"
-            placeholder='[{"time":0,"text":"เนื้อเพลงบรรทัดแรก"}]'
-          ></textarea>
+          <textarea id="adminLyrics" class="json-textarea" spellcheck="false"
+            placeholder='[{"time":0,"text":"เนื้อเพลงบรรทัดแรก"}]'></textarea>
 
           <label class="field-label" for="adminChords">Chords JSON Array</label>
-          <textarea
-            id="adminChords"
-            class="json-textarea"
-            spellcheck="false"
-            placeholder='[{"time":0,"chord":"C"}]'
-          ></textarea>
+          <textarea id="adminChords" class="json-textarea" spellcheck="false"
+            placeholder='[{"time":0,"chord":"C"}]'></textarea>
 
           <div id="adminError" class="admin-error" hidden></div>
 
           <div class="admin-actions">
             <button id="saveSongBtn" class="full-btn primary" type="button">
-              <i class="fa-solid fa-floppy-disk"></i>
-              บันทึกเพลง
+              <i class="fa-solid fa-floppy-disk"></i> บันทึกเพลง
             </button>
-
             <button id="deleteSongBtn" class="full-btn danger" type="button">
-              <i class="fa-solid fa-trash"></i>
-              ลบเพลง
+              <i class="fa-solid fa-trash"></i> ลบเพลง
             </button>
-
             <button id="exportJsonBtn" class="full-btn success" type="button">
-              <i class="fa-solid fa-file-export"></i>
-              Export songs.json
+              <i class="fa-solid fa-file-export"></i> Export songs.json
             </button>
           </div>
         </section>
@@ -255,11 +299,8 @@
     </div>
   </div>
 
-  <!-- Libraries -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/howler/2.2.4/howler.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
-
-  <!-- JS หลัก -->
   <script src="script.js"></script>
 </body>
 </html>

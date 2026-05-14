@@ -1,0 +1,17 @@
+{
+  "_comment": "Song index. Each entry points to Lyrics/<id>.json and Chords/<id>.json. To add a new song: add an entry here, then create the matching files in Lyrics/ and Chords/.",
+  "songs": [
+    {
+      "id": "lenka-the-show",
+      "title": "The Show - Lenka",
+      "mp3": "songs/lenka-the-show.mp3",
+      "bpm": 123
+    },
+    {
+      "id": "pink-sweats-at-my-worst",
+      "title": "At My Worst - Pink Sweat$",
+      "mp3": "songs/Pink Sweats-At My Worst.mp3",
+      "bpm": 67
+    }
+  ]
+}

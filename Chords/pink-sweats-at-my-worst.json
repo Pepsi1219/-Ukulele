@@ -1,0 +1,50 @@
+[
+  { "time": 10.1,  "chord": "Am" },
+  { "time": 13.5,  "chord": "F"  },
+  { "time": 17.6,  "chord": "C"  },
+  { "time": 20.5,  "chord": "G"  },
+  { "time": 24.1,  "chord": "Am" },
+  { "time": 28.0,  "chord": "F"  },
+
+  { "time": 34.5,  "chord": "Am" },
+  { "time": 37.1,  "chord": "F"  },
+  { "time": 39.0,  "chord": "C"  },
+  { "time": 41.6,  "chord": "G"  },
+  { "time": 42.5,  "chord": "Am" },
+
+  { "time": 43.7,  "chord": "Am" },
+  { "time": 47.5,  "chord": "F"  },
+  { "time": 51.5,  "chord": "C"  },
+  { "time": 55.4,  "chord": "G"  },
+  { "time": 59.3,  "chord": "Am" },
+  { "time": 63.2,  "chord": "F"  },
+
+  { "time": 67.8,  "chord": "Am" },
+  { "time": 71.7,  "chord": "F"  },
+  { "time": 75.7,  "chord": "C"  },
+  { "time": 79.6,  "chord": "G"  },
+  { "time": 83.5,  "chord": "Am" },
+
+  { "time": 87.5,  "chord": "Am" },
+  { "time": 90.9,  "chord": "F"  },
+  { "time": 93.0,  "chord": "C"  },
+  { "time": 94.8,  "chord": "G"  },
+  { "time": 96.0,  "chord": "Am" },
+
+  { "time": 105.7, "chord": "Am" },
+  { "time": 109.5, "chord": "F"  },
+  { "time": 113.4, "chord": "C"  },
+  { "time": 117.4, "chord": "G"  },
+  { "time": 121.4, "chord": "Am" },
+
+  { "time": 127.5, "chord": "Am" },
+  { "time": 131.4, "chord": "F"  },
+  { "time": 135.3, "chord": "C"  },
+  { "time": 139.2, "chord": "G"  },
+  { "time": 143.1, "chord": "Am" },
+
+  { "time": 151.8, "chord": "Am" },
+  { "time": 155.7, "chord": "F"  },
+  { "time": 159.6, "chord": "C"  },
+  { "time": 163.5, "chord": "G"  }
+]
