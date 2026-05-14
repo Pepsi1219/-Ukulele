@@ -2,7 +2,7 @@
 <html lang="th" data-theme="dark">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>Ukulele Practice App</title>
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -23,6 +23,12 @@
       </div>
 
       <div class="header-actions">
+        <button id="swapPanelsBtn" class="icon-btn secondary" type="button" aria-label="สลับตำแหน่ง Chord ↔ Lyrics" title="สลับ Chord ↔ Lyrics" aria-pressed="false">
+          <i class="fa-solid fa-arrow-right-arrow-left"></i>
+        </button>
+        <button id="dancerToggleBtn" class="icon-btn secondary" type="button" aria-label="แสดง/ซ่อนตัวการ์ตูน" title="แสดง/ซ่อนตัวการ์ตูน" aria-pressed="true">
+          <i class="fa-solid fa-person-rays" id="dancerIcon"></i>
+        </button>
         <button id="themeToggleBtn" class="icon-btn secondary" type="button" aria-label="Toggle theme">
           <i class="fa-solid fa-moon" id="themeIcon"></i>
         </button>
@@ -235,7 +241,10 @@
       <section class="panel lyrics-panel">
         <div class="section-title">
           <h2>เนื้อเพลง</h2>
-          <span class="status-pill">Auto Scroll</span>
+          <button id="autoScrollToggle" class="status-pill toggle-pill is-on" type="button" aria-pressed="true" title="เปิด/ปิด Auto Scroll">
+            <i class="fa-solid fa-arrows-up-down"></i>
+            <span>Auto Scroll</span>
+          </button>
         </div>
         <div id="lyricsContainer" class="lyrics-container">
           <p class="empty-state">ยังไม่มีเนื้อเพลง</p>

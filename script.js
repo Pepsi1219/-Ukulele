@@ -38,7 +38,10 @@ const state = {
   metroSynth: null,
   userScrolling: false,
   userScrollTimer: null,
-  audioMode: null   // "song" | "vocal" | null — must be set before audio loads
+  audioMode: null,        // "song" | "vocal" | null — must be set before audio loads
+  autoScrollEnabled: true,// master toggle for lyric auto-scroll
+  dancerEnabled: true,    // master toggle for dancing character visibility
+  panelsSwapped: false    // false: Chord centre, Lyrics right | true: Lyrics centre, Chord right
 };
 
 /* =========================
@@ -74,8 +77,16 @@ const dom = {
   themeToggleBtn: document.getElementById("themeToggleBtn"),
   themeIcon:      document.getElementById("themeIcon"),
 
-  // Dance character
-  danceCharWrap: document.getElementById("danceCharWrap")
+  // Auto-scroll toggle
+  autoScrollToggle: document.getElementById("autoScrollToggle"),
+
+  // Dance character + its toggle
+  danceCharWrap:   document.getElementById("danceCharWrap"),
+  dancerToggleBtn: document.getElementById("dancerToggleBtn"),
+
+  // Layout swap (Chord ↔ Lyrics)
+  swapPanelsBtn:   document.getElementById("swapPanelsBtn"),
+  mainGrid:        document.querySelector(".main-grid")
 };
 
 /* =========================
@@ -154,13 +165,68 @@ function findCurrentTimedIndex(items, currentSeconds) {
 ========================= */
 function applyTheme(theme) {
   document.documentElement.setAttribute("data-theme", theme);
-  dom.themeIcon.className = `fa-solid ${theme === "dark" ? "fa-moon" : "fa-sun"}`;
+  if (dom.themeIcon) {
+    dom.themeIcon.className = `fa-solid ${theme === "dark" ? "fa-moon" : "fa-sun"}`;
+  }
   localStorage.setItem("ukulele-theme", theme);
 }
 
 function toggleTheme() {
   const current = document.documentElement.getAttribute("data-theme");
   applyTheme(current === "dark" ? "light" : "dark");
+}
+
+/* =========================
+   Auto-Scroll Toggle (lyrics panel follow)
+========================= */
+function applyAutoScroll(enabled) {
+  state.autoScrollEnabled = !!enabled;
+  if (dom.autoScrollToggle) {
+    dom.autoScrollToggle.classList.toggle("is-on",  state.autoScrollEnabled);
+    dom.autoScrollToggle.classList.toggle("is-off", !state.autoScrollEnabled);
+    dom.autoScrollToggle.setAttribute("aria-pressed", String(state.autoScrollEnabled));
+  }
+  localStorage.setItem("ukulele-autoscroll", state.autoScrollEnabled ? "on" : "off");
+}
+
+function toggleAutoScroll() {
+  applyAutoScroll(!state.autoScrollEnabled);
+}
+
+/* =========================
+   Dancing Character Toggle (show/hide)
+========================= */
+function applyDancer(enabled) {
+  state.dancerEnabled = !!enabled;
+  if (dom.danceCharWrap) {
+    dom.danceCharWrap.classList.toggle("hidden", !state.dancerEnabled);
+  }
+  if (dom.dancerToggleBtn) {
+    dom.dancerToggleBtn.setAttribute("aria-pressed", String(state.dancerEnabled));
+  }
+  localStorage.setItem("ukulele-dancer", state.dancerEnabled ? "on" : "off");
+}
+
+function toggleDancer() {
+  applyDancer(!state.dancerEnabled);
+}
+
+/* =========================
+   Panel Layout Swap (Chord ↔ Lyrics)
+========================= */
+function applyPanelSwap(swapped) {
+  state.panelsSwapped = !!swapped;
+  if (dom.mainGrid) {
+    dom.mainGrid.classList.toggle("panels-swapped", state.panelsSwapped);
+  }
+  if (dom.swapPanelsBtn) {
+    dom.swapPanelsBtn.setAttribute("aria-pressed", String(state.panelsSwapped));
+  }
+  localStorage.setItem("ukulele-panel-swap", state.panelsSwapped ? "on" : "off");
+}
+
+function togglePanelSwap() {
+  applyPanelSwap(!state.panelsSwapped);
 }
 
 /* =========================
@@ -175,7 +241,9 @@ function setBeatTempo(bpm) {
    Character Dance State
 ========================= */
 function setCharPlaying(playing) {
-  dom.danceCharWrap.classList.toggle("is-playing", playing);
+  if (dom.danceCharWrap) {
+    dom.danceCharWrap.classList.toggle("is-playing", playing);
+  }
 }
 
 /* =========================
@@ -266,6 +334,10 @@ function setAudioMode(mode) {
 // "vocal" → swap prefix to `vocal/<file>` (same filename)
 function getMp3PathFor(song) {
   if (state.audioMode === "vocal") {
+    if (!/^songs\//i.test(song.mp3)) {
+      console.warn(`getMp3PathFor: "${song.mp3}" doesn't start with "songs/" — vocal swap skipped`);
+      return song.mp3;
+    }
     return song.mp3.replace(/^songs\//i, "vocal/");
   }
   return song.mp3;
@@ -586,7 +658,8 @@ function updateCurrentLyric(currentSeconds) {
   const current = dom.lyricsContainer.querySelector(`.lyric-row[data-index="${nextIndex}"]`);
   if (current) {
     current.classList.add("active");
-    if (!state.userScrolling) {
+    // Two gates: master toggle (autoScrollEnabled) + short pause after manual scroll
+    if (state.autoScrollEnabled && !state.userScrolling) {
       current.scrollIntoView({ behavior: "smooth", block: "center" });
     }
   }
@@ -679,8 +752,13 @@ function flashMetronome() {
 ========================= */
 function bindEvents() {
   dom.songSelect.addEventListener("change", e => {
-    // Ignore placeholder ("" value)
-    if (e.target.value) selectSong(e.target.value);
+    if (e.target.value) {
+      selectSong(e.target.value);
+    } else if (state.selectedSong) {
+      // Revert dropdown if user picked the "— เลือกเพลง —" placeholder while a song is loaded.
+      // (Prevents UI mismatch where dropdown shows placeholder but state still holds the old song.)
+      dom.songSelect.value = state.selectedSong.id;
+    }
   });
 
   // Audio mode toggle (Song / Vocal)
@@ -721,6 +799,35 @@ function bindEvents() {
 
   dom.themeToggleBtn.addEventListener("click", toggleTheme);
 
+  if (dom.autoScrollToggle) {
+    dom.autoScrollToggle.addEventListener("click", toggleAutoScroll);
+  }
+  if (dom.dancerToggleBtn) {
+    dom.dancerToggleBtn.addEventListener("click", toggleDancer);
+  }
+  if (dom.swapPanelsBtn) {
+    dom.swapPanelsBtn.addEventListener("click", togglePanelSwap);
+  }
+
+  // ===== Mobile: block pinch zoom & double-tap zoom =====
+  // iOS Safari ignores user-scalable=no in meta — handle via JS gesture events.
+  ["gesturestart", "gesturechange", "gestureend"].forEach(evt => {
+    document.addEventListener(evt, e => e.preventDefault(), { passive: false });
+  });
+  // Block multi-touch zoom on Android / other browsers
+  document.addEventListener("touchmove", e => {
+    if (e.touches && e.touches.length > 1) e.preventDefault();
+  }, { passive: false });
+  // Block double-tap zoom (300ms window)
+  let lastTapEnd = 0;
+  document.addEventListener("touchend", e => {
+    const now = Date.now();
+    if (now - lastTapEnd <= 300) e.preventDefault();
+    lastTapEnd = now;
+  }, { passive: false });
+  // (Removed Ctrl+wheel zoom block — it was making mouse scroll feel blocked
+  //  because non-passive wheel listeners force the browser to wait before scrolling.)
+
   window.addEventListener("beforeunload", () => {
     stopAnimationLoop();
     if (state.sound) state.sound.unload();
@@ -736,6 +843,18 @@ async function initApp() {
   // Restore saved theme
   const savedTheme = localStorage.getItem("ukulele-theme") || "dark";
   applyTheme(savedTheme);
+
+  // Restore saved Auto-Scroll preference (default: on)
+  const savedAutoScroll = localStorage.getItem("ukulele-autoscroll");
+  applyAutoScroll(savedAutoScroll === null ? true : savedAutoScroll === "on");
+
+  // Restore saved Dancer preference (default: on)
+  const savedDancer = localStorage.getItem("ukulele-dancer");
+  applyDancer(savedDancer === null ? true : savedDancer === "on");
+
+  // Restore saved Panel-Swap preference (default: off)
+  const savedSwap = localStorage.getItem("ukulele-panel-swap");
+  applyPanelSwap(savedSwap === "on");
 
   bindEvents();
   updateBpm(dom.bpmSlider.value);

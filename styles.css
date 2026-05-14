@@ -70,7 +70,21 @@ body,
    Base
 ===================== */
 *, *::before, *::after { box-sizing: border-box; }
-html { scroll-behavior: smooth; }
+html, body {
+  width: 100%;
+  max-width: 100%;
+}
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+  text-size-adjust: 100%;
+  touch-action: pan-x pan-y;   /* allow scroll, block pinch zoom */
+}
+body {
+  overflow-x: hidden;          /* clip horizontal overflow on body only — keeps html as root scroller */
+  overscroll-behavior: none;
+}
 
 body {
   margin: 0;
@@ -140,6 +154,12 @@ h1 i { color: var(--accent); }
   align-items: stretch;
 }
 
+/* Swapped layout: Chord panel moves to far right, Lyrics to center */
+.main-grid.panels-swapped {
+  grid-template-columns: 340px minmax(0, 1fr) 340px;
+}
+.main-grid.panels-swapped .chord-panel { order: 3; }
+
 /* =====================
    Panel
 ===================== */
@@ -151,6 +171,7 @@ h1 i { color: var(--accent); }
   background: var(--panel);
   box-shadow: var(--shadow);
   backdrop-filter: blur(20px);
+  min-width: 0;                /* prevent grid blow-out from long content */
 }
 
 .section-title {
@@ -179,6 +200,30 @@ h1 i { color: var(--accent); }
   border-color: transparent;
   font-weight: 800;
 }
+
+/* Clickable toggle variant of status-pill (Auto Scroll on/off) */
+button.toggle-pill {
+  cursor: pointer;
+  font-family: inherit;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 160ms ease, color 160ms ease, border-color 160ms ease, opacity 160ms ease;
+}
+button.toggle-pill.is-on {
+  color: var(--primary);
+  background: rgba(56, 189, 248, 0.14);
+  border-color: rgba(56, 189, 248, 0.35);
+  font-weight: 700;
+}
+button.toggle-pill.is-off { opacity: 0.65; }
+button.toggle-pill:hover { transform: translateY(-1px); }
+
+/* Header dancer toggle: dim when dancer is off */
+#dancerToggleBtn[aria-pressed="false"] { opacity: 0.55; }
+
+/* Hide dancing character when toggled off */
+.dance-char-wrap.hidden { display: none !important; }
 
 /* =====================
    Form Elements
@@ -634,7 +679,8 @@ h1 i { color: var(--accent); }
   display: inline-flex;
   flex-direction: column;
   align-items: flex-start;
-  white-space: pre;
+  max-width: 100%;
+  white-space: pre-wrap;       /* preserve spaces, but allow wrap on narrow screens */
 }
 
 .inline-chord {
@@ -646,7 +692,7 @@ h1 i { color: var(--accent); }
   line-height: 1.2;
   letter-spacing: 0.02em;
   min-width: 1ch;
-  white-space: pre;
+  white-space: pre;            /* chord names stay on one line */
 }
 
 .inline-lyric {
@@ -655,7 +701,9 @@ h1 i { color: var(--accent); }
   font-size: 0.92rem;
   color: var(--muted);
   line-height: 1.5;
-  white-space: pre;
+  white-space: pre-wrap;       /* wrap long lyric text on narrow screens */
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .lyric-row.active .inline-chord {
@@ -768,6 +816,8 @@ h1 i { color: var(--accent); }
 ===================== */
 @media (max-width: 1180px) {
   .main-grid { grid-template-columns: 1fr 1fr; }
+  .main-grid.panels-swapped { grid-template-columns: 1fr 1fr; }
+  .main-grid.panels-swapped .chord-panel { order: 0; }  /* swap disabled under 2-col */
   .player-panel { grid-column: 1 / -1; min-height: auto; }
   .lyrics-container { height: 520px; }
 }
@@ -776,16 +826,26 @@ h1 i { color: var(--accent); }
   .app-shell { padding: 14px; }
   .app-header { align-items: flex-start; flex-direction: column; }
   .main-grid { grid-template-columns: 1fr; }
+  .main-grid.panels-swapped { grid-template-columns: 1fr; }
 
   .panel { min-height: auto; padding: 16px; border-radius: 20px; }
 
   .chord-stage { min-height: 420px; }
-
   .lyrics-container { height: 420px; }
 
-  .admin-layout { grid-template-columns: 1fr; }
-  .admin-song-list { border-right: 0; border-bottom: 1px solid var(--border); max-height: 230px; }
-  .form-grid { grid-template-columns: 1fr; }
-  .modal-backdrop { padding: 10px; }
-  .admin-modal { max-height: 96vh; }
+  /* Allow lyric rows to wrap nicely on narrow screens */
+  .lyric-row { padding: 6px 8px; }
+  .inline-lyric { font-size: 0.86rem; }
+
+  /* Controls: smaller to fit 6 buttons comfortably */
+  .controls { gap: 6px; }
+  .control-btn { width: 40px; height: 40px; font-size: 0.85rem; }
+  .control-btn.primary { width: 52px; height: 52px; font-size: 1.05rem; }
+}
+
+/* Very narrow phones (≤ 360px) */
+@media (max-width: 360px) {
+  .control-btn { width: 36px; height: 36px; }
+  .control-btn.primary { width: 46px; height: 46px; }
+  .controls { gap: 4px; }
 }

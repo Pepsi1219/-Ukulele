@@ -4,7 +4,7 @@
   
   { "time": 5.5, "section": "Verse 1" },
 
-  { "time": 10.5, "line": [{ "lyric": "Can I call you " }, { "chord": "G", "lyric": "baby? Can you be my " }, { "chord": "Am", "lyric": "friend?" }] },
+  { "time": 10.5, "line": [{ "lyric": "Can I call you " }, { "chord": "C", "lyric": "baby? Can you be my " }, { "chord": "Am", "lyric": "friend?" }] },
   { "time": 16.0, "line": [{ "lyric": "Can you be my " }, { "chord": "Dm", "lyric": "lover up until the very " }, { "chord": "G", "lyric": "end?" }] },
   { "time": 21.6, "line": [{ "lyric": "Let me show you " }, { "chord": "C", "lyric": "love, oh, no " }, { "chord": "Am", "lyric": "pretend" }] },
   { "time": 26.0, "line": [{ "lyric": "Stick by my " }, { "chord": "Dm", "lyric": "side even when the world is caving " }, { "chord": "G", "lyric": "in, yeah" }] },
