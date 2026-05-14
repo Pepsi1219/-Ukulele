@@ -17,9 +17,8 @@
 
     <!-- Header -->
     <header class="app-header">
-      <div>
-        <p class="eyebrow">Ukulele Practice Studio</p>
-        <h1><i class="fa-solid fa-guitar"></i> ซ้อมอูคูเลเล่</h1>
+      <div><p class="eyebrow">Ukulele Practice</p>
+        <h1><i class="fa-solid fa-guitar"></i>Ukulele Studio</h1>
       </div>
 
       <div class="header-actions">
@@ -42,7 +41,7 @@
       <section class="panel player-panel">
         <div class="section-title">
           <h2>เครื่องเล่นเพลง</h2>
-          <span id="loadStatus" class="status-pill">กำลังโหลดข้อมูล...</span>
+          <span id="loadStatus" class="load-light load-light--loading" role="status" aria-live="polite" title="กำลังโหลดข้อมูล..." aria-label="กำลังโหลดข้อมูล..."></span>
         </div>
 
         <label class="field-label">เลือกแหล่งเสียง</label>
@@ -107,7 +106,6 @@
             <button class="chip" data-speed="1.25" type="button">1.25x</button>
             <button class="chip" data-speed="1.5"  type="button">1.5x</button>
           </div>
-          <p class="hint">Howler.js + preserve pitch — ปรับความเร็วโดยเสียงไม่เพี้ยนใน browser ที่รองรับ</p>
         </div>
 
         <div class="metronome-card">

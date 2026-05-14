@@ -222,6 +222,33 @@ button.toggle-pill:hover { transform: translateY(-1px); }
 /* Header dancer toggle: dim when dancer is off */
 #dancerToggleBtn[aria-pressed="false"] { opacity: 0.55; }
 
+/* Load status indicator light (replaces text pill in section-title) */
+.load-light {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: var(--muted);
+  flex-shrink: 0;
+  transition: background 200ms ease, box-shadow 200ms ease;
+}
+.load-light--loading {
+  background: #fbbf24;
+  animation: load-pulse 1.5s ease-in-out infinite;
+}
+.load-light--success {
+  background: #22c55e;
+  box-shadow: 0 0 10px rgba(34, 197, 94, 0.55);
+}
+.load-light--error {
+  background: #ef4444;
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.55);
+}
+@keyframes load-pulse {
+  0%, 100% { opacity: 0.5; transform: scale(0.85); }
+  50%      { opacity: 1;   transform: scale(1); }
+}
+
 /* Header swap-panels toggle: highlight + icon flip when active */
 #swapPanelsBtn {
   transition: transform 160ms ease, background 200ms ease, color 200ms ease, box-shadow 200ms ease;
@@ -839,8 +866,22 @@ button.toggle-pill:hover { transform: translateY(-1px); }
 }
 
 @media (max-width: 760px) {
-  .app-shell { padding: 14px; }
-  .app-header { align-items: flex-start; flex-direction: column; }
+  /* Safe-area-aware padding — respects iPhone notch / Android cutouts */
+  .app-shell {
+    padding-top:    max(14px, env(safe-area-inset-top));
+    padding-right:  max(14px, env(safe-area-inset-right));
+    padding-bottom: max(14px, env(safe-area-inset-bottom));
+    padding-left:   max(14px, env(safe-area-inset-left));
+  }
+  /* Keep header in row so toggles stay at top-right corner (not stacked below title) */
+  .app-header {
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .app-header > div:first-child { min-width: 0; flex: 1 1 auto; }
+  .header-actions { flex-shrink: 0; margin-left: auto; }
   .main-grid { grid-template-columns: 1fr; }
   .main-grid.panels-swapped { grid-template-columns: 1fr; }
 

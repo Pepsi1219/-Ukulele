@@ -151,6 +151,15 @@ function buildChordsFromLyrics(lyrics) {
   return chords.sort((a, b) => a.time - b.time);
 }
 
+// Update the load-status indicator light (green/red/yellow dot in section-title)
+// state: "loading" | "success" | "error"
+function setLoadStatus(state, label) {
+  if (!dom.loadStatus) return;
+  dom.loadStatus.className = `load-light load-light--${state}`;
+  dom.loadStatus.title = label;
+  dom.loadStatus.setAttribute("aria-label", label);
+}
+
 function findCurrentTimedIndex(items, currentSeconds) {
   let index = -1;
   for (let i = 0; i < items.length; i++) {
@@ -280,14 +289,14 @@ async function loadSongs() {
     }));
 
     state.songs = songs;
-    dom.loadStatus.textContent = "โหลดสำเร็จ";
+    setLoadStatus("success", "โหลดสำเร็จ");
   } catch (error) {
     console.error(error);
     // Fallback to embedded demo data
     state.songs = (fallbackSongs.songs || []).map(s =>
       buildSong(s, s.lyrics, null)
     );
-    dom.loadStatus.textContent = "ใช้ข้อมูลตัวอย่าง";
+    setLoadStatus("error", "โหลดไม่สำเร็จ — ใช้ข้อมูลตัวอย่าง");
   }
 
   renderSongSelect();
@@ -430,7 +439,7 @@ function loadSongAudio(song) {
 
     onloaderror: (_, error) => {
       console.error("MP3 load error:", error);
-      dom.loadStatus.textContent = "โหลด MP3 ไม่สำเร็จ";
+      setLoadStatus("error", "โหลด MP3 ไม่สำเร็จ");
       dom.playPauseBtn.disabled = true;
       dom.stopBtn.disabled = true;
       dom.seekBackBtn.disabled = true;
