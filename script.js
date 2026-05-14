@@ -34,11 +34,11 @@ const state = {
   currentChordIndex: -1,
   rafId: null,
   metronomeOn: false,
-  adminSelectedId: null,
   metroLoop: null,
   metroSynth: null,
   userScrolling: false,
-  userScrollTimer: null
+  userScrollTimer: null,
+  audioMode: null   // "song" | "vocal" | null — must be set before audio loads
 };
 
 /* =========================
@@ -50,6 +50,11 @@ const dom = {
   currentSongTitle:  document.getElementById("currentSongTitle"),
   playPauseBtn:      document.getElementById("playPauseBtn"),
   stopBtn:           document.getElementById("stopBtn"),
+  seekBackBtn:       document.getElementById("seekBackBtn"),
+  seekFwdBtn:        document.getElementById("seekFwdBtn"),
+  prevSongBtn:       document.getElementById("prevSongBtn"),
+  nextSongBtn:       document.getElementById("nextSongBtn"),
+  audioModeToggle:   document.getElementById("audioModeToggle"),
   currentTime:       document.getElementById("currentTime"),
   durationTime:      document.getElementById("durationTime"),
   progressTrack:     document.getElementById("progressTrack"),
@@ -70,24 +75,7 @@ const dom = {
   themeIcon:      document.getElementById("themeIcon"),
 
   // Dance character
-  danceCharWrap: document.getElementById("danceCharWrap"),
-
-  // Admin
-  openAdminBtn:    document.getElementById("openAdminBtn"),
-  closeAdminBtn:   document.getElementById("closeAdminBtn"),
-  adminModal:      document.getElementById("adminModal"),
-  adminSongList:   document.getElementById("adminSongList"),
-  newSongBtn:      document.getElementById("newSongBtn"),
-  saveSongBtn:     document.getElementById("saveSongBtn"),
-  deleteSongBtn:   document.getElementById("deleteSongBtn"),
-  exportJsonBtn:   document.getElementById("exportJsonBtn"),
-  adminError:      document.getElementById("adminError"),
-  adminId:         document.getElementById("adminId"),
-  adminTitleInput: document.getElementById("adminTitleInput"),
-  adminMp3:        document.getElementById("adminMp3"),
-  adminBpm:        document.getElementById("adminBpm"),
-  adminLyrics:     document.getElementById("adminLyrics"),
-  adminChords:     document.getElementById("adminChords")
+  danceCharWrap: document.getElementById("danceCharWrap")
 };
 
 /* =========================
@@ -235,16 +223,17 @@ async function loadSongs() {
   }
 
   renderSongSelect();
-  renderAdminSongList();
-  if (state.songs.length > 0) selectSong(state.songs[0].id);
+  // Default state: empty until user picks audio mode AND a song
+  showIdleState();
 }
 
 function renderSongSelect() {
   dom.songSelect.innerHTML = "";
-  if (!state.songs.length) {
-    dom.songSelect.innerHTML = `<option value="">ไม่มีเพลง</option>`;
-    return;
-  }
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = state.songs.length ? "— เลือกเพลง —" : "ไม่มีเพลง";
+  dom.songSelect.appendChild(placeholder);
+
   state.songs.forEach(song => {
     const option = document.createElement("option");
     option.value = song.id;
@@ -254,21 +243,94 @@ function renderSongSelect() {
 }
 
 /* =========================
+   Audio source mode (Song / Vocal)
+========================= */
+function setAudioMode(mode) {
+  state.audioMode = mode;
+  // Update toggle button active states
+  if (dom.audioModeToggle) {
+    dom.audioModeToggle.querySelectorAll(".chip[data-mode]").forEach(btn => {
+      btn.classList.toggle("active", btn.dataset.mode === mode);
+    });
+  }
+  // If a song is already selected, reload audio with new path
+  if (state.selectedSong) {
+    loadSongAudio(state.selectedSong);
+  } else {
+    showIdleState();
+  }
+}
+
+// Map a song's `mp3` field to the actual path for the current audio mode.
+// "song"  → original `songs/<file>` path
+// "vocal" → swap prefix to `vocal/<file>` (same filename)
+function getMp3PathFor(song) {
+  if (state.audioMode === "vocal") {
+    return song.mp3.replace(/^songs\//i, "vocal/");
+  }
+  return song.mp3;
+}
+
+/* =========================
+   Idle / Empty State
+========================= */
+function showIdleState() {
+  stopSong();
+  unloadSound();
+  state.currentLyricIndex = -1;
+  state.currentChordIndex = -1;
+  state.duration = 0;
+
+  dom.currentSongTitle.textContent = state.selectedSong
+    ? state.selectedSong.title
+    : "ยังไม่ได้เลือกเพลง";
+
+  const msg = !state.audioMode && !state.selectedSong ? "เลือกแหล่งเสียงและเพลงเพื่อเริ่มต้น"
+            : !state.audioMode                        ? "กรุณาเลือกแหล่งเสียง (Song / Vocal)"
+            : !state.selectedSong                     ? "กรุณาเลือกเพลง"
+            : "";
+
+  dom.lyricsContainer.innerHTML = `<p class="empty-state">${msg}</p>`;
+  dom.chordDisplay.innerHTML    = `<span class="empty-state">${msg || "เลือกเพลงแล้วกด Play"}</span>`;
+  dom.currentChordLabel.textContent = "-";
+
+  resetProgress();
+  dom.durationTime.textContent = "00:00";
+
+  dom.playPauseBtn.disabled = true;
+  dom.stopBtn.disabled      = true;
+  dom.seekBackBtn.disabled  = true;
+  dom.seekFwdBtn.disabled   = true;
+
+  setCharPlaying(false);
+}
+
+/* =========================
    Player Functions
 ========================= */
 function selectSong(songId) {
   const song = state.songs.find(s => s.id === songId);
   if (!song) return;
 
+  state.selectedSong = song;
+  dom.songSelect.value = song.id;
+
+  // Only proceed to load audio + render content if BOTH mode and song are picked
+  if (state.audioMode) {
+    loadSongAudio(song);
+  } else {
+    showIdleState();
+  }
+}
+
+function loadSongAudio(song) {
   stopSong();
   unloadSound();
 
-  state.selectedSong = song;
   state.currentLyricIndex = -1;
   state.currentChordIndex = -1;
   state.duration = 0;
 
-  dom.songSelect.value = song.id;
   dom.currentSongTitle.textContent = song.title;
   dom.bpmSlider.value = String(song.bpm);
   dom.bpmValue.textContent = String(song.bpm);
@@ -279,7 +341,7 @@ function selectSong(songId) {
   setChordDisplay(null);
 
   state.sound = new Howl({
-    src: [song.mp3],
+    src: [getMp3PathFor(song)],
     html5: true,
     preload: true,
     rate: state.speed,
@@ -289,6 +351,8 @@ function selectSong(songId) {
       dom.durationTime.textContent = formatTime(state.duration);
       dom.playPauseBtn.disabled = false;
       dom.stopBtn.disabled = false;
+      dom.seekBackBtn.disabled = false;
+      dom.seekFwdBtn.disabled = false;
       applyPreservePitch();
     },
 
@@ -297,6 +361,8 @@ function selectSong(songId) {
       dom.loadStatus.textContent = "โหลด MP3 ไม่สำเร็จ";
       dom.playPauseBtn.disabled = true;
       dom.stopBtn.disabled = true;
+      dom.seekBackBtn.disabled = true;
+      dom.seekFwdBtn.disabled = true;
       setChordDisplay("MP3?");
     },
 
@@ -332,6 +398,19 @@ function selectSong(songId) {
       setCharPlaying(false);
     }
   });
+}
+
+// Cycle to previous/next song in manifest order
+function changeSong(delta) {
+  if (!state.songs.length) return;
+  if (!state.selectedSong) {
+    // No song selected yet — just pick the first one
+    selectSong(state.songs[0].id);
+    return;
+  }
+  const idx = state.songs.findIndex(s => s.id === state.selectedSong.id);
+  const newIdx = (idx + delta + state.songs.length) % state.songs.length;
+  selectSong(state.songs[newIdx].id);
 }
 
 function applyPreservePitch() {
@@ -370,6 +449,16 @@ function stopSong() {
 
 function updatePlayPauseIcon() {
   dom.playPauseBtn.innerHTML = `<i class="fa-solid ${state.isPlaying ? "fa-pause" : "fa-play"}"></i>`;
+}
+
+// Seek by a relative offset in seconds (negative = backward, positive = forward)
+function seekBy(deltaSeconds) {
+  if (!state.sound || !state.duration) return;
+  const current = Number(state.sound.seek()) || 0;
+  const target  = Math.min(Math.max(current + deltaSeconds, 0), state.duration);
+  state.sound.seek(target);
+  updateProgress(target);
+  updateTimedDisplays(target);
 }
 
 function setSpeed(speed) {
@@ -586,149 +675,28 @@ function flashMetronome() {
 }
 
 /* =========================
-   Admin Functions
-========================= */
-function openAdminModal() {
-  dom.adminModal.classList.add("open");
-  dom.adminModal.setAttribute("aria-hidden", "false");
-  renderAdminSongList();
-  if (state.selectedSong) fillAdminForm(state.selectedSong.id);
-}
-
-function closeAdminModal() {
-  dom.adminModal.classList.remove("open");
-  dom.adminModal.setAttribute("aria-hidden", "true");
-  clearAdminError();
-}
-
-function renderAdminSongList() {
-  dom.adminSongList.innerHTML = "";
-  if (!state.songs.length) {
-    dom.adminSongList.innerHTML = `<p class="empty-state">ยังไม่มีเพลง</p>`;
-    return;
-  }
-  state.songs.forEach(song => {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "admin-song-item";
-    btn.dataset.id = song.id;
-    btn.innerHTML = `<strong>${escapeHTML(song.title)}</strong><br><small>${escapeHTML(song.mp3)}</small>`;
-    if (song.id === state.adminSelectedId) btn.classList.add("active");
-    btn.addEventListener("click", () => fillAdminForm(song.id));
-    dom.adminSongList.appendChild(btn);
-  });
-}
-
-function fillAdminForm(songId) {
-  const song = state.songs.find(s => s.id === songId);
-  if (!song) return;
-  state.adminSelectedId = song.id;
-  dom.adminId.value       = song.id;
-  dom.adminTitleInput.value = song.title;
-  dom.adminMp3.value      = song.mp3;
-  dom.adminBpm.value      = String(song.bpm);
-  dom.adminLyrics.value   = JSON.stringify(song.lyrics, null, 2);
-  dom.adminChords.value   = "// Auto-generated from lyrics\n" + JSON.stringify(song.chords, null, 2);
-  clearAdminError();
-  renderAdminSongList();
-}
-
-function prepareNewSong() {
-  const newId = createUUID();
-  state.adminSelectedId = newId;
-  dom.adminId.value       = newId;
-  dom.adminTitleInput.value = "New Song";
-  dom.adminMp3.value      = "songs/new-song.mp3";
-  dom.adminBpm.value      = "100";
-  dom.adminLyrics.value   = JSON.stringify([
-    { time: 0, section: "Verse" },
-    { time: 0, line: [{ chord: "C", lyric: "เนื้อเพลงบรรทัดแรก" }] }
-  ], null, 2);
-  dom.adminChords.value   = "// Auto-generated from lyrics";
-  clearAdminError();
-  renderAdminSongList();
-}
-
-function getSongFromAdminForm() {
-  const id    = dom.adminId.value.trim() || createUUID();
-  const title = dom.adminTitleInput.value.trim();
-  const mp3   = dom.adminMp3.value.trim();
-  const bpm   = Number(dom.adminBpm.value);
-
-  if (!title) throw new Error("กรุณากรอกชื่อเพลง");
-  if (!mp3)   throw new Error("กรุณากรอก MP3 Path เช่น songs/song1.mp3");
-  if (!Number.isFinite(bpm) || bpm < 30 || bpm > 200) throw new Error("BPM ต้องอยู่ระหว่าง 30-200");
-
-  let lyrics;
-  try { lyrics = JSON.parse(dom.adminLyrics.value || "[]"); }
-  catch { throw new Error("Lyrics JSON ไม่ถูกต้อง"); }
-
-  if (!Array.isArray(lyrics)) throw new Error("Lyrics ต้องเป็น Array");
-  lyrics.forEach(entry => {
-    if (typeof entry.time !== "number") throw new Error('แต่ละ entry ต้องมี "time": number');
-    if (entry.line && !Array.isArray(entry.line)) throw new Error('"line" ต้องเป็น Array');
-  });
-
-  const sortedLyrics = lyrics.sort((a, b) => a.time - b.time);
-  return { id, title, mp3, bpm, lyrics: sortedLyrics, chords: buildChordsFromLyrics(sortedLyrics) };
-}
-
-function saveSongFromAdmin() {
-  try {
-    const song = getSongFromAdminForm();
-    const idx  = state.songs.findIndex(s => s.id === song.id);
-    if (idx >= 0) state.songs[idx] = song;
-    else state.songs.push(song);
-    state.adminSelectedId = song.id;
-    renderSongSelect();
-    renderAdminSongList();
-    selectSong(song.id);
-    clearAdminError();
-  } catch (error) { showAdminError(error.message); }
-}
-
-function deleteSongFromAdmin() {
-  const id = dom.adminId.value.trim();
-  if (!id) return;
-  state.songs = state.songs.filter(s => s.id !== id);
-  state.adminSelectedId = null;
-  renderSongSelect();
-  renderAdminSongList();
-  if (state.songs.length > 0) {
-    selectSong(state.songs[0].id);
-    fillAdminForm(state.songs[0].id);
-  } else {
-    stopSong();
-    unloadSound();
-    prepareNewSong();
-  }
-}
-
-function exportSongsJson() {
-  const exportData = {
-    songs: state.songs.map(s => ({ id: s.id, title: s.title, mp3: s.mp3, bpm: s.bpm, lyrics: s.lyrics }))
-  };
-  const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json;charset=utf-8" });
-  const url  = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href     = url;
-  link.download = "songs.json";
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
-}
-
-function showAdminError(message) { dom.adminError.hidden = false; dom.adminError.textContent = message; }
-function clearAdminError()       { dom.adminError.hidden = true;  dom.adminError.textContent = ""; }
-
-/* =========================
    Event Binding
 ========================= */
 function bindEvents() {
-  dom.songSelect.addEventListener("change", e => { selectSong(e.target.value); });
+  dom.songSelect.addEventListener("change", e => {
+    // Ignore placeholder ("" value)
+    if (e.target.value) selectSong(e.target.value);
+  });
+
+  // Audio mode toggle (Song / Vocal)
+  if (dom.audioModeToggle) {
+    dom.audioModeToggle.addEventListener("click", e => {
+      const btn = e.target.closest(".chip[data-mode]");
+      if (btn) setAudioMode(btn.dataset.mode);
+    });
+  }
+
   dom.playPauseBtn.addEventListener("click", togglePlayPause);
   dom.stopBtn.addEventListener("click", stopSong);
+  dom.seekBackBtn.addEventListener("click", () => seekBy(-5));
+  dom.seekFwdBtn.addEventListener("click",  () => seekBy(5));
+  dom.prevSongBtn.addEventListener("click", () => changeSong(-1));
+  dom.nextSongBtn.addEventListener("click", () => changeSong(1));
 
   dom.speedButtons.addEventListener("click", e => {
     const btn = e.target.closest("[data-speed]");
@@ -738,19 +706,8 @@ function bindEvents() {
   dom.progressTrack.addEventListener("click", e => { seekFromPointer(e.clientX); });
 
   dom.progressTrack.addEventListener("keydown", e => {
-    if (!state.sound || !state.duration) return;
-    const current = Number(state.sound.seek()) || 0;
-    const step = e.shiftKey ? 10 : 5;
-    if (e.key === "ArrowRight") {
-      e.preventDefault();
-      const t = Math.min(current + step, state.duration);
-      state.sound.seek(t); updateProgress(t); updateTimedDisplays(t);
-    }
-    if (e.key === "ArrowLeft") {
-      e.preventDefault();
-      const t = Math.max(current - step, 0);
-      state.sound.seek(t); updateProgress(t); updateTimedDisplays(t);
-    }
+    if (e.key === "ArrowRight") { e.preventDefault(); seekBy(e.shiftKey ? 10 : 5); }
+    if (e.key === "ArrowLeft")  { e.preventDefault(); seekBy(e.shiftKey ? -10 : -5); }
   });
 
   dom.lyricsContainer.addEventListener("scroll", () => {
@@ -763,19 +720,6 @@ function bindEvents() {
   dom.metroToggleBtn.addEventListener("click", toggleMetronome);
 
   dom.themeToggleBtn.addEventListener("click", toggleTheme);
-
-  dom.openAdminBtn.addEventListener("click", openAdminModal);
-  dom.closeAdminBtn.addEventListener("click", closeAdminModal);
-  dom.adminModal.addEventListener("click", e => { if (e.target === dom.adminModal) closeAdminModal(); });
-
-  dom.newSongBtn.addEventListener("click", prepareNewSong);
-  dom.saveSongBtn.addEventListener("click", saveSongFromAdmin);
-  dom.deleteSongBtn.addEventListener("click", deleteSongFromAdmin);
-  dom.exportJsonBtn.addEventListener("click", exportSongsJson);
-
-  window.addEventListener("keydown", e => {
-    if (e.key === "Escape" && dom.adminModal.classList.contains("open")) closeAdminModal();
-  });
 
   window.addEventListener("beforeunload", () => {
     stopAnimationLoop();

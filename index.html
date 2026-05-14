@@ -26,10 +26,6 @@
         <button id="themeToggleBtn" class="icon-btn secondary" type="button" aria-label="Toggle theme">
           <i class="fa-solid fa-moon" id="themeIcon"></i>
         </button>
-        <button id="openAdminBtn" class="icon-btn secondary" type="button">
-          <i class="fa-solid fa-gear"></i>
-          Admin
-        </button>
       </div>
     </header>
 
@@ -43,9 +39,15 @@
           <span id="loadStatus" class="status-pill">กำลังโหลดข้อมูล...</span>
         </div>
 
+        <label class="field-label">เลือกแหล่งเสียง</label>
+        <div id="audioModeToggle" class="audio-mode-toggle">
+          <button class="chip" data-mode="song"  type="button">Song</button>
+          <button class="chip" data-mode="vocal" type="button">Vocal</button>
+        </div>
+
         <label class="field-label" for="songSelect">เลือกเพลง</label>
         <select id="songSelect" class="select-input">
-          <option value="">กำลังโหลด...</option>
+          <option value="">— เลือกเพลง —</option>
         </select>
 
         <div class="now-playing">
@@ -59,11 +61,23 @@
         </div>
 
         <div class="controls">
+          <button id="prevSongBtn" class="control-btn" type="button" aria-label="เพลงก่อนหน้า" title="เพลงก่อนหน้า">
+            <i class="fa-solid fa-backward-step"></i>
+          </button>
+          <button id="seekBackBtn" class="control-btn" type="button" disabled aria-label="ถอยหลัง 5 วินาที" title="ถอยหลัง 5 วิ">
+            <i class="fa-solid fa-backward"></i>
+          </button>
           <button id="playPauseBtn" class="control-btn primary" type="button" disabled>
             <i class="fa-solid fa-play"></i>
           </button>
           <button id="stopBtn" class="control-btn" type="button" disabled>
             <i class="fa-solid fa-stop"></i>
+          </button>
+          <button id="seekFwdBtn" class="control-btn" type="button" disabled aria-label="ไปข้างหน้า 5 วินาที" title="ไปข้างหน้า 5 วิ">
+            <i class="fa-solid fa-forward"></i>
+          </button>
+          <button id="nextSongBtn" class="control-btn" type="button" aria-label="เพลงถัดไป" title="เพลงถัดไป">
+            <i class="fa-solid fa-forward-step"></i>
           </button>
         </div>
 
@@ -229,74 +243,6 @@
       </section>
 
     </main>
-  </div>
-
-  <!-- Admin Modal -->
-  <div id="adminModal" class="modal-backdrop" aria-hidden="true">
-    <div class="admin-modal" role="dialog" aria-modal="true" aria-labelledby="adminTitle">
-      <div class="admin-header">
-        <div>
-          <p class="eyebrow">Admin Panel</p>
-          <h2 id="adminTitle">จัดการลิสต์เพลง</h2>
-        </div>
-        <button id="closeAdminBtn" class="icon-btn secondary" type="button" aria-label="ปิดหน้าต่าง Admin">
-          <i class="fa-solid fa-xmark"></i>
-        </button>
-      </div>
-
-      <div class="admin-layout">
-        <aside class="admin-song-list">
-          <button id="newSongBtn" class="full-btn primary" type="button">
-            <i class="fa-solid fa-plus"></i>
-            เพิ่มเพลงใหม่
-          </button>
-          <div id="adminSongList" class="admin-list"></div>
-        </aside>
-
-        <section class="admin-editor">
-          <div class="form-grid">
-            <div>
-              <label class="field-label" for="adminId">ID</label>
-              <input id="adminId" class="text-input" type="text" readonly />
-            </div>
-            <div>
-              <label class="field-label" for="adminTitleInput">ชื่อเพลง</label>
-              <input id="adminTitleInput" class="text-input" type="text" placeholder="ชื่อเพลง" />
-            </div>
-            <div>
-              <label class="field-label" for="adminMp3">MP3 Path</label>
-              <input id="adminMp3" class="text-input" type="text" placeholder="songs/song-name.mp3" />
-            </div>
-            <div>
-              <label class="field-label" for="adminBpm">BPM เริ่มต้น</label>
-              <input id="adminBpm" class="text-input" type="number" min="30" max="200" value="100" />
-            </div>
-          </div>
-
-          <label class="field-label" for="adminLyrics">Lyrics JSON Array</label>
-          <textarea id="adminLyrics" class="json-textarea" spellcheck="false"
-            placeholder='[{"time":0,"text":"เนื้อเพลงบรรทัดแรก"}]'></textarea>
-
-          <label class="field-label" for="adminChords">Chords JSON Array</label>
-          <textarea id="adminChords" class="json-textarea" spellcheck="false"
-            placeholder='[{"time":0,"chord":"C"}]'></textarea>
-
-          <div id="adminError" class="admin-error" hidden></div>
-
-          <div class="admin-actions">
-            <button id="saveSongBtn" class="full-btn primary" type="button">
-              <i class="fa-solid fa-floppy-disk"></i> บันทึกเพลง
-            </button>
-            <button id="deleteSongBtn" class="full-btn danger" type="button">
-              <i class="fa-solid fa-trash"></i> ลบเพลง
-            </button>
-            <button id="exportJsonBtn" class="full-btn success" type="button">
-              <i class="fa-solid fa-file-export"></i> Export songs.json
-            </button>
-          </div>
-        </section>
-      </div>
-    </div>
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/howler/2.2.4/howler.min.js"></script>

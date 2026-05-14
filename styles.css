@@ -135,7 +135,7 @@ h1 i { color: var(--accent); }
 
 .main-grid {
   display: grid;
-  grid-template-columns: 340px minmax(320px, 1fr) 430px;
+  grid-template-columns: 340px 340px minmax(0, 1fr);
   gap: 18px;
   align-items: stretch;
 }
@@ -243,7 +243,7 @@ h1 i { color: var(--accent); }
 /* =====================
    Controls & Buttons
 ===================== */
-.controls { display: flex; justify-content: center; gap: 14px; margin: 24px 0; }
+.controls { display: flex; justify-content: center; gap: 8px; margin: 24px 0; }
 
 .control-btn, .icon-btn, .full-btn, .chip {
   border: 0;
@@ -262,18 +262,27 @@ h1 i { color: var(--accent); }
 .control-btn {
   display: grid;
   place-items: center;
-  width: 54px;
-  height: 54px;
+  width: 44px;
+  height: 44px;
   border-radius: 999px;
-  font-size: 1.05rem;
+  font-size: 0.95rem;
 }
 .control-btn.primary {
-  width: 68px;
-  height: 68px;
+  width: 60px;
+  height: 60px;
   color: #020617;
   background: var(--primary);
-  font-size: 1.35rem;
+  font-size: 1.25rem;
 }
+
+/* Audio source toggle (Song / Vocal) */
+.audio-mode-toggle {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.audio-mode-toggle .chip { flex: 1; min-height: 38px; padding: 0 13px; border-radius: 999px; font-weight: 800; }
+.audio-mode-toggle .chip.active { color: #020617; background: var(--accent); }
 
 .icon-btn {
   display: inline-flex;

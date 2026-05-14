@@ -6,7 +6,7 @@
 
   { "time": 10.5, "line": [{ "lyric": "Can I call you " }, { "chord": "G", "lyric": "baby? Can you be my " }, { "chord": "Am", "lyric": "friend?" }] },
   { "time": 16.0, "line": [{ "lyric": "Can you be my " }, { "chord": "Dm", "lyric": "lover up until the very " }, { "chord": "G", "lyric": "end?" }] },
-  { "time": 21.6, "line": [{ "chord": "C",  "lyric": "Let me show you " }, { "chord": "C", "lyric": "love, oh, no " }, { "chord": "Am", "lyric": "pretend" }] },
+  { "time": 21.6, "line": [{ "lyric": "Let me show you " }, { "chord": "C", "lyric": "love, oh, no " }, { "chord": "Am", "lyric": "pretend" }] },
   { "time": 26.0, "line": [{ "lyric": "Stick by my " }, { "chord": "Dm", "lyric": "side even when the world is caving " }, { "chord": "G", "lyric": "in, yeah" }] },
 
   { "time": 30.0,  "section": "Pre-Chorus" },
@@ -25,7 +25,7 @@
 
   { "time": 72.0, "section": "Verse 2" },
   { "time": 73.0, "line": [{ "lyric": "If you stay " }, { "chord": "C", "lyric": "forever, let me hold your " }, { "chord": "Am", "lyric": "hand" }] },
-  { "time": 78.7, "line": [{ "lyric": "I can fill those " }, { "chord": "Dm", "lyric": "places in your heart no one else " }, { "chord": "C", "lyric": "can" }] },
+  { "time": 78.7, "line": [{ "lyric": "I can fill those " }, { "chord": "Dm", "lyric": "places in your heart no one else " }, { "chord": "G", "lyric": "can" }] },
   { "time": 83.7, "line": [{ "lyric": "Let me show you " }, { "chord": "C ", "lyric": "love, oh, no " }, { "chord": "Am", "lyric": "pretend, yeah" }] },
   { "time": 89.0, "line": [{ "lyric": "I'll be right " }, { "chord": "Dm", "lyric": "here, baby, you know it's sink or" }, { "chord": "G", "lyric": " swim" }] },
 
@@ -39,8 +39,8 @@
   { "time": 115.0, "line": [{ "lyric": "'Cause it's only " }, { "chord": "C", "lyric": "you, nobody new, I put you " }, { "chord": "Am", "lyric": "first" }] },
   { "time": 121.0, "line": [{ "lyric": "'And for " }, { "chord": "Dm", "lyric": "you, girl, I swear I'd do the wors" }, { "chord": "G", "lyric": "t" }] },
 
-  { "time": 122.0,"section": "Post-Chorus" },
-  { "time": 126.4,"line": [{ "chord": "C", "lyric": "Ooh," }, {"lyric": "ooh-ooh-" }, { "chord": "Am", "lyric": "ooh-ooh-ooh, ooh- " }] },
+  { "time": 127.0,"section": "Post-Chorus" },
+  { "time": 127.0,"line": [{ "chord": "C", "lyric": "Ooh, ooh-ooh-ooh-ooh- " }, { "chord": "Am", "lyric": "ooh, ooh-ooh-ooh-ooh Ooh-ooh-ooh, ooh, " }] },
   { "time": 132.0,"line": [{ "chord": "Dm", "lyric": "ooh-ooh-ooh Ooh-ooh-ooh, ooh," }] },
   { "time": 136.0,"line": [{ "chord": "G", "lyric": "ooh-ooh" },{ "lyric": " Ooh-ooh-" }, { "chord": "C", "lyric": "ooh, ooh-ooh-ooh-ooh-oo" }, { "chord": "Am", "lyric": "h" }] },
   { "time": 142.0,"line": [{ "lyric": "Ooh-ooh-" }, { "chord": "Dm", "lyric": "ooh, ooh-ooh-ooh-ooh-o" }, { "chord": "G", "lyric": "oh" }] },
