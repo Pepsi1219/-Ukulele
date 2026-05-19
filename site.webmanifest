@@ -1,0 +1,20 @@
+{
+  "name": "Ukulele Practice Studio",
+  "short_name": "Ukulele",
+  "description": "ซ้อมอูคูเลเล่ — แสดงคอร์ดและเนื้อเพลงพร้อม metronome",
+  "lang": "th",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "icons": [
+    {
+      "src": "icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
