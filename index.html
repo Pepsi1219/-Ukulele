@@ -54,7 +54,25 @@
       <section class="panel player-panel">
         <div class="section-title">
           <h2>เครื่องเล่นเพลง</h2>
-          <span id="loadStatus" class="load-light load-light--loading" role="status" aria-live="polite" title="กำลังโหลดข้อมูล..." aria-label="กำลังโหลดข้อมูล..."></span>
+          <div class="player-section-actions">
+            <button id="favoriteBtn" class="icon-btn secondary fav-header-btn" type="button"
+                    aria-label="Mark as Favorite" title="Mark as Favorite" hidden>
+              <i class="fa-regular fa-star" id="favoriteIcon"></i>
+            </button>
+            <button id="favFilterBtn" class="icon-btn secondary" type="button"
+                    aria-pressed="false" aria-label="แสดงเฉพาะ Favorites" title="แสดงเฉพาะ Favorites">
+              <i class="fa-solid fa-filter"></i>
+            </button>
+            <button id="historyBtn" class="icon-btn secondary" type="button"
+                    aria-label="ดูประวัติการฝึก" title="Practice History">
+              <i class="fa-solid fa-chart-simple"></i>
+            </button>
+            <button id="editorToggleBtn" class="icon-btn secondary" type="button"
+                    aria-label="เปิด Timestamp Editor" title="Timestamp Editor" disabled>
+              <i class="fa-solid fa-pen-to-square"></i>
+            </button>
+            <span id="loadStatus" class="load-light load-light--loading" role="status" aria-live="polite" title="กำลังโหลดข้อมูล..." aria-label="กำลังโหลดข้อมูล..."></span>
+          </div>
         </div>
 
         <label class="field-label">เลือกแหล่งเสียง</label>
@@ -105,8 +123,21 @@
             <span id="durationTime">00:00</span>
           </div>
           <div id="progressTrack" class="progress-track" role="slider" tabindex="0">
-            <div id="progressFill" class="progress-fill"></div>
+            <div id="progressFill"  class="progress-fill"></div>
+            <div id="loopRegion"    class="loop-region"     hidden></div>
+            <div id="loopMarkerA"   class="loop-marker loop-marker-a" hidden></div>
+            <div id="loopMarkerB"   class="loop-marker loop-marker-b" hidden></div>
             <div id="progressThumb" class="progress-thumb"></div>
+          </div>
+          <div class="loop-controls">
+            <div class="loop-ab-group">
+              <button id="loopABtn"    class="chip loop-chip" type="button" disabled aria-label="ตั้ง Loop จุดเริ่มต้น (A)">A</button>
+              <button id="loopBBtn"    class="chip loop-chip" type="button" disabled aria-label="ตั้ง Loop จุดสิ้นสุด (B)">B</button>
+              <button id="loopClearBtn" class="icon-btn loop-clear-btn" type="button" hidden aria-label="ล้าง Loop">
+                <i class="fa-solid fa-xmark"></i>
+              </button>
+            </div>
+            <span id="loopStatusText" class="loop-status"></span>
           </div>
         </div>
 
@@ -146,13 +177,28 @@
       <section class="panel chord-panel">
         <div class="section-title">
           <h2>คอร์ดอูคูเลเล่</h2>
-          <span id="currentChordLabel" class="status-pill accent">-</span>
+          <div class="chord-panel-actions">
+            <button id="diagramOrientBtn" class="icon-btn secondary" type="button"
+                    aria-pressed="false" aria-label="สลับแนวนอน/แนวตั้ง" title="สลับแนวนอน/แนวตั้ง">
+              <i class="fa-solid fa-rotate"></i>
+            </button>
+            <span id="currentChordLabel" class="status-pill accent">-</span>
+          </div>
         </div>
 
         <div class="chord-stage">
           <!-- Chord badge -->
           <div id="chordDisplay" class="chord-display">
             <span class="empty-state">เลือกเพลงแล้วกด Play</span>
+          </div>
+
+          <!-- Chord diagram (finger positions) -->
+          <div id="chordDiagram" class="chord-diagram-wrap" hidden></div>
+
+          <!-- Strumming Pattern Visualizer -->
+          <div id="strumVisualizer" class="strum-visualizer" hidden>
+            <div id="strumPatternBtns" class="strum-pattern-btns"></div>
+            <div id="strumBeats" class="strum-beats"></div>
           </div>
 
           <!-- Dancing character (Lottie) -->
@@ -180,9 +226,119 @@
     </main>
   </div>
 
+  <!-- ===== Timestamp Editor (full-screen overlay) ===== -->
+  <div id="editorPanel" class="editor-panel" hidden>
+
+    <!-- Top bar -->
+    <div class="editor-topbar">
+      <button id="editorCloseBtn" class="icon-btn editor-back-btn" type="button" aria-label="กลับ">
+        <i class="fa-solid fa-arrow-left"></i>
+        <span>กลับ</span>
+      </button>
+      <span id="editorSongTitle" class="editor-song-name"></span>
+      <div class="editor-topbar-end">
+        <button id="editorImportBtn" class="chip editor-import-btn" type="button" hidden
+                title="นำเข้าคอร์ด + timestamp จากเนื้อร้องที่ stamp ไว้แล้ว">
+          <i class="fa-solid fa-file-import"></i> นำเข้าจากเนื้อร้อง
+        </button>
+        <span id="editorStampCount" class="editor-stamp-count"></span>
+        <button id="editorExportBtn" class="chip editor-export-btn" type="button">
+          <i class="fa-solid fa-copy"></i> Copy JSON
+        </button>
+      </div>
+    </div>
+
+    <!-- Tab bar: Lyrics ↔ Chords -->
+    <div class="editor-tab-bar">
+      <button id="editorTabLyrics" class="editor-tab active" data-tab="lyrics" type="button">
+        <i class="fa-solid fa-align-left"></i> เนื้อเพลง
+      </button>
+      <button id="editorTabChords" class="editor-tab" data-tab="chords" type="button">
+        <i class="fa-solid fa-guitar"></i> คอร์ด
+      </button>
+    </div>
+
+    <!-- Mini transport -->
+    <div class="editor-transport">
+      <div class="editor-btns">
+        <button id="editorSeekBackBtn" class="control-btn" type="button" aria-label="ถอยหลัง 5 วิ" title="ถอยหลัง 5 วิ">
+          <i class="fa-solid fa-backward"></i>
+        </button>
+        <button id="editorPlayPauseBtn" class="control-btn primary" type="button">
+          <i class="fa-solid fa-play"></i>
+        </button>
+        <button id="editorStopBtn" class="control-btn" type="button" aria-label="หยุด" title="หยุด">
+          <i class="fa-solid fa-stop"></i>
+        </button>
+        <button id="editorSeekFwdBtn" class="control-btn" type="button" aria-label="ไปข้างหน้า 5 วิ" title="ไปข้างหน้า 5 วิ">
+          <i class="fa-solid fa-forward"></i>
+        </button>
+      </div>
+      <div class="editor-timeline-row">
+        <span id="editorCurrentTime" class="editor-time">00:00</span>
+        <div id="editorProgressTrack" class="editor-progress-track">
+          <div id="editorProgressFill" class="editor-progress-fill"></div>
+        </div>
+        <span id="editorDurationTime" class="editor-time">00:00</span>
+      </div>
+    </div>
+
+    <!-- Live lyric banner — only visible on chords tab -->
+    <div id="editorLyricBanner" class="editor-lyric-banner" hidden>
+      <div class="editor-banner-content">
+        <span class="banner-label">เนื้อร้อง</span>
+        <span class="banner-hint">—</span>
+      </div>
+      <div class="editor-banner-actions">
+        <button id="chordAutoScrollBtn" class="status-pill toggle-pill is-on" type="button"
+                aria-pressed="true" title="เปิด/ปิด Auto Scroll คอร์ด">
+          <i class="fa-solid fa-arrows-up-down"></i>
+          <span>Auto Scroll</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Lyric lines list -->
+    <div id="editorLinesList" class="editor-lines-list"></div>
+
+    <!-- Keyboard hint footer -->
+    <div class="editor-footer">
+      <span class="editor-hint">
+        คลิกช่อง <strong>คอร์ด</strong> หรือ <strong>เนื้อเพลง</strong> เพื่อแก้ไขโดยตรง &nbsp;·&nbsp;
+        วางเมาส์ที่บรรทัดเพื่อเพิ่ม/ลบ segment &nbsp;·&nbsp;
+        กด <kbd>Space</kbd> หรือ <strong>Stamp</strong> เพื่อตั้งเวลา &nbsp;·&nbsp;
+        <kbd>↑</kbd><kbd>↓</kbd> เลื่อนบรรทัด &nbsp;·&nbsp; <kbd>Esc</kbd> กลับ
+      </span>
+    </div>
+
+  </div>
+  <!-- ===== /Timestamp Editor ===== -->
+
+  <!-- ===== Practice History Panel ===== -->
+  <div id="historyPanel" class="history-panel" hidden>
+
+    <div class="history-topbar">
+      <button id="historyCloseBtn" class="icon-btn editor-back-btn" type="button" aria-label="กลับ">
+        <i class="fa-solid fa-arrow-left"></i>
+        <span>กลับ</span>
+      </button>
+      <span class="history-title">
+        <i class="fa-solid fa-chart-simple"></i> Practice History
+      </span>
+      <button id="historyClearBtn" class="chip history-clear-btn" type="button"
+              title="ล้างประวัติทั้งหมด">
+        <i class="fa-solid fa-trash-can"></i> ล้างข้อมูล
+      </button>
+    </div>
+
+    <div id="historyContent" class="history-content"></div>
+
+  </div>
+  <!-- ===== /Practice History Panel ===== -->
+
   <script src="https://cdnjs.cloudflare.com/ajax/libs/howler/2.2.4/howler.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/bodymovin/5.12.2/lottie.min.js"></script>
-  <script src="script.js"></script>
+  <script type="module" src="script.js"></script>
 </body>
 </html>
