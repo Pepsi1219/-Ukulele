@@ -41,7 +41,9 @@ const state = {
   audioMode: null,        // "song" | "vocal" | null — must be set before audio loads
   autoScrollEnabled: true,// master toggle for lyric auto-scroll
   dancerEnabled: true,    // master toggle for dancing character visibility
-  panelsSwapped: false    // false: Chord centre, Lyrics right | true: Lyrics centre, Chord right
+  panelsSwapped: false,   // false: Chord centre, Lyrics right | true: Lyrics centre, Chord right
+  lottieIdle: null,       // Lottie instance — idle/relax animation
+  lottiePlaying: null     // Lottie instance — playing/wave-sound animation
 };
 
 /* =========================
@@ -83,6 +85,8 @@ const dom = {
   // Dance character + its toggle
   danceCharWrap:   document.getElementById("danceCharWrap"),
   dancerToggleBtn: document.getElementById("dancerToggleBtn"),
+  lottieIdleEl:    document.getElementById("lottieIdle"),
+  lottiePlayingEl: document.getElementById("lottiePlaying"),
 
   // Layout swap (Chord ↔ Lyrics)
   swapPanelsBtn:   document.getElementById("swapPanelsBtn"),
@@ -105,13 +109,6 @@ function createUUID() {
     const r = Math.random() * 16 | 0;
     return (char === "x" ? r : (r & 0x3) | 0x8).toString(16);
   });
-}
-
-function escapeHTML(value) {
-  return String(value)
-    .replaceAll("&", "&amp;").replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;").replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
 }
 
 // Builds the final song object from a manifest entry + its lyrics & chords arrays
@@ -239,19 +236,48 @@ function togglePanelSwap() {
 }
 
 /* =========================
-   Beat tempo (drives character dance speed)
+   Lottie Character Animations
 ========================= */
-function setBeatTempo(bpm) {
-  const beatSec = (60 / Math.max(bpm, 30)).toFixed(4);
-  document.documentElement.style.setProperty("--beat-duration", `${beatSec}s`);
+function initLottieDancer() {
+  if (typeof lottie === "undefined") {
+    console.warn("lottie library not loaded");
+    return;
+  }
+  if (dom.lottieIdleEl && !state.lottieIdle) {
+    state.lottieIdle = lottie.loadAnimation({
+      container: dom.lottieIdleEl,
+      renderer:  "svg",
+      loop:      true,
+      autoplay:  true,
+      path:      "animation/relax-animation.json"
+    });
+  }
+  if (dom.lottiePlayingEl && !state.lottiePlaying) {
+    state.lottiePlaying = lottie.loadAnimation({
+      container: dom.lottiePlayingEl,
+      renderer:  "svg",
+      loop:      true,
+      autoplay:  false,
+      path:      "animation/wave-sound-animation.json"
+    });
+  }
 }
 
 /* =========================
-   Character Dance State
+   Character Dance State — swap between idle/playing Lottie animations
 ========================= */
 function setCharPlaying(playing) {
-  if (dom.danceCharWrap) {
-    dom.danceCharWrap.classList.toggle("is-playing", playing);
+  if (!dom.lottieIdleEl || !dom.lottiePlayingEl) return;
+  if (playing) {
+    dom.lottieIdleEl.hidden    = true;
+    dom.lottiePlayingEl.hidden = false;
+    if (state.lottieIdle)    state.lottieIdle.pause();
+    if (state.lottiePlaying) state.lottiePlaying.play();
+  } else {
+    dom.lottiePlayingEl.hidden = true;
+    dom.lottieIdleEl.hidden    = false;
+    if (state.lottiePlaying) state.lottiePlaying.pause();
+    if (state.lottieIdle)    state.lottieIdle.play();
   }
 }
 
@@ -415,7 +441,6 @@ function loadSongAudio(song) {
   dom.currentSongTitle.textContent = song.title;
   dom.bpmSlider.value = String(song.bpm);
   dom.bpmValue.textContent = String(song.bpm);
-  setBeatTempo(song.bpm);
 
   renderLyrics(song.lyrics);
   resetProgress();
@@ -748,7 +773,6 @@ function updateBpm(value) {
   dom.bpmSlider.value    = String(bpm);
   dom.bpmValue.textContent = String(bpm);
   if (Tone.Transport) Tone.Transport.bpm.rampTo(bpm, 0.05);
-  setBeatTempo(bpm);
 }
 
 function flashMetronome() {
@@ -866,6 +890,7 @@ async function initApp() {
   applyPanelSwap(savedSwap === "on");
 
   bindEvents();
+  initLottieDancer();
   updateBpm(dom.bpmSlider.value);
   await loadSongs();
 }

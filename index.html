@@ -155,95 +155,10 @@
             <span class="empty-state">เลือกเพลงแล้วกด Play</span>
           </div>
 
-          <!-- Dancing character -->
+          <!-- Dancing character (Lottie) -->
           <div id="danceCharWrap" class="dance-char-wrap">
-            <svg class="dancer-svg" viewBox="0 0 200 265" xmlns="http://www.w3.org/2000/svg">
-
-              <!-- Shadow -->
-              <ellipse class="char-shadow" cx="100" cy="257" rx="48" ry="9"/>
-
-              <!-- Left leg -->
-              <g class="dancer-leg dancer-leg-left" style="transform-box:fill-box;transform-origin:top center">
-                <rect class="char-clothes" x="72" y="182" width="24" height="62" rx="12"/>
-                <ellipse class="char-shoe" cx="84" cy="244" rx="27" ry="12"/>
-              </g>
-
-              <!-- Right leg -->
-              <g class="dancer-leg dancer-leg-right" style="transform-box:fill-box;transform-origin:top center">
-                <rect class="char-clothes" x="104" y="182" width="24" height="62" rx="12"/>
-                <ellipse class="char-shoe" cx="116" cy="244" rx="27" ry="12"/>
-              </g>
-
-              <!-- Body group (bounces together) -->
-              <g class="dancer-body" style="transform-box:fill-box;transform-origin:bottom center">
-
-                <!-- Torso -->
-                <rect class="char-clothes" x="60" y="95" width="80" height="96" rx="28"/>
-
-                <!-- Left arm -->
-                <g class="dancer-arm dancer-arm-left" style="transform-box:fill-box;transform-origin:right center">
-                  <rect class="char-clothes" x="10" y="108" width="54" height="22" rx="11"/>
-                  <circle class="char-skin" cx="8" cy="119" r="13"/>
-                </g>
-
-                <!-- Right arm + ukulele -->
-                <g class="dancer-arm dancer-arm-right" style="transform-box:fill-box;transform-origin:left center">
-                  <rect class="char-clothes" x="136" y="108" width="54" height="22" rx="11"/>
-                  <!-- Ukulele body (figure-8) -->
-                  <ellipse class="char-uke-body" cx="198" cy="128" rx="12" ry="13"/>
-                  <ellipse class="char-uke-body" cx="198" cy="148" rx="14" ry="15"/>
-                  <!-- Uke neck -->
-                  <rect class="char-uke-neck" x="195" y="105" width="6" height="25" rx="3"/>
-                  <!-- Uke tuning pegs -->
-                  <rect class="char-uke-neck" x="201" y="108" width="8" height="3" rx="1.5"/>
-                  <rect class="char-uke-neck" x="201" y="114" width="8" height="3" rx="1.5"/>
-                  <!-- Uke strings -->
-                  <line class="char-uke-string" x1="194" y1="118" x2="194" y2="157"/>
-                  <line class="char-uke-string" x1="197" y1="118" x2="197" y2="157"/>
-                  <line class="char-uke-string" x1="200" y1="118" x2="200" y2="157"/>
-                  <line class="char-uke-string" x1="203" y1="118" x2="203" y2="157"/>
-                  <!-- Sound hole -->
-                  <circle cx="198" cy="148" r="5" class="char-uke-hole"/>
-                </g>
-
-                <!-- Head -->
-                <g class="dancer-head" style="transform-box:fill-box;transform-origin:bottom center">
-                  <circle class="char-skin" cx="100" cy="60" r="44"/>
-
-                  <!-- Hair spikes -->
-                  <path class="char-hair" d="M 70 40 Q 77 15 84 40 Z"/>
-                  <path class="char-hair" d="M 88 33 Q 100 6 112 33 Z"/>
-                  <path class="char-hair" d="M 116 40 Q 123 15 130 40 Z"/>
-
-                  <!-- Left eye -->
-                  <g class="dancer-eye-l" style="transform-box:fill-box;transform-origin:center">
-                    <circle cx="84" cy="58" r="9" fill="white"/>
-                    <circle class="char-pupil" cx="86" cy="60" r="5.5"/>
-                    <circle cx="88" cy="56" r="2.5" fill="white"/>
-                  </g>
-                  <!-- Right eye -->
-                  <g class="dancer-eye-r" style="transform-box:fill-box;transform-origin:center">
-                    <circle cx="116" cy="58" r="9" fill="white"/>
-                    <circle class="char-pupil" cx="118" cy="60" r="5.5"/>
-                    <circle cx="120" cy="56" r="2.5" fill="white"/>
-                  </g>
-
-                  <!-- Smile -->
-                  <path class="char-mouth" d="M 85 74 Q 100 91 115 74" stroke-width="3.5" stroke-linecap="round" fill="none"/>
-
-                  <!-- Blush -->
-                  <ellipse cx="72" cy="70" rx="10" ry="7" fill="#f87171" opacity="0.4"/>
-                  <ellipse cx="128" cy="70" rx="10" ry="7" fill="#f87171" opacity="0.4"/>
-                </g>
-
-              </g>
-
-              <!-- Floating music notes -->
-              <text class="dancer-note note-1" x="148" y="52" font-size="22">♪</text>
-              <text class="dancer-note note-2" x="20" y="65" font-size="16">♫</text>
-              <text class="dancer-note note-3" x="156" y="90" font-size="14">♩</text>
-
-            </svg>
+            <div id="lottieIdle"    class="lottie-player"></div>
+            <div id="lottiePlaying" class="lottie-player" hidden></div>
           </div>
         </div>
       </section>
@@ -267,6 +182,7 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/howler/2.2.4/howler.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/bodymovin/5.12.2/lottie.min.js"></script>
   <script src="script.js"></script>
 </body>
 </html>
