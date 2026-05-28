@@ -1,4 +1,49 @@
-"use strict";
+// ── Utility imports (pure functions — also used by unit tests) ──────────────
+import { formatTime }               from "./src/utils/formatTime.js";
+import { createUUID }               from "./src/utils/createUUID.js";
+import { buildChordsFromLyrics,
+         findCurrentTimedIndex }    from "./src/utils/chordEngine.js";
+import { buildSong }                from "./src/utils/songBuilder.js";
+import { getMp3PathFor as _getMp3 } from "./src/utils/playerUtils.js";
+import { getChordData,
+         renderChordDiagramSVG }    from "./src/utils/chordDiagram.js";
+import { findSectionBounds,
+         normalizeABRange,
+         shouldSeekBack,
+         calcLoopMarkerPercents }   from "./src/utils/loopEngine.js";
+import { STRUM_PATTERNS,
+         getPatternById,
+         calcCurrentBeat }         from "./src/utils/strumEngine.js";
+import { buildEditorRows,
+         applyStamp,
+         shiftTime,
+         exportToLyricsJson,
+         countStamped,
+         updateSegment,
+         addSegment,
+         removeSegment,
+         insertLineRow,
+         removeRow,
+         insertSectionRow,
+         updateSectionName }       from "./src/utils/timestampEditor.js";
+import { toggleFavoriteId,
+         filterFavorites,
+         addSession,
+         aggregateBySong,
+         recentSessions,
+         totalSecInDays,
+         formatLogDuration }        from "./src/utils/practiceLog.js";
+import { buildChordRows,
+         applyChordStamp,
+         shiftChordTime,
+         updateChordName,
+         insertChordRow,
+         removeChordRow,
+         exportToChordJson,
+         countChordStamped,
+         importChordsFromLyrics,
+         buildLyricContext,
+         findLyricContextAt }      from "./src/utils/chordEditor.js";
 
 /* =========================
    State
@@ -43,7 +88,32 @@ const state = {
   dancerEnabled: true,    // master toggle for dancing character visibility
   panelsSwapped: false,   // false: Chord centre, Lyrics right | true: Lyrics centre, Chord right
   lottieIdle: null,       // Lottie instance — idle/relax animation
-  lottiePlaying: null     // Lottie instance — playing/wave-sound animation
+  lottiePlaying: null,    // Lottie instance — playing/wave-sound animation
+  strumPatternId: "island", // currently selected strumming pattern id
+  editorOpen:      false,   // true when Timestamp Editor is visible
+  editorTab:            "lyrics",// "lyrics" | "chords"
+  editorRows:           [],      // current lyrics editor row objects
+  editorFocusIdx:       -1,      // focused lyrics row index (-1 = none)
+  chordRows:            [],      // current chord editor row objects
+  chordFocusIdx:        -1,      // focused chord row index (-1 = none)
+  editorBannerLyricIdx: -1,      // cached lyric-row index shown in banner
+  chordAutoScroll:      true,    // auto-scroll chord list to active row while playing
+  editorActiveChordIdx: -1,      // last chord row index highlighted by auto-scroll
+  chordDiagramLandscape: false,  // true = chord diagram rotated to landscape
+  // ── Favorites ──
+  favorites:       new Set(),   // Set of song IDs marked as favorites
+  favFilterOn:     false,       // true = show only favorite songs in dropdown
+  // ── Practice Log ──
+  practiceLog:         [],      // array of { songId, songTitle, date, durationSec }
+  practiceSessionStart: null,   // Date.now() when play started (null if paused/stopped)
+  practiceSessionSec:   0,      // accumulated seconds for the current session
+  loop: {
+    mode: null,           // null | "ab" | "section"
+    sectionLabel: null,   // section name when mode="section"
+    startTime: null,      // loop start in seconds
+    endTime: null,        // loop end in seconds (null = last section, use duration)
+    aMarked: false,       // true when A point is set but B not yet confirmed
+  }
 };
 
 /* =========================
@@ -72,6 +142,7 @@ const dom = {
   metroVisual:       document.getElementById("metroVisual"),
   metroStateText:    document.getElementById("metroStateText"),
   chordDisplay:      document.getElementById("chordDisplay"),
+  chordDiagram:      document.getElementById("chordDiagram"),
   currentChordLabel: document.getElementById("currentChordLabel"),
   lyricsContainer:   document.getElementById("lyricsContainer"),
 
@@ -90,63 +161,60 @@ const dom = {
 
   // Layout swap (Chord ↔ Lyrics)
   swapPanelsBtn:   document.getElementById("swapPanelsBtn"),
-  mainGrid:        document.querySelector(".main-grid")
+  mainGrid:        document.querySelector(".main-grid"),
+
+  // Timestamp / Chord Editor
+  editorTabLyrics:    document.getElementById("editorTabLyrics"),
+  editorTabChords:    document.getElementById("editorTabChords"),
+  editorImportBtn:     document.getElementById("editorImportBtn"),
+  editorLyricBanner:   document.getElementById("editorLyricBanner"),
+  chordAutoScrollBtn:  document.getElementById("chordAutoScrollBtn"),
+  diagramOrientBtn:    document.getElementById("diagramOrientBtn"),
+  // Favorites + History
+  favoriteBtn:    document.getElementById("favoriteBtn"),
+  favoriteIcon:   document.getElementById("favoriteIcon"),
+  favFilterBtn:   document.getElementById("favFilterBtn"),
+  historyBtn:     document.getElementById("historyBtn"),
+  historyPanel:   document.getElementById("historyPanel"),
+  historyContent: document.getElementById("historyContent"),
+  historyCloseBtn:document.getElementById("historyCloseBtn"),
+  historyClearBtn:document.getElementById("historyClearBtn"),
+  editorToggleBtn:    document.getElementById("editorToggleBtn"),
+  editorPanel:        document.getElementById("editorPanel"),
+  editorCloseBtn:     document.getElementById("editorCloseBtn"),
+  editorSongTitle:    document.getElementById("editorSongTitle"),
+  editorStampCount:   document.getElementById("editorStampCount"),
+  editorExportBtn:    document.getElementById("editorExportBtn"),
+  editorLinesList:    document.getElementById("editorLinesList"),
+  editorPlayPauseBtn: document.getElementById("editorPlayPauseBtn"),
+  editorStopBtn:      document.getElementById("editorStopBtn"),
+  editorSeekBackBtn:  document.getElementById("editorSeekBackBtn"),
+  editorSeekFwdBtn:   document.getElementById("editorSeekFwdBtn"),
+  editorCurrentTime:  document.getElementById("editorCurrentTime"),
+  editorDurationTime: document.getElementById("editorDurationTime"),
+  editorProgressTrack:document.getElementById("editorProgressTrack"),
+  editorProgressFill: document.getElementById("editorProgressFill"),
+
+  // Strumming Pattern Visualizer
+  strumVisualizer:   document.getElementById("strumVisualizer"),
+  strumPatternBtns:  document.getElementById("strumPatternBtns"),
+  strumBeats:        document.getElementById("strumBeats"),
+
+  // Loop controls
+  loopABtn:        document.getElementById("loopABtn"),
+  loopBBtn:        document.getElementById("loopBBtn"),
+  loopClearBtn:    document.getElementById("loopClearBtn"),
+  loopStatusText:  document.getElementById("loopStatusText"),
+  loopMarkerA:     document.getElementById("loopMarkerA"),
+  loopMarkerB:     document.getElementById("loopMarkerB"),
+  loopRegion:      document.getElementById("loopRegion"),
 };
 
 /* =========================
    Utility Functions
 ========================= */
-function formatTime(seconds) {
-  if (!Number.isFinite(seconds) || seconds < 0) return "00:00";
-  const mins = Math.floor(seconds / 60);
-  const secs = Math.floor(seconds % 60);
-  return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
-}
-
-function createUUID() {
-  if (crypto && typeof crypto.randomUUID === "function") return crypto.randomUUID();
-  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, char => {
-    const r = Math.random() * 16 | 0;
-    return (char === "x" ? r : (r & 0x3) | 0x8).toString(16);
-  });
-}
-
-// Builds the final song object from a manifest entry + its lyrics & chords arrays
-function buildSong(meta, lyricsArr, chordsArr) {
-  const lyrics = Array.isArray(lyricsArr) ? lyricsArr : [];
-  const explicit = Array.isArray(chordsArr) ? chordsArr : null;
-
-  const chords = explicit
-    ? explicit
-        .map(c => ({ time: Number(c.time), chord: String(c.chord || "") }))
-        .filter(c => Number.isFinite(c.time) && c.chord)
-        .sort((a, b) => a.time - b.time)
-    : buildChordsFromLyrics(lyrics);
-
-  return {
-    id:    meta.id || createUUID(),
-    title: meta.title || "Untitled Song",
-    mp3:   meta.mp3 || "",
-    bpm:   Number(meta.bpm) || 100,
-    lyrics,
-    chords
-  };
-}
-
-// Fallback ONLY — used when a song has no entry in chords.json.
-// Takes the first chord-bearing segment of each lyric line.
-// For precise mid-line chord changes, define them in chords.json instead.
-function buildChordsFromLyrics(lyrics) {
-  const chords = [];
-  lyrics.forEach(entry => {
-    if (!Array.isArray(entry.line)) return;
-    const firstSeg = entry.line.find(seg => seg.chord);
-    if (firstSeg) {
-      chords.push({ time: Number(entry.time), chord: firstSeg.chord });
-    }
-  });
-  return chords.sort((a, b) => a.time - b.time);
-}
+// formatTime, createUUID, buildSong, buildChordsFromLyrics,
+// findCurrentTimedIndex — all imported from src/utils/ at the top of this file.
 
 // Update the load-status indicator light (green/red/yellow dot in section-title)
 // state: "loading" | "success" | "error"
@@ -157,13 +225,1135 @@ function setLoadStatus(state, label) {
   dom.loadStatus.setAttribute("aria-label", label);
 }
 
-function findCurrentTimedIndex(items, currentSeconds) {
-  let index = -1;
-  for (let i = 0; i < items.length; i++) {
-    if (currentSeconds >= Number(items[i].time)) index = i;
+
+
+/* =========================
+   Timestamp Editor
+========================= */
+
+/** Formats seconds as "MM:SS.d" (one decimal) for the timestamp badges. */
+function formatEditorTime(seconds) {
+  if (!isFinite(seconds) || seconds < 0) return "00:00.0";
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${String(m).padStart(2, "0")}:${s.toFixed(1).padStart(4, "0")}`;
+}
+
+/** Opens the editor for the currently selected song. */
+function openEditor() {
+  if (!state.selectedSong || !state.duration) return;
+  state.editorOpen     = true;
+  state.editorTab      = "lyrics";
+  state.editorRows     = buildEditorRows(state.selectedSong.lyrics ?? []);
+  state.editorFocusIdx = -1;
+  state.chordRows      = buildChordRows(state.selectedSong.chords ?? []);
+  state.chordFocusIdx  = -1;
+
+  if (dom.editorSongTitle)    dom.editorSongTitle.textContent    = state.selectedSong.title;
+  if (dom.editorDurationTime) dom.editorDurationTime.textContent = formatTime(state.duration);
+
+  // Activate lyrics tab by default
+  switchEditorTab("lyrics");
+  updateEditorPlayPauseIcon();
+
+  const t = state.sound ? (Number(state.sound.seek()) || 0) : 0;
+  updateEditorProgress(t);
+
+  if (dom.editorPanel) dom.editorPanel.hidden = false;
+  if (dom.mainGrid)    dom.mainGrid.hidden    = true;
+}
+
+/** Switches between the "lyrics" and "chords" editor tabs. */
+function switchEditorTab(tab) {
+  state.editorTab              = tab;
+  state.editorBannerLyricIdx   = -1;  // reset banner cache on every tab switch
+  state.editorActiveChordIdx   = -1;  // force highlight re-apply after tab switch
+
+  if (dom.editorTabLyrics) dom.editorTabLyrics.classList.toggle("active", tab === "lyrics");
+  if (dom.editorTabChords) dom.editorTabChords.classList.toggle("active", tab === "chords");
+
+  // Show/hide chord-only controls
+  const onChords = tab === "chords";
+  if (dom.editorImportBtn)   dom.editorImportBtn.hidden   = !onChords;
+  if (dom.editorLyricBanner) dom.editorLyricBanner.hidden = !onChords;
+
+  if (tab === "lyrics") {
+    state.editorFocusIdx = -1;
+    renderEditorLines();
+  } else {
+    state.chordFocusIdx = -1;
+    renderChordRows();
+    // Immediately populate banner for current playback position
+    const t = state.sound ? (Number(state.sound.seek()) || 0) : 0;
+    updateEditorLyricBanner(t);
+  }
+  updateEditorStampCount();
+}
+
+/** Closes the editor and returns to the normal view. */
+function closeEditor() {
+  state.editorOpen = false;
+  if (dom.editorPanel) dom.editorPanel.hidden = true;
+  if (dom.mainGrid)    dom.mainGrid.hidden    = false;
+}
+
+// Detect whether the browser supports field-sizing:content natively.
+// If not, we fall back to measuring scrollWidth manually.
+const _supportsFieldSizing = CSS.supports("field-sizing", "content");
+
+/**
+ * Sizes an <input> to exactly fit its current content.
+ * This is a no-op when the browser already handles it via field-sizing:content.
+ */
+function autoResizeInput(input) {
+  if (_supportsFieldSizing) return;          // CSS handles it — nothing to do
+  input.style.width = "1px";                 // collapse so scrollWidth = natural content width
+  input.style.width = input.scrollWidth + "px";
+}
+
+/** Re-renders the editor lines list and resets focus (used after structural changes). */
+function reRenderEditorLines() {
+  state.editorFocusIdx = -1;
+  renderEditorLines();
+  updateEditorStampCount();
+}
+
+/** Creates a delete-row button for the row at `rowIdx`. */
+function makeDelRowBtn(rowIdx) {
+  const btn     = document.createElement("button");
+  btn.type      = "button";
+  btn.className = "editor-del-row-btn icon-btn";
+  btn.innerHTML = `<i class="fa-solid fa-trash-can"></i>`;
+  btn.title     = "ลบบรรทัดนี้";
+  btn.addEventListener("click", e => {
+    e.stopPropagation();
+    state.editorRows = removeRow(state.editorRows, rowIdx);
+    reRenderEditorLines();
+  });
+  return btn;
+}
+
+/** Creates an insert-row divider (appears between/before rows with add buttons). */
+function makeInsertDivider(afterIdx) {
+  const div     = document.createElement("div");
+  div.className = "editor-row-divider";
+
+  const addLineBtn     = document.createElement("button");
+  addLineBtn.type      = "button";
+  addLineBtn.className = "editor-insert-btn";
+  addLineBtn.innerHTML = `<i class="fa-solid fa-plus"></i> บรรทัด`;
+  addLineBtn.title     = "เพิ่มบรรทัดเนื้อเพลง";
+  addLineBtn.addEventListener("click", e => {
+    e.stopPropagation();
+    state.editorRows = insertLineRow(state.editorRows, afterIdx);
+    reRenderEditorLines();
+    // Auto-focus the new row's first lyric input
+    setTimeout(() => {
+      const newIdx = afterIdx + 1;
+      const newEl  = dom.editorLinesList.querySelector(`[data-row-index="${newIdx}"] .editor-lyric-input`);
+      if (newEl) newEl.focus();
+    }, 30);
+  });
+  div.appendChild(addLineBtn);
+
+  const addSecBtn     = document.createElement("button");
+  addSecBtn.type      = "button";
+  addSecBtn.className = "editor-insert-btn editor-insert-sec-btn";
+  addSecBtn.innerHTML = `<i class="fa-solid fa-layer-group"></i> Section`;
+  addSecBtn.title     = "เพิ่ม Section header";
+  addSecBtn.addEventListener("click", e => {
+    e.stopPropagation();
+    state.editorRows = insertSectionRow(state.editorRows, afterIdx, "");
+    reRenderEditorLines();
+    // Auto-focus the new section name input
+    setTimeout(() => {
+      const newIdx = afterIdx + 1;
+      const newEl  = dom.editorLinesList.querySelector(`[data-row-index="${newIdx}"] .editor-section-input`);
+      if (newEl) newEl.focus();
+    }, 30);
+  });
+  div.appendChild(addSecBtn);
+
+  return div;
+}
+
+/** Builds and inserts all row elements into the editor lines list. */
+function renderEditorLines() {
+  if (!dom.editorLinesList) return;
+  dom.editorLinesList.innerHTML = "";
+
+  // Top insert divider (before index 0)
+  dom.editorLinesList.appendChild(makeInsertDivider(-1));
+
+  state.editorRows.forEach((row, i) => {
+    const el = document.createElement("div");
+    el.dataset.rowIndex = String(i);
+
+    if (row.type === "section") {
+      // ── Section row (now editable) ─────────────────────────────────────
+      el.className = "editor-row editor-row-section";
+
+      const nameInput       = document.createElement("input");
+      nameInput.type        = "text";
+      nameInput.className   = "editor-section-input";
+      nameInput.value       = row.sectionName;
+      nameInput.placeholder = "ชื่อ Section…";
+      nameInput.title       = "แก้ไขชื่อ Section";
+      nameInput.addEventListener("input", () => {
+        state.editorRows = updateSectionName(state.editorRows, i, nameInput.value);
+      });
+      el.appendChild(nameInput);
+
+      el.appendChild(makeDelRowBtn(i));
+
+    } else {
+      // ── Line row (fully editable) ──────────────────────────────────────
+      el.className = "editor-row editor-row-line";
+      el.tabIndex  = 0;
+
+      // Time badge + fine-tune buttons
+      const timeDiv   = document.createElement("div");
+      timeDiv.className = "editor-row-time";
+
+      const badge     = document.createElement("span");
+      badge.className = `editor-time-badge ${row.time !== null ? "stamped" : "unstamped"}`;
+      badge.textContent = row.time !== null ? formatEditorTime(row.time) : "--:--";
+      timeDiv.appendChild(badge);
+
+      const fineBtns  = document.createElement("div");
+      fineBtns.className = "editor-fine-btns";
+      [-0.1, 0.1].forEach(delta => {
+        const btn       = document.createElement("button");
+        btn.type        = "button";
+        btn.className   = "editor-fine-btn";
+        btn.textContent = delta < 0 ? "−" : "+";
+        btn.title       = `${delta > 0 ? "+" : ""}${delta.toFixed(1)}s`;
+        btn.dataset.rowIndex = String(i);
+        btn.dataset.delta    = String(delta);
+        btn.addEventListener("click", e => {
+          e.stopPropagation();
+          const idx = Number(btn.dataset.rowIndex);
+          state.editorRows = shiftTime(state.editorRows, idx, Number(btn.dataset.delta));
+          refreshEditorRowBadge(idx);
+          updateEditorStampCount();
+        });
+        fineBtns.appendChild(btn);
+      });
+      timeDiv.appendChild(fineBtns);
+      el.appendChild(timeDiv);
+
+      // Content: editable segments
+      const content   = document.createElement("div");
+      content.className = "editor-row-content";
+
+      (row.originalLine || []).forEach((seg, si) => {
+        const segEl       = document.createElement("div");
+        segEl.className   = "editor-seg editor-seg-editable";
+
+        // ── Chord row: input + optional remove-segment button ──
+        const chordRow    = document.createElement("div");
+        chordRow.className = "editor-seg-chord-row";
+
+        const chordInput       = document.createElement("input");
+        chordInput.type        = "text";
+        chordInput.className   = "editor-chord-input";
+        chordInput.value       = seg.chord ?? "";
+        chordInput.placeholder = "–";
+        chordInput.title       = "คอร์ด (ว่างไว้ได้ถ้าไม่มีคอร์ด)";
+        chordInput.addEventListener("input", () => {
+          state.editorRows = updateSegment(state.editorRows, i, si, { chord: chordInput.value });
+          autoResizeInput(chordInput);
+        });
+        autoResizeInput(chordInput);   // initial size
+        chordRow.appendChild(chordInput);
+
+        // Remove-segment button (only visible when >1 segment in the line)
+        if (row.originalLine.length > 1) {
+          const rmBtn     = document.createElement("button");
+          rmBtn.type      = "button";
+          rmBtn.className = "editor-rm-seg-btn";
+          rmBtn.innerHTML = `<i class="fa-solid fa-xmark"></i>`;
+          rmBtn.title     = "ลบ segment นี้";
+          rmBtn.addEventListener("click", e => {
+            e.stopPropagation();
+            state.editorRows = removeSegment(state.editorRows, i, si);
+            reRenderEditorLines();
+          });
+          chordRow.appendChild(rmBtn);
+        }
+        segEl.appendChild(chordRow);
+
+        // ── Lyric input ──
+        const lyricInput       = document.createElement("input");
+        lyricInput.type        = "text";
+        lyricInput.className   = "editor-lyric-input";
+        lyricInput.value       = seg.lyric ?? "";
+        lyricInput.placeholder = "เนื้อเพลง…";
+        lyricInput.addEventListener("input", () => {
+          state.editorRows = updateSegment(state.editorRows, i, si, { lyric: lyricInput.value });
+          autoResizeInput(lyricInput);
+        });
+        autoResizeInput(lyricInput);   // initial size
+        segEl.appendChild(lyricInput);
+        content.appendChild(segEl);
+      });
+
+      // ── Add-segment button ──
+      const addSegBtn     = document.createElement("button");
+      addSegBtn.type      = "button";
+      addSegBtn.className = "editor-add-seg-btn chip";
+      addSegBtn.innerHTML = `<i class="fa-solid fa-plus"></i>`;
+      addSegBtn.title     = "เพิ่ม segment (คอร์ด + เนื้อ)";
+      addSegBtn.addEventListener("click", e => {
+        e.stopPropagation();
+        state.editorRows = addSegment(state.editorRows, i);
+        reRenderEditorLines();
+        // Focus the new chord input in the added segment
+        setTimeout(() => {
+          const rowEl  = dom.editorLinesList.querySelector(`[data-row-index="${i}"]`);
+          const inputs = rowEl ? rowEl.querySelectorAll(".editor-chord-input") : [];
+          if (inputs.length) inputs[inputs.length - 1].focus();
+        }, 30);
+      });
+      content.appendChild(addSegBtn);
+
+      el.appendChild(content);
+
+      // Stamp button
+      const stampBtn       = document.createElement("button");
+      stampBtn.type        = "button";
+      stampBtn.className   = "editor-stamp-btn chip";
+      stampBtn.innerHTML   = `<i class="fa-solid fa-clock"></i> Stamp`;
+      stampBtn.dataset.rowIndex = String(i);
+      stampBtn.addEventListener("click", e => {
+        e.stopPropagation();
+        editorStampRow(Number(stampBtn.dataset.rowIndex));
+      });
+      el.appendChild(stampBtn);
+
+      // Delete-row button
+      el.appendChild(makeDelRowBtn(i));
+
+      // Click row body to focus (skip when clicking inside an input or button)
+      el.addEventListener("click", ev => {
+        if (ev.target.closest("input, button")) return;
+        editorFocusRow(i);
+      });
+    }
+
+    dom.editorLinesList.appendChild(el);
+    // Insert divider after each row
+    dom.editorLinesList.appendChild(makeInsertDivider(i));
+  });
+}
+
+/** Moves focus (visual highlight) to a line row at `rowIdx`. */
+function editorFocusRow(rowIdx) {
+  if (rowIdx < 0 || rowIdx >= state.editorRows.length) return;
+  if (state.editorRows[rowIdx].type !== "line") return;
+
+  state.editorFocusIdx = rowIdx;
+
+  dom.editorLinesList.querySelectorAll(".editor-row-line.focused").forEach(el => {
+    el.classList.remove("focused");
+  });
+  const el = dom.editorLinesList.querySelector(`.editor-row-line[data-row-index="${rowIdx}"]`);
+  if (el) {
+    el.classList.add("focused");
+    el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+}
+
+/**
+ * Stamps the current playback time onto the row at `rowIdx`,
+ * then auto-advances focus to the next line row.
+ */
+function editorStampRow(rowIdx) {
+  if (!state.sound) return;
+  const t = Number(state.sound.seek()) || 0;
+  state.editorRows = applyStamp(state.editorRows, rowIdx, t);
+  refreshEditorRowBadge(rowIdx);
+  updateEditorStampCount();
+
+  // Auto-advance to next line row
+  const nextIdx = state.editorRows.findIndex((r, i) => i > rowIdx && r.type === "line");
+  if (nextIdx !== -1) editorFocusRow(nextIdx);
+}
+
+/** Refreshes the time badge of a single row without re-rendering the full list. */
+function refreshEditorRowBadge(rowIdx) {
+  const row = state.editorRows[rowIdx];
+  if (!row) return;
+  const el = dom.editorLinesList.querySelector(`.editor-row-line[data-row-index="${rowIdx}"]`);
+  if (!el) return;
+  const badge = el.querySelector(".editor-time-badge");
+  if (!badge) return;
+  const hasTime = row.time !== null;
+  badge.className   = `editor-time-badge ${hasTime ? "stamped" : "unstamped"}`;
+  badge.textContent = hasTime ? formatEditorTime(row.time) : "--:--";
+}
+
+/* =========================
+   Import from Lyrics + Live Banner
+========================= */
+
+/**
+ * Imports chord entries from the current lyrics editor rows and populates
+ * the chord editor. Warns when existing chord data would be overwritten.
+ */
+function handleEditorImport() {
+  if (!state.editorRows.length) {
+    alert("ไม่มีข้อมูลเนื้อร้อง — กรุณาสลับไปแท็บเนื้อเพลงแล้วเพิ่มข้อมูลก่อน");
+    return;
+  }
+
+  const imported = importChordsFromLyrics(state.editorRows);
+
+  if (!imported.length) {
+    alert("ไม่พบคอร์ดในเนื้อร้อง — กรุณาใส่คอร์ดในช่องคอร์ดของแท็บเนื้อเพลงก่อน");
+    return;
+  }
+
+  const unstamped = imported.filter(e => e.time === 0).length;
+  const hasOld    = state.chordRows.length > 0;
+
+  let msg = `พบ ${imported.length} คอร์ดจากเนื้อร้อง`;
+  if (unstamped > 0)  msg += `\n(${unstamped} คอร์ดยังไม่มีเวลา จะใช้ 0:00 ไว้ก่อน)`;
+  if (hasOld)         msg += `\n\n⚠️ ข้อมูลคอร์ดเดิม (${state.chordRows.length} รายการ) จะถูกแทนที่`;
+  msg += "\n\nดำเนินการต่อ?";
+
+  if (!confirm(msg)) return;
+
+  state.chordRows = buildChordRows(imported);
+  reRenderChordRows();
+
+  // Brief success feedback on the button
+  if (dom.editorImportBtn) {
+    dom.editorImportBtn.innerHTML = `<i class="fa-solid fa-check"></i> นำเข้า ${imported.length} คอร์ดแล้ว`;
+    setTimeout(() => {
+      if (dom.editorImportBtn)
+        dom.editorImportBtn.innerHTML = `<i class="fa-solid fa-file-import"></i> นำเข้าจากเนื้อร้อง`;
+    }, 3000);
+  }
+}
+
+/**
+ * Updates the live lyric banner shown above the chord list.
+ * Reads `state.editorRows` to find the lyric line at `currentSeconds`.
+ * Skips re-rendering when the active line hasn't changed (cached by index).
+ *
+ * @param {number} currentSeconds  current playback position
+ */
+function updateEditorLyricBanner(currentSeconds) {
+  if (!dom.editorLyricBanner || dom.editorLyricBanner.hidden) return;
+
+  // Find index of the last lyric-line row whose time ≤ currentSeconds
+  const lineRows = state.editorRows.filter(r => r.type === "line" && r.time !== null);
+  let activeIdx  = -1;
+  for (let i = 0; i < lineRows.length; i++) {
+    if (lineRows[i].time <= currentSeconds) activeIdx = i;
     else break;
   }
-  return index;
+
+  // Only re-render when the active line actually changes
+  if (activeIdx === state.editorBannerLyricIdx) return;
+  state.editorBannerLyricIdx = activeIdx;
+
+  // Update only the dynamic content zone — never touch .editor-banner-actions
+  const contentEl = dom.editorLyricBanner.querySelector(".editor-banner-content");
+  if (!contentEl) return;
+  contentEl.innerHTML = "";
+
+  const label       = document.createElement("span");
+  label.className   = "banner-label";
+  label.textContent = "เนื้อร้อง";
+  contentEl.appendChild(label);
+
+  if (activeIdx < 0) {
+    const hint       = document.createElement("span");
+    hint.className   = "banner-hint";
+    hint.textContent = "—";
+    contentEl.appendChild(hint);
+    return;
+  }
+
+  const row  = lineRows[activeIdx];
+  const segs = row.originalLine || [];
+
+  // Chord names (deduplicated, preserving order)
+  const seen   = new Set();
+  const chords = segs
+    .map(s => (s.chord || "").trim())
+    .filter(c => c && !seen.has(c) && seen.add(c));
+
+  if (chords.length) {
+    const chordEl       = document.createElement("span");
+    chordEl.className   = "banner-chord";
+    chordEl.textContent = chords.join(" / ");
+    contentEl.appendChild(chordEl);
+  }
+
+  // Lyric text
+  const lyricText = segs.map(s => s.lyric ?? "").join("").trim();
+  if (lyricText) {
+    const lyricEl       = document.createElement("span");
+    lyricEl.className   = "banner-lyric";
+    lyricEl.textContent = lyricText;
+    contentEl.appendChild(lyricEl);
+  }
+}
+
+/** Toggles chord-editor auto-scroll on/off and syncs button appearance. */
+function applyChordAutoScroll(enabled) {
+  state.chordAutoScroll = !!enabled;
+  if (dom.chordAutoScrollBtn) {
+    dom.chordAutoScrollBtn.classList.toggle("is-on",  state.chordAutoScroll);
+    dom.chordAutoScrollBtn.classList.toggle("is-off", !state.chordAutoScroll);
+    dom.chordAutoScrollBtn.setAttribute("aria-pressed", String(state.chordAutoScroll));
+  }
+}
+
+/**
+ * Called every RAF tick (via updateEditorProgress).
+ * Finds the chord row whose time is ≤ currentSeconds, highlights it,
+ * and scrolls it into view when auto-scroll is enabled.
+ */
+function updateChordAutoScroll(currentSeconds) {
+  if (!state.editorOpen || state.editorTab !== "chords") return;
+  if (!dom.editorLinesList) return;
+
+  // Find active chord index (last row with time ≤ currentSeconds)
+  let activeIdx = -1;
+  for (let i = 0; i < state.chordRows.length; i++) {
+    const { time } = state.chordRows[i];
+    if (time !== null && time <= currentSeconds) activeIdx = i;
+  }
+
+  // Update highlight regardless of auto-scroll setting
+  if (activeIdx !== state.editorActiveChordIdx) {
+    // Remove old highlight
+    const prev = dom.editorLinesList.querySelector(".editor-chord-row.playing");
+    if (prev) prev.classList.remove("playing");
+
+    state.editorActiveChordIdx = activeIdx;
+
+    // Apply new highlight
+    if (activeIdx >= 0) {
+      const el = dom.editorLinesList.querySelector(
+        `.editor-chord-row[data-chord-index="${activeIdx}"]`
+      );
+      if (el) {
+        el.classList.add("playing");
+        if (state.chordAutoScroll) {
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }
+    }
+  }
+}
+
+/* =========================
+   Chord Editor Tab
+========================= */
+
+/** Re-renders chord rows and resets focus (used after structural changes). */
+function reRenderChordRows() {
+  state.chordFocusIdx      = -1;
+  state.editorActiveChordIdx = -1;  // force highlight re-apply after render
+  renderChordRows();
+  updateEditorStampCount();
+}
+
+/** Creates a delete button for the chord row at `idx`. */
+function makeChordDelBtn(idx) {
+  const btn     = document.createElement("button");
+  btn.type      = "button";
+  btn.className = "editor-del-row-btn icon-btn";
+  btn.innerHTML = `<i class="fa-solid fa-trash-can"></i>`;
+  btn.title     = "ลบคอร์ดนี้";
+  btn.addEventListener("click", e => {
+    e.stopPropagation();
+    state.chordRows = removeChordRow(state.chordRows, idx);
+    reRenderChordRows();
+  });
+  return btn;
+}
+
+/** Creates an insert divider with a "+ คอร์ด" button. */
+function makeChordInsertDivider(afterIdx) {
+  const div     = document.createElement("div");
+  div.className = "editor-row-divider";
+
+  const addBtn     = document.createElement("button");
+  addBtn.type      = "button";
+  addBtn.className = "editor-insert-btn";
+  addBtn.innerHTML = `<i class="fa-solid fa-plus"></i> คอร์ด`;
+  addBtn.title     = "เพิ่มคอร์ดใหม่";
+  addBtn.addEventListener("click", e => {
+    e.stopPropagation();
+    state.chordRows = insertChordRow(state.chordRows, afterIdx);
+    reRenderChordRows();
+    setTimeout(() => {
+      const newIdx = afterIdx + 1;
+      const newEl  = dom.editorLinesList.querySelector(
+        `[data-chord-index="${newIdx}"] .editor-chname-input`
+      );
+      if (newEl) newEl.focus();
+    }, 30);
+  });
+  div.appendChild(addBtn);
+  return div;
+}
+
+/** Creates a visual-only section header divider for the chord tab. */
+function makeChordSectionDivider(name) {
+  const el = document.createElement("div");
+  el.className = "editor-chord-section";
+  el.innerHTML =
+    `<span class="chord-sec-line"></span>` +
+    `<i class="fa-solid fa-music"></i>` +
+    `<span class="chord-sec-name">${name || "(section)"}</span>` +
+    `<span class="chord-sec-line"></span>`;
+  return el;
+}
+
+/** Builds and inserts all chord row elements into the editor lines list. */
+function renderChordRows() {
+  if (!dom.editorLinesList) return;
+  dom.editorLinesList.innerHTML = "";
+
+  // Top insert divider
+  dom.editorLinesList.appendChild(makeChordInsertDivider(-1));
+
+  if (!state.chordRows.length) {
+    const empty     = document.createElement("p");
+    empty.className = "empty-state";
+    empty.style.padding = "24px";
+    empty.textContent   = "ยังไม่มีข้อมูลคอร์ด — กด + คอร์ด เพื่อเริ่มเพิ่ม";
+    dom.editorLinesList.appendChild(empty);
+    return;
+  }
+
+  // Build lyric context once for section dividers + hints
+  const lyricCtx   = buildLyricContext(state.editorRows);
+  let   lastSection = undefined;  // undefined = "haven't passed any stamped chord yet"
+
+  state.chordRows.forEach((row, i) => {
+    // ── Find lyric context for this chord (only when stamped) ──────────────
+    const ctx = row.time !== null ? findLyricContextAt(lyricCtx, row.time) : null;
+
+    // ── Section divider — inject when entering a new named section ──────────
+    if (ctx !== null && ctx.sectionName !== null && ctx.sectionName !== lastSection) {
+      lastSection = ctx.sectionName;
+      dom.editorLinesList.appendChild(makeChordSectionDivider(ctx.sectionName));
+    }
+
+    const el      = document.createElement("div");
+    el.className  = "editor-row editor-chord-row";
+    el.dataset.chordIndex = String(i);
+    el.tabIndex   = 0;
+
+    // Time area (same pattern as lyrics rows)
+    const timeDiv   = document.createElement("div");
+    timeDiv.className = "editor-row-time";
+
+    const badge     = document.createElement("span");
+    badge.className = `editor-time-badge ${row.time !== null ? "stamped" : "unstamped"}`;
+    badge.textContent = row.time !== null ? formatEditorTime(row.time) : "--:--";
+    timeDiv.appendChild(badge);
+
+    const fineBtns  = document.createElement("div");
+    fineBtns.className = "editor-fine-btns";
+    [-0.1, 0.1].forEach(delta => {
+      const btn       = document.createElement("button");
+      btn.type        = "button";
+      btn.className   = "editor-fine-btn";
+      btn.textContent = delta < 0 ? "−" : "+";
+      btn.title       = `${delta > 0 ? "+" : ""}${delta.toFixed(1)}s`;
+      btn.addEventListener("click", e => {
+        e.stopPropagation();
+        state.chordRows = shiftChordTime(state.chordRows, i, delta);
+        refreshChordRowBadge(i);
+        updateEditorStampCount();
+      });
+      fineBtns.appendChild(btn);
+    });
+    timeDiv.appendChild(fineBtns);
+    el.appendChild(timeDiv);
+
+    // Chord name input (prominent — this IS the main content)
+    const chordInput       = document.createElement("input");
+    chordInput.type        = "text";
+    chordInput.className   = "editor-chname-input";
+    chordInput.value       = row.chord;
+    chordInput.placeholder = "คอร์ด…";
+    chordInput.title       = "ชื่อคอร์ด เช่น Am, G7, Cmaj7/E";
+    chordInput.addEventListener("input", () => {
+      state.chordRows = updateChordName(state.chordRows, i, chordInput.value);
+      autoResizeInput(chordInput);
+    });
+    autoResizeInput(chordInput);
+    el.appendChild(chordInput);
+
+    // Stamp button
+    const stampBtn       = document.createElement("button");
+    stampBtn.type        = "button";
+    stampBtn.className   = "editor-stamp-btn chip";
+    stampBtn.innerHTML   = `<i class="fa-solid fa-clock"></i> Stamp`;
+    stampBtn.addEventListener("click", e => {
+      e.stopPropagation();
+      chordStampRow(i);
+    });
+    el.appendChild(stampBtn);
+
+    // Delete button
+    el.appendChild(makeChordDelBtn(i));
+
+    // Click to focus
+    el.addEventListener("click", ev => {
+      if (ev.target.closest("input, button")) return;
+      chordFocusRow(i);
+    });
+
+    dom.editorLinesList.appendChild(el);
+
+    // ── Lyric hint — show matching lyric text under the chord row ──────────
+    if (ctx && ctx.lyricText) {
+      const hint     = document.createElement("div");
+      hint.className = "editor-chord-lyric-hint";
+      hint.textContent = `↳ ${ctx.lyricText}`;
+      dom.editorLinesList.appendChild(hint);
+    }
+
+    dom.editorLinesList.appendChild(makeChordInsertDivider(i));
+  });
+}
+
+/** Sets focus highlight on chord row at `idx`. */
+function chordFocusRow(idx) {
+  if (idx < 0 || idx >= state.chordRows.length) return;
+  state.chordFocusIdx = idx;
+
+  dom.editorLinesList.querySelectorAll(".editor-chord-row.focused").forEach(el => {
+    el.classList.remove("focused");
+  });
+  const el = dom.editorLinesList.querySelector(`.editor-chord-row[data-chord-index="${idx}"]`);
+  if (el) {
+    el.classList.add("focused");
+    el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+}
+
+/** Stamps current playback time on chord row `idx`, then advances focus. */
+function chordStampRow(idx) {
+  if (!state.sound) return;
+  const t = Number(state.sound.seek()) || 0;
+  state.chordRows = applyChordStamp(state.chordRows, idx, t);
+  refreshChordRowBadge(idx);
+  updateEditorStampCount();
+  if (idx < state.chordRows.length - 1) chordFocusRow(idx + 1);
+}
+
+/** Refreshes the time badge of a single chord row in-place. */
+function refreshChordRowBadge(idx) {
+  const row = state.chordRows[idx];
+  if (!row) return;
+  const el = dom.editorLinesList.querySelector(`.editor-chord-row[data-chord-index="${idx}"]`);
+  if (!el) return;
+  const badge = el.querySelector(".editor-time-badge");
+  if (!badge) return;
+  const hasTime = row.time !== null;
+  badge.className   = `editor-time-badge ${hasTime ? "stamped" : "unstamped"}`;
+  badge.textContent = hasTime ? formatEditorTime(row.time) : "--:--";
+}
+
+/** Updates the stamp-count badge in the topbar (tab-aware). */
+function updateEditorStampCount() {
+  if (!dom.editorStampCount) return;
+  const isChords = state.editorTab === "chords";
+  const { stamped, total } = isChords
+    ? countChordStamped(state.chordRows)
+    : countStamped(state.editorRows);
+  const unit = isChords ? "คอร์ด" : "บรรทัด";
+  dom.editorStampCount.textContent = `${stamped} / ${total} ${unit}`;
+  dom.editorStampCount.classList.toggle("all-done", stamped === total && total > 0);
+}
+
+/** Updates the editor's mini progress bar and time display. */
+function updateEditorProgress(currentSeconds) {
+  if (!state.editorOpen) return;
+  const duration = state.duration || 0;
+  const percent  = duration > 0 ? Math.min((currentSeconds / duration) * 100, 100) : 0;
+  if (dom.editorCurrentTime)  dom.editorCurrentTime.textContent  = formatTime(currentSeconds);
+  if (dom.editorProgressFill) dom.editorProgressFill.style.width = `${percent}%`;
+  updateEditorLyricBanner(currentSeconds);
+  updateChordAutoScroll(currentSeconds);
+}
+
+/** Syncs the editor play/pause button icon with current playback state. */
+function updateEditorPlayPauseIcon() {
+  if (!dom.editorPlayPauseBtn) return;
+  dom.editorPlayPauseBtn.innerHTML =
+    `<i class="fa-solid ${state.isPlaying ? "fa-pause" : "fa-play"}"></i>`;
+}
+
+/** Copies the active tab's data as JSON to the clipboard. */
+function handleEditorExport() {
+  const isChords = state.editorTab === "chords";
+  const rows = isChords ? state.chordRows : state.editorRows;
+  if (!rows.length) return;
+
+  const json = isChords
+    ? exportToChordJson(state.chordRows)
+    : exportToLyricsJson(state.editorRows);
+
+  const { stamped, total } = isChords
+    ? countChordStamped(state.chordRows)
+    : countStamped(state.editorRows);
+  const unit = isChords ? "คอร์ด" : "บรรทัด";
+
+  navigator.clipboard.writeText(json)
+    .then(() => {
+      if (!dom.editorExportBtn) return;
+      const unstamped = total - stamped;
+      const label = unstamped > 0
+        ? `✓ Copied! (${unstamped} ${unit}ยังไม่มีเวลา)`
+        : "✓ Copied!";
+      dom.editorExportBtn.textContent = label;
+      setTimeout(() => {
+        if (dom.editorExportBtn) {
+          dom.editorExportBtn.innerHTML = `<i class="fa-solid fa-copy"></i> Copy JSON`;
+        }
+      }, 3000);
+    })
+    .catch(() => {
+      prompt("คัดลอก JSON ด้านล่าง:", json);
+    });
+}
+
+/**
+ * Keyboard handler for the editor panel.
+ * Space/Enter = stamp focused row | ↑↓ = move focus | Esc = close
+ * Routes to chord handler when chords tab is active.
+ */
+function handleEditorKeydown(e) {
+  if (e.target.tagName === "INPUT") return;
+
+  if (state.editorTab === "chords") {
+    // ── Chords tab ──────────────────────────────────────────────────────
+    switch (e.key) {
+      case " ":
+      case "Enter":
+        e.preventDefault();
+        if (state.chordFocusIdx >= 0) chordStampRow(state.chordFocusIdx);
+        break;
+      case "ArrowDown":
+      case "Tab":
+        if (e.key === "Tab") e.preventDefault();
+        if (state.chordFocusIdx < state.chordRows.length - 1)
+          chordFocusRow(state.chordFocusIdx + 1);
+        break;
+      case "ArrowUp":
+        e.preventDefault();
+        if (state.chordFocusIdx > 0) chordFocusRow(state.chordFocusIdx - 1);
+        break;
+      case "Escape":
+        closeEditor();
+        break;
+    }
+    return;
+  }
+
+  // ── Lyrics tab ────────────────────────────────────────────────────────
+  const lineRows   = state.editorRows
+    .map((r, i) => ({ r, i }))
+    .filter(({ r }) => r.type === "line");
+  const currentPos = lineRows.findIndex(({ i }) => i === state.editorFocusIdx);
+
+  switch (e.key) {
+    case " ":
+    case "Enter":
+      e.preventDefault();
+      if (state.editorFocusIdx >= 0) editorStampRow(state.editorFocusIdx);
+      break;
+    case "ArrowDown":
+    case "Tab":
+      if (e.key === "Tab") e.preventDefault();
+      if (currentPos < lineRows.length - 1)
+        editorFocusRow(lineRows[currentPos + 1].i);
+      break;
+    case "ArrowUp":
+      e.preventDefault();
+      if (currentPos > 0)
+        editorFocusRow(lineRows[currentPos - 1].i);
+      break;
+    case "Escape":
+      closeEditor();
+      break;
+  }
+}
+
+/* =========================
+   Strumming Pattern Visualizer
+========================= */
+
+/**
+ * Builds the pattern-selector chips and the initial beat cells.
+ * Called once during initApp — the container stays hidden until a song loads.
+ */
+function initStrumVisualizer() {
+  if (!dom.strumPatternBtns) return;
+
+  // Build pattern selector chips
+  dom.strumPatternBtns.innerHTML = "";
+  STRUM_PATTERNS.forEach(p => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "chip strum-chip";
+    btn.dataset.strumId = p.id;
+    btn.title = p.note;
+    btn.textContent = p.label;
+    btn.classList.toggle("active", p.id === state.strumPatternId);
+    btn.addEventListener("click", () => {
+      state.strumPatternId = p.id;
+      dom.strumPatternBtns.querySelectorAll(".strum-chip").forEach(b => {
+        b.classList.toggle("active", b.dataset.strumId === p.id);
+      });
+      renderStrumBeats();
+    });
+    dom.strumPatternBtns.appendChild(btn);
+  });
+
+  renderStrumBeats();
+}
+
+/** Re-renders the beat cells for the currently selected pattern. */
+function renderStrumBeats() {
+  if (!dom.strumBeats) return;
+  const pattern = getPatternById(state.strumPatternId) ?? STRUM_PATTERNS[0];
+  dom.strumBeats.innerHTML = "";
+
+  pattern.beats.forEach((beat, i) => {
+    const cell = document.createElement("div");
+    const typeClass =
+      beat === "D" ? "strum-cell-down" :
+      beat === "U" ? "strum-cell-up"   : "strum-cell-rest";
+    cell.className = `strum-cell ${typeClass}`;
+    cell.dataset.beatIndex = String(i);
+
+    const arrow = document.createElement("span");
+    arrow.className = "strum-arrow";
+    arrow.textContent =
+      beat === "D" ? "↓" :
+      beat === "U" ? "↑" : "·";
+    cell.appendChild(arrow);
+    dom.strumBeats.appendChild(cell);
+  });
+}
+
+/**
+ * Highlights the beat cell that matches the current playback position.
+ * Called on every animation frame while playing.
+ *
+ * @param {number} currentSeconds  current playback position
+ */
+function updateStrumBeat(currentSeconds) {
+  if (!dom.strumBeats || !state.selectedSong || !state.isPlaying) return;
+
+  const pattern = getPatternById(state.strumPatternId) ?? STRUM_PATTERNS[0];
+  const songBpm     = Number(state.selectedSong.bpm) || 100;
+  const effectiveBpm = songBpm * state.speed * pattern.subDiv;
+
+  const beatIdx = calcCurrentBeat(currentSeconds, effectiveBpm, pattern.beats.length);
+
+  dom.strumBeats.querySelectorAll(".strum-cell").forEach((cell, i) => {
+    cell.classList.toggle("active", i === beatIdx);
+  });
+}
+
+/** Removes the active highlight from all beat cells (called on stop/reset). */
+function resetStrumBeat() {
+  if (!dom.strumBeats) return;
+  dom.strumBeats.querySelectorAll(".strum-cell.active").forEach(c => {
+    c.classList.remove("active");
+  });
+}
+
+/* =========================
+   Loop Engine
+========================= */
+
+/** Resets all loop state and refreshes the UI. */
+function clearLoop() {
+  state.loop.mode         = null;
+  state.loop.sectionLabel = null;
+  state.loop.startTime    = null;
+  state.loop.endTime      = null;
+  state.loop.aMarked      = false;
+  updateLoopUI();
+}
+
+/** Activates A-B loop with pre-validated (already sorted) start/end times. */
+function activateABLoop(startTime, endTime) {
+  state.loop.mode         = "ab";
+  state.loop.sectionLabel = null;
+  state.loop.startTime    = startTime;
+  state.loop.endTime      = endTime;
+  state.loop.aMarked      = false;
+  updateLoopUI();
+}
+
+/** Updates all loop-related UI elements to reflect current state.loop. */
+function updateLoopUI() {
+  const { mode, startTime, endTime, aMarked, sectionLabel } = state.loop;
+  const hasFullLoop = mode !== null;
+  const aSet = aMarked || hasFullLoop;
+
+  // ── A button visual state ──
+  if (dom.loopABtn) {
+    dom.loopABtn.classList.toggle("loop-a-set",    aSet && mode !== "ab");
+    dom.loopABtn.classList.toggle("loop-ab-active", mode === "ab");
+  }
+  // ── B button visual state ──
+  if (dom.loopBBtn) {
+    dom.loopBBtn.classList.toggle("loop-b-set", mode === "ab");
+  }
+  // ── Clear button ──
+  if (dom.loopClearBtn) {
+    dom.loopClearBtn.hidden = !aSet;
+  }
+  // ── Status text ──
+  if (dom.loopStatusText) {
+    if (!aSet) {
+      dom.loopStatusText.textContent = "";
+    } else if (aMarked && !hasFullLoop) {
+      dom.loopStatusText.textContent =
+        `A: ${formatTime(startTime)} — กด B เพื่อตั้ง end point`;
+    } else if (mode === "ab") {
+      dom.loopStatusText.textContent =
+        `Loop: ${formatTime(startTime)} → ${formatTime(endTime)}`;
+    } else if (mode === "section") {
+      const endLabel = endTime !== null ? formatTime(endTime) : "end";
+      dom.loopStatusText.textContent =
+        `[ ${sectionLabel} ]  ${formatTime(startTime)} → ${endLabel}`;
+    }
+  }
+  // ── Progress bar markers + region ──
+  updateLoopMarkers();
+  // ── Section label highlight in lyrics ──
+  updateSectionLoopHighlight();
+}
+
+/** Positions/shows the loop region overlay and A/B marker lines on the progress bar. */
+function updateLoopMarkers() {
+  const { mode, startTime, endTime, aMarked } = state.loop;
+  const duration = state.duration;
+
+  const showA = (aMarked || mode) && startTime !== null && duration > 0;
+  const showBAndRegion = mode !== null && duration > 0;
+  const resolvedEnd = (endTime !== null ? endTime : duration) || 0;
+
+  // A marker
+  if (dom.loopMarkerA) {
+    if (showA) {
+      dom.loopMarkerA.style.left = `${Math.min((startTime / duration) * 100, 100)}%`;
+      dom.loopMarkerA.hidden = false;
+    } else {
+      dom.loopMarkerA.hidden = true;
+    }
+  }
+
+  // B marker + region overlay
+  if (showBAndRegion) {
+    const { aPercent, bPercent, regionWidth } =
+      calcLoopMarkerPercents(duration, startTime, resolvedEnd);
+
+    if (dom.loopMarkerB) {
+      dom.loopMarkerB.style.left = `${bPercent}%`;
+      dom.loopMarkerB.hidden = false;
+    }
+    if (dom.loopRegion) {
+      dom.loopRegion.style.left  = `${aPercent}%`;
+      dom.loopRegion.style.width = `${regionWidth}%`;
+      dom.loopRegion.hidden = false;
+    }
+  } else {
+    if (dom.loopMarkerB) dom.loopMarkerB.hidden = true;
+    if (dom.loopRegion)  dom.loopRegion.hidden  = true;
+  }
+}
+
+/** Toggles loop-active highlight on the matching section label in the lyrics panel. */
+function updateSectionLoopHighlight() {
+  if (!dom.lyricsContainer) return;
+  dom.lyricsContainer.querySelectorAll(".lyric-section-label").forEach(el => {
+    el.classList.toggle(
+      "loop-active",
+      state.loop.mode === "section" && el.dataset.section === state.loop.sectionLabel
+    );
+  });
+}
+
+/** Called when the user presses the A button. */
+function handleLoopABtn() {
+  if (!state.sound || !state.duration) return;
+  if (state.loop.aMarked || state.loop.mode) {
+    // A already set (pending or full loop active) → cancel everything
+    clearLoop();
+    return;
+  }
+  const t = Number(state.sound.seek()) || 0;
+  state.loop.aMarked   = true;
+  state.loop.startTime = t;
+  updateLoopUI();
+}
+
+/** Called when the user presses the B button. */
+function handleLoopBBtn() {
+  if (!state.sound || !state.duration) return;
+  if (!state.loop.aMarked) return; // B without A → no-op
+  const t = Number(state.sound.seek()) || 0;
+  const { startTime, endTime } = normalizeABRange(state.loop.startTime, t);
+  activateABLoop(startTime, endTime);
+}
+
+/**
+ * Activates a Section Loop for the given section name.
+ * Clicking an already-active section toggles it off.
+ * Seeks playback to the section start immediately.
+ */
+function handleSectionClick(sectionName) {
+  if (!state.selectedSong || !state.duration) return;
+
+  // Toggle off if already looping this section
+  if (state.loop.mode === "section" && state.loop.sectionLabel === sectionName) {
+    clearLoop();
+    return;
+  }
+
+  const bounds = findSectionBounds(state.selectedSong.lyrics, sectionName);
+  if (!bounds) return;
+
+  state.loop.mode         = "section";
+  state.loop.sectionLabel = sectionName;
+  state.loop.startTime    = bounds.startTime;
+  state.loop.endTime      = bounds.endTime; // null = last section, resolved to duration at play time
+  state.loop.aMarked      = false;
+
+  // Seek immediately to section start
+  if (state.sound) {
+    state.sound.seek(bounds.startTime);
+    updateProgress(bounds.startTime);
+    updateTimedDisplays(bounds.startTime);
+  }
+
+  updateLoopUI();
+}
+
+/** Enables or disables the A/B loop buttons (tied to whether audio is loaded). */
+function setLoopButtonsEnabled(enabled) {
+  if (dom.loopABtn) dom.loopABtn.disabled = !enabled;
+  if (dom.loopBBtn) dom.loopBBtn.disabled = !enabled;
 }
 
 /* =========================
@@ -331,16 +1521,23 @@ async function loadSongs() {
 }
 
 function renderSongSelect() {
+  const visibleSongs = state.favFilterOn
+    ? filterFavorites(state.songs, state.favorites)
+    : state.songs;
+
   dom.songSelect.innerHTML = "";
   const placeholder = document.createElement("option");
   placeholder.value = "";
-  placeholder.textContent = state.songs.length ? "— เลือกเพลง —" : "ไม่มีเพลง";
+  placeholder.textContent = visibleSongs.length
+    ? "— เลือกเพลง —"
+    : state.favFilterOn ? "ไม่มีเพลง Favorite" : "ไม่มีเพลง";
   dom.songSelect.appendChild(placeholder);
 
-  state.songs.forEach(song => {
+  visibleSongs.forEach(song => {
     const option = document.createElement("option");
     option.value = song.id;
-    option.textContent = song.title;
+    option.textContent = (state.favorites.has(song.id) ? "★ " : "") + song.title;
+    if (state.selectedSong && song.id === state.selectedSong.id) option.selected = true;
     dom.songSelect.appendChild(option);
   });
 }
@@ -364,18 +1561,9 @@ function setAudioMode(mode) {
   }
 }
 
-// Map a song's `mp3` field to the actual path for the current audio mode.
-// "song"  → original `songs/<file>` path
-// "vocal" → swap prefix to `vocal/<file>` (same filename)
+// Wrapper: binds the imported pure getMp3PathFor to the current audio mode state.
 function getMp3PathFor(song) {
-  if (state.audioMode === "vocal") {
-    if (!/^songs\//i.test(song.mp3)) {
-      console.warn(`getMp3PathFor: "${song.mp3}" doesn't start with "songs/" — vocal swap skipped`);
-      return song.mp3;
-    }
-    return song.mp3.replace(/^songs\//i, "vocal/");
-  }
-  return song.mp3;
+  return _getMp3(song, state.audioMode);
 }
 
 /* =========================
@@ -409,6 +1597,12 @@ function showIdleState() {
   dom.seekBackBtn.disabled  = true;
   dom.seekFwdBtn.disabled   = true;
 
+  if (state.editorOpen) closeEditor();
+  if (dom.editorToggleBtn) dom.editorToggleBtn.disabled = true;
+  clearLoop();
+  setLoopButtonsEnabled(false);
+  if (dom.strumVisualizer) dom.strumVisualizer.hidden = true;
+  resetStrumBeat();
   setCharPlaying(false);
 }
 
@@ -421,6 +1615,7 @@ function selectSong(songId) {
 
   state.selectedSong = song;
   dom.songSelect.value = song.id;
+  updateFavoriteBtn();
 
   // Only proceed to load audio + render content if BOTH mode and song are picked
   if (state.audioMode) {
@@ -431,8 +1626,12 @@ function selectSong(songId) {
 }
 
 function loadSongAudio(song) {
+  if (state.editorOpen) closeEditor();
   stopSong();
   unloadSound();
+  clearLoop();
+  setLoopButtonsEnabled(false);
+  if (dom.editorToggleBtn) dom.editorToggleBtn.disabled = true;
 
   state.currentLyricIndex = -1;
   state.currentChordIndex = -1;
@@ -445,6 +1644,7 @@ function loadSongAudio(song) {
   renderLyrics(song.lyrics);
   resetProgress();
   setChordDisplay(null);
+  if (dom.strumVisualizer) dom.strumVisualizer.hidden = false;
 
   state.sound = new Howl({
     src: [getMp3PathFor(song)],
@@ -459,6 +1659,8 @@ function loadSongAudio(song) {
       dom.stopBtn.disabled = false;
       dom.seekBackBtn.disabled = false;
       dom.seekFwdBtn.disabled = false;
+      setLoopButtonsEnabled(true);
+      if (dom.editorToggleBtn) dom.editorToggleBtn.disabled = false;
       applyPreservePitch();
     },
 
@@ -478,6 +1680,7 @@ function loadSongAudio(song) {
       startAnimationLoop();
       applyPreservePitch();
       setCharPlaying(true);
+      startPracticeTimer();
     },
 
     onpause: () => {
@@ -485,6 +1688,7 @@ function loadSongAudio(song) {
       updatePlayPauseIcon();
       stopAnimationLoop();
       setCharPlaying(false);
+      pausePracticeTimer();
     },
 
     onstop: () => {
@@ -494,6 +1698,7 @@ function loadSongAudio(song) {
       resetProgress();
       updateTimedDisplays(0);
       setCharPlaying(false);
+      commitPracticeSession();
     },
 
     onend: () => {
@@ -502,6 +1707,7 @@ function loadSongAudio(song) {
       stopAnimationLoop();
       resetProgress();
       setCharPlaying(false);
+      commitPracticeSession();
     }
   });
 }
@@ -550,11 +1756,13 @@ function stopSong() {
   updatePlayPauseIcon();
   stopAnimationLoop();
   resetProgress();
+  resetStrumBeat();
   setCharPlaying(false);
 }
 
 function updatePlayPauseIcon() {
   dom.playPauseBtn.innerHTML = `<i class="fa-solid ${state.isPlaying ? "fa-pause" : "fa-play"}"></i>`;
+  updateEditorPlayPauseIcon();
 }
 
 // Seek by a relative offset in seconds (negative = backward, positive = forward)
@@ -576,9 +1784,10 @@ function setSpeed(speed) {
 }
 
 function resetProgress() {
-  dom.currentTime.textContent = "00:00";
+  dom.currentTime.textContent  = "00:00";
   dom.progressFill.style.width = "0%";
   dom.progressThumb.style.left = "0%";
+  updateEditorProgress(0);
 }
 
 function seekFromPointer(clientX) {
@@ -599,8 +1808,24 @@ function startAnimationLoop() {
   const tick = () => {
     if (!state.sound || !state.isPlaying) return;
     const t = Number(state.sound.seek()) || 0;
+
+    // ── Loop boundary check ──────────────────────────────────────────────────
+    if (state.loop.mode) {
+      const loopEnd = state.loop.endTime !== null
+        ? state.loop.endTime
+        : state.duration;
+      if (shouldSeekBack(t, state.loop.startTime, loopEnd)) {
+        state.sound.seek(state.loop.startTime);
+        state.rafId = requestAnimationFrame(tick);
+        return;
+      }
+    }
+    // ────────────────────────────────────────────────────────────────────────
+
     updateProgress(t);
     updateTimedDisplays(t);
+    updateStrumBeat(t);
+    updateEditorProgress(t);
     state.rafId = requestAnimationFrame(tick);
   };
   state.rafId = requestAnimationFrame(tick);
@@ -643,6 +1868,7 @@ function renderLyrics(lyrics) {
       const label = document.createElement("div");
       label.className = "lyric-section-label";
       label.textContent = `[ ${entry.section} ]`;
+      label.dataset.section = entry.section;
       fragment.appendChild(label);
 
     } else if (Array.isArray(entry.line)) {
@@ -706,16 +1932,46 @@ function updateCurrentLyric(currentSeconds) {
 ========================= */
 function setChordDisplay(chord) {
   dom.chordDisplay.innerHTML = "";
+
   if (!chord) {
     dom.chordDisplay.innerHTML = `<span class="empty-state">รอคอร์ดแรก...</span>`;
     dom.currentChordLabel.textContent = "-";
+    if (dom.chordDiagram) dom.chordDiagram.hidden = true;
     return;
   }
+
+  // Chord badge
   const badge = document.createElement("div");
   badge.className = "chord-badge";
   badge.textContent = chord;
   dom.chordDisplay.appendChild(badge);
   dom.currentChordLabel.textContent = chord;
+
+  // Chord diagram — show when chord data exists, hide when unknown
+  if (dom.chordDiagram) {
+    const data = getChordData(chord);
+    if (data) {
+      dom.chordDiagram.innerHTML = "";
+      dom.chordDiagram.appendChild(renderChordDiagramSVG(data));
+      dom.chordDiagram.hidden = false;
+    } else {
+      dom.chordDiagram.hidden = true;
+    }
+  }
+}
+
+/** Toggles chord diagram between portrait (vertical) and landscape (horizontal). */
+function toggleDiagramOrient() {
+  state.chordDiagramLandscape = !state.chordDiagramLandscape;
+  if (dom.chordDiagram) {
+    dom.chordDiagram.classList.toggle("landscape", state.chordDiagramLandscape);
+  }
+  if (dom.diagramOrientBtn) {
+    dom.diagramOrientBtn.setAttribute("aria-pressed", String(state.chordDiagramLandscape));
+    dom.diagramOrientBtn.title = state.chordDiagramLandscape
+      ? "เปลี่ยนเป็นแนวตั้ง"
+      : "เปลี่ยนเป็นแนวนอน";
+  }
 }
 
 function updateCurrentChord(currentSeconds) {
@@ -827,6 +2083,72 @@ function bindEvents() {
     state.userScrollTimer = setTimeout(() => { state.userScrolling = false; }, 3000);
   }, { passive: true });
 
+  // Section label click → Section Loop
+  dom.lyricsContainer.addEventListener("click", e => {
+    const label = e.target.closest(".lyric-section-label");
+    if (label && label.dataset.section) handleSectionClick(label.dataset.section);
+  });
+
+  // A/B loop buttons + clear
+  if (dom.loopABtn)    dom.loopABtn.addEventListener("click",    handleLoopABtn);
+  if (dom.loopBBtn)    dom.loopBBtn.addEventListener("click",    handleLoopBBtn);
+  if (dom.loopClearBtn) dom.loopClearBtn.addEventListener("click", clearLoop);
+
+  // ── Timestamp / Chord Editor ──────────────────────────────────────────────
+  if (dom.editorToggleBtn) dom.editorToggleBtn.addEventListener("click", openEditor);
+  if (dom.editorCloseBtn)  dom.editorCloseBtn.addEventListener("click",  closeEditor);
+  if (dom.editorExportBtn) dom.editorExportBtn.addEventListener("click",  handleEditorExport);
+  if (dom.editorTabLyrics) dom.editorTabLyrics.addEventListener("click", () => switchEditorTab("lyrics"));
+  if (dom.editorTabChords) dom.editorTabChords.addEventListener("click", () => switchEditorTab("chords"));
+  if (dom.editorImportBtn)    dom.editorImportBtn.addEventListener("click", handleEditorImport);
+  if (dom.chordAutoScrollBtn) dom.chordAutoScrollBtn.addEventListener("click", () => {
+    applyChordAutoScroll(!state.chordAutoScroll);
+  });
+
+  // Editor mini transport (delegates to the same functions as the main player)
+  if (dom.editorPlayPauseBtn) dom.editorPlayPauseBtn.addEventListener("click", togglePlayPause);
+  if (dom.editorStopBtn)      dom.editorStopBtn.addEventListener("click",      stopSong);
+  if (dom.editorSeekBackBtn)  dom.editorSeekBackBtn.addEventListener("click",  () => seekBy(-5));
+  if (dom.editorSeekFwdBtn)   dom.editorSeekFwdBtn.addEventListener("click",   () => seekBy(5));
+
+  // Editor progress track seek
+  if (dom.editorProgressTrack) {
+    dom.editorProgressTrack.addEventListener("click", e => {
+      if (!state.sound || !state.duration) return;
+      const rect  = dom.editorProgressTrack.getBoundingClientRect();
+      const ratio = Math.min(Math.max((e.clientX - rect.left) / rect.width, 0), 1);
+      const t     = ratio * state.duration;
+      state.sound.seek(t);
+      updateEditorProgress(t);
+      updateProgress(t);
+    });
+  }
+
+  // Editor keyboard shortcuts (Space, ↑↓, Esc)
+  if (dom.editorPanel) {
+    dom.editorPanel.addEventListener("keydown", handleEditorKeydown);
+  }
+  // Also catch Space/Esc globally when editor is open
+  document.addEventListener("keydown", e => {
+    if (!state.editorOpen) return;
+    handleEditorKeydown(e);
+  });
+
+  // Chord diagram orientation
+  if (dom.diagramOrientBtn) dom.diagramOrientBtn.addEventListener("click", toggleDiagramOrient);
+
+  // Favorites + History
+  if (dom.favoriteBtn)     dom.favoriteBtn.addEventListener("click", toggleFavorite);
+  if (dom.favFilterBtn)    dom.favFilterBtn.addEventListener("click", toggleFavFilter);
+  if (dom.historyBtn)      dom.historyBtn.addEventListener("click", openHistoryPanel);
+  if (dom.historyCloseBtn) dom.historyCloseBtn.addEventListener("click", closeHistoryPanel);
+  if (dom.historyClearBtn) dom.historyClearBtn.addEventListener("click", () => {
+    if (!confirm("ล้างประวัติการฝึกทั้งหมด?")) return;
+    state.practiceLog = [];
+    savePracticeLog();
+    renderHistoryPanel();
+  });
+
   dom.bpmSlider.addEventListener("input", e => { updateBpm(e.target.value); });
   dom.metroToggleBtn.addEventListener("click", toggleMetronome);
 
@@ -870,6 +2192,212 @@ function bindEvents() {
 }
 
 /* =========================
+   Favorites
+========================= */
+
+/** Loads favorites from localStorage into state.favorites (Set). */
+function loadFavorites() {
+  try {
+    const raw = localStorage.getItem("ukulele-favorites");
+    state.favorites = raw ? new Set(JSON.parse(raw)) : new Set();
+  } catch { state.favorites = new Set(); }
+}
+
+/** Saves state.favorites to localStorage. */
+function saveFavorites() {
+  localStorage.setItem("ukulele-favorites", JSON.stringify([...state.favorites]));
+}
+
+/** Toggles favorite status for the currently selected song. */
+function toggleFavorite() {
+  if (!state.selectedSong) return;
+  state.favorites = toggleFavoriteId(state.favorites, state.selectedSong.id);
+  saveFavorites();
+  updateFavoriteBtn();
+  // If filter is on and we just un-favorited, re-render the select
+  if (state.favFilterOn) renderSongSelect();
+}
+
+/** Syncs the star button appearance with the current song's favorite state. */
+function updateFavoriteBtn() {
+  if (!dom.favoriteBtn || !dom.favoriteIcon) return;
+  const isFav = state.selectedSong && state.favorites.has(state.selectedSong.id);
+  dom.favoriteBtn.hidden = !state.selectedSong;
+  dom.favoriteIcon.className = isFav ? "fa-solid fa-star" : "fa-regular fa-star";
+  dom.favoriteBtn.classList.toggle("is-favorite", !!isFav);
+  dom.favoriteBtn.title = isFav ? "ลบออกจาก Favorites" : "เพิ่มใน Favorites";
+}
+
+/** Toggles the favorites-only filter and re-renders the song select. */
+function toggleFavFilter() {
+  state.favFilterOn = !state.favFilterOn;
+  if (dom.favFilterBtn) {
+    dom.favFilterBtn.setAttribute("aria-pressed", String(state.favFilterOn));
+    dom.favFilterBtn.title = state.favFilterOn
+      ? "แสดงทั้งหมด (ปิด filter)"
+      : "แสดงเฉพาะ Favorites";
+  }
+  renderSongSelect();
+}
+
+/* =========================
+   Practice Log
+========================= */
+
+/** Loads practice log from localStorage. */
+function loadPracticeLog() {
+  try {
+    const raw = localStorage.getItem("ukulele-practice-log");
+    state.practiceLog = raw ? JSON.parse(raw) : [];
+  } catch { state.practiceLog = []; }
+}
+
+/** Saves practice log to localStorage. */
+function savePracticeLog() {
+  localStorage.setItem("ukulele-practice-log", JSON.stringify(state.practiceLog));
+}
+
+/** Called when playback starts — records the wall-clock start time. */
+function startPracticeTimer() {
+  if (!state.practiceSessionStart) {
+    state.practiceSessionStart = Date.now();
+  }
+}
+
+/** Called when playback pauses — accumulates elapsed seconds. */
+function pausePracticeTimer() {
+  if (state.practiceSessionStart) {
+    state.practiceSessionSec += (Date.now() - state.practiceSessionStart) / 1000;
+    state.practiceSessionStart = null;
+  }
+}
+
+/** Saves the current session if it exceeds 10 s, then resets the timer. */
+function commitPracticeSession() {
+  pausePracticeTimer();
+  const MIN_SEC = 10;
+  if (state.practiceSessionSec >= MIN_SEC && state.selectedSong) {
+    const today = new Date().toISOString().slice(0, 10);
+    const session = {
+      songId:      state.selectedSong.id,
+      songTitle:   state.selectedSong.title,
+      date:        today,
+      durationSec: Math.round(state.practiceSessionSec),
+    };
+    state.practiceLog = addSession(state.practiceLog, session);
+    savePracticeLog();
+  }
+  state.practiceSessionStart = null;
+  state.practiceSessionSec   = 0;
+}
+
+/* =========================
+   Practice History Panel
+========================= */
+
+function openHistoryPanel() {
+  renderHistoryPanel();
+  if (dom.historyPanel) dom.historyPanel.hidden = false;
+  if (dom.mainGrid)     dom.mainGrid.hidden     = true;
+}
+
+function closeHistoryPanel() {
+  if (dom.historyPanel) dom.historyPanel.hidden = true;
+  if (dom.mainGrid)     dom.mainGrid.hidden     = false;
+}
+
+function renderHistoryPanel() {
+  if (!dom.historyContent) return;
+  dom.historyContent.innerHTML = "";
+
+  const today  = new Date().toISOString().slice(0, 10);
+  const weekSec = totalSecInDays(state.practiceLog, today, 7);
+  const totalSec = state.practiceLog.reduce((s, r) => s + (r.durationSec || 0), 0);
+  const songCount = new Set(state.practiceLog.map(r => r.songId)).size;
+
+  // ── Summary cards ─────────────────────────────────────────────────────────
+  const summary = document.createElement("div");
+  summary.className = "history-summary";
+
+  const cards = [
+    { icon: "fa-clock",        label: "รวมทั้งหมด",    value: formatLogDuration(totalSec)  },
+    { icon: "fa-music",        label: "เพลงที่ฝึก",    value: `${songCount} เพลง`           },
+    { icon: "fa-calendar-week",label: "สัปดาห์นี้",    value: formatLogDuration(weekSec)   },
+  ];
+  cards.forEach(c => {
+    const card       = document.createElement("div");
+    card.className   = "history-stat-card";
+    card.innerHTML   =
+      `<i class="fa-solid ${c.icon}"></i>` +
+      `<span class="stat-value">${c.value}</span>` +
+      `<span class="stat-label">${c.label}</span>`;
+    summary.appendChild(card);
+  });
+  dom.historyContent.appendChild(summary);
+
+  if (!state.practiceLog.length) {
+    const empty       = document.createElement("p");
+    empty.className   = "empty-state";
+    empty.style.padding = "40px 24px";
+    empty.textContent = "ยังไม่มีประวัติการฝึก — กด Play แล้วซ้อมอย่างน้อย 10 วินาที";
+    dom.historyContent.appendChild(empty);
+    return;
+  }
+
+  // ── Per-song aggregation ──────────────────────────────────────────────────
+  const agg = aggregateBySong(state.practiceLog);
+  const maxSec = agg[0]?.totalSec || 1;
+
+  const songSection = makeHistorySection("เวลาต่อเพลง");
+  agg.forEach(entry => {
+    const row = document.createElement("div");
+    row.className = "history-song-row";
+    const pct = Math.round((entry.totalSec / maxSec) * 100);
+    const isFav = state.favorites.has(entry.songId);
+    row.innerHTML =
+      `<span class="history-song-name">${isFav ? "★ " : ""}${entry.songTitle}</span>` +
+      `<div class="history-bar-wrap">` +
+        `<div class="history-bar" style="width:${pct}%"></div>` +
+      `</div>` +
+      `<span class="history-song-time">${formatLogDuration(entry.totalSec)}</span>`;
+    songSection.list.appendChild(row);
+  });
+  dom.historyContent.appendChild(songSection.section);
+
+  // ── Recent sessions ───────────────────────────────────────────────────────
+  const recent = recentSessions(state.practiceLog, 30);
+  const recentSection = makeHistorySection("ประวัติล่าสุด");
+  recent.forEach(s => {
+    const row = document.createElement("div");
+    row.className = "history-session-row";
+    const d = s.date || "";
+    const displayDate = d
+      ? new Intl.DateTimeFormat("th-TH", { day: "numeric", month: "short", year: "numeric" }).format(new Date(d))
+      : "—";
+    row.innerHTML =
+      `<span class="session-date">${displayDate}</span>` +
+      `<span class="session-title">${s.songTitle}</span>` +
+      `<span class="session-dur">${formatLogDuration(s.durationSec)}</span>`;
+    recentSection.list.appendChild(row);
+  });
+  dom.historyContent.appendChild(recentSection.section);
+}
+
+/** Helper: creates a labelled section with a list container. */
+function makeHistorySection(title) {
+  const section    = document.createElement("div");
+  section.className = "history-section";
+  const heading    = document.createElement("h3");
+  heading.className = "history-section-title";
+  heading.textContent = title;
+  const list       = document.createElement("div");
+  list.className   = "history-section-list";
+  section.appendChild(heading);
+  section.appendChild(list);
+  return { section, list };
+}
+
+/* =========================
    Init
 ========================= */
 async function initApp() {
@@ -889,10 +2417,20 @@ async function initApp() {
   const savedSwap = localStorage.getItem("ukulele-panel-swap");
   applyPanelSwap(savedSwap === "on");
 
+  // Restore Favorites + Practice Log
+  loadFavorites();
+  loadPracticeLog();
+
   bindEvents();
   initLottieDancer();
+  initStrumVisualizer();
   updateBpm(dom.bpmSlider.value);
   await loadSongs();
+
+  // Commit any unsaved session when user closes/reloads the page
+  window.addEventListener("beforeunload", () => {
+    if (state.isPlaying) commitPracticeSession();
+  });
 }
 
 initApp();
