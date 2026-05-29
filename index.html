@@ -67,6 +67,10 @@
                     aria-label="ดูประวัติการฝึก" title="Practice History">
               <i class="fa-solid fa-chart-simple"></i>
             </button>
+            <button id="strumBtn" class="icon-btn secondary" type="button"
+                    aria-label="Strumming Pattern" title="Strumming Pattern">
+              <i class="fa-solid fa-music"></i>
+            </button>
             <button id="editorToggleBtn" class="icon-btn secondary" type="button"
                     aria-label="เปิด Timestamp Editor" title="Timestamp Editor" disabled>
               <i class="fa-solid fa-pen-to-square"></i>
@@ -194,12 +198,6 @@
 
           <!-- Chord diagram (finger positions) -->
           <div id="chordDiagram" class="chord-diagram-wrap" hidden></div>
-
-          <!-- Strumming Pattern Visualizer -->
-          <div id="strumVisualizer" class="strum-visualizer" hidden>
-            <div id="strumPatternBtns" class="strum-pattern-btns"></div>
-            <div id="strumBeats" class="strum-beats"></div>
-          </div>
 
           <!-- Dancing character (Lottie) -->
           <div id="danceCharWrap" class="dance-char-wrap">
@@ -335,6 +333,29 @@
 
   </div>
   <!-- ===== /Practice History Panel ===== -->
+
+  <!-- ===== Strumming Pattern Panel ===== -->
+  <div id="strumPanel" class="strum-panel" hidden>
+
+    <div class="strum-topbar">
+      <button id="strumCloseBtn" class="icon-btn editor-back-btn" type="button" aria-label="กลับ">
+        <i class="fa-solid fa-arrow-left"></i>
+        <span>กลับ</span>
+      </button>
+      <span class="strum-panel-title">
+        <i class="fa-solid fa-music"></i> Strumming Pattern
+      </span>
+    </div>
+
+    <div class="strum-panel-body">
+      <div id="strumVisualizer" class="strum-visualizer">
+        <div id="strumPatternBtns" class="strum-pattern-btns"></div>
+        <div id="strumBeats" class="strum-beats"></div>
+      </div>
+    </div>
+
+  </div>
+  <!-- ===== /Strumming Pattern Panel ===== -->
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/howler/2.2.4/howler.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>

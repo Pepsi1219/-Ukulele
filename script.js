@@ -195,8 +195,10 @@ const dom = {
   editorProgressTrack:document.getElementById("editorProgressTrack"),
   editorProgressFill: document.getElementById("editorProgressFill"),
 
-  // Strumming Pattern Visualizer
-  strumVisualizer:   document.getElementById("strumVisualizer"),
+  // Strumming Pattern Panel (overlay)
+  strumBtn:          document.getElementById("strumBtn"),
+  strumPanel:        document.getElementById("strumPanel"),
+  strumCloseBtn:     document.getElementById("strumCloseBtn"),
   strumPatternBtns:  document.getElementById("strumPatternBtns"),
   strumBeats:        document.getElementById("strumBeats"),
 
@@ -1601,7 +1603,6 @@ function showIdleState() {
   if (dom.editorToggleBtn) dom.editorToggleBtn.disabled = true;
   clearLoop();
   setLoopButtonsEnabled(false);
-  if (dom.strumVisualizer) dom.strumVisualizer.hidden = true;
   resetStrumBeat();
   setCharPlaying(false);
 }
@@ -1644,7 +1645,6 @@ function loadSongAudio(song) {
   renderLyrics(song.lyrics);
   resetProgress();
   setChordDisplay(null);
-  if (dom.strumVisualizer) dom.strumVisualizer.hidden = false;
 
   state.sound = new Howl({
     src: [getMp3PathFor(song)],
@@ -2142,6 +2142,8 @@ function bindEvents() {
   if (dom.favFilterBtn)    dom.favFilterBtn.addEventListener("click", toggleFavFilter);
   if (dom.historyBtn)      dom.historyBtn.addEventListener("click", openHistoryPanel);
   if (dom.historyCloseBtn) dom.historyCloseBtn.addEventListener("click", closeHistoryPanel);
+  if (dom.strumBtn)        dom.strumBtn.addEventListener("click", openStrumPanel);
+  if (dom.strumCloseBtn)   dom.strumCloseBtn.addEventListener("click", closeStrumPanel);
   if (dom.historyClearBtn) dom.historyClearBtn.addEventListener("click", () => {
     if (!confirm("ล้างประวัติการฝึกทั้งหมด?")) return;
     state.practiceLog = [];
@@ -2304,6 +2306,18 @@ function openHistoryPanel() {
 function closeHistoryPanel() {
   if (dom.historyPanel) dom.historyPanel.hidden = true;
   if (dom.mainGrid)     dom.mainGrid.hidden     = false;
+}
+
+// ─── Strumming Pattern Panel ──────────────────────────────────────────────────
+
+function openStrumPanel() {
+  if (dom.strumPanel) dom.strumPanel.hidden = false;
+  if (dom.mainGrid)   dom.mainGrid.hidden   = true;
+}
+
+function closeStrumPanel() {
+  if (dom.strumPanel) dom.strumPanel.hidden = true;
+  if (dom.mainGrid)   dom.mainGrid.hidden   = false;
 }
 
 function renderHistoryPanel() {
