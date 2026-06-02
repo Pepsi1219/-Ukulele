@@ -46,6 +46,16 @@ import { buildChordRows,
          findLyricContextAt }      from "./src/utils/chordEditor.js";
 
 /* =========================
+   Metronome Sound Definitions
+========================= */
+const METRO_SOUNDS = [
+  { id: "wood",  label: "Wood" },
+  { id: "kick",  label: "Kick" },
+  { id: "hihat", label: "Hi-Hat" },
+  { id: "bell",  label: "Bell" },
+];
+
+/* =========================
    State
 ========================= */
 const MANIFEST_JSON_PATH = "manifest.json";
@@ -79,6 +89,7 @@ const state = {
   currentChordIndex: -1,
   rafId: null,
   metronomeOn: false,
+  metroSoundId: "wood",    // current metronome sound: wood | kick | hihat | bell
   metroLoop: null,
   metroSynth: null,
   userScrolling: false,
@@ -99,7 +110,7 @@ const state = {
   editorBannerLyricIdx: -1,      // cached lyric-row index shown in banner
   chordAutoScroll:      true,    // auto-scroll chord list to active row while playing
   editorActiveChordIdx: -1,      // last chord row index highlighted by auto-scroll
-  chordDiagramLandscape: false,  // true = chord diagram rotated to landscape
+  chordDiagramRotation: 0,       // 0 | 90 | 180 | 270 — current diagram rotation
   // ── Favorites ──
   favorites:       new Set(),   // Set of song IDs marked as favorites
   favFilterOn:     false,       // true = show only favorite songs in dropdown
@@ -140,7 +151,7 @@ const dom = {
   bpmValue:          document.getElementById("bpmValue"),
   metroToggleBtn:    document.getElementById("metroToggleBtn"),
   metroVisual:       document.getElementById("metroVisual"),
-  metroStateText:    document.getElementById("metroStateText"),
+  metroSoundBtns:    document.getElementById("metroSoundBtns"),
   chordDisplay:      document.getElementById("chordDisplay"),
   chordDiagram:      document.getElementById("chordDiagram"),
   currentChordLabel: document.getElementById("currentChordLabel"),
@@ -1639,8 +1650,7 @@ function loadSongAudio(song) {
   state.duration = 0;
 
   dom.currentSongTitle.textContent = song.title;
-  dom.bpmSlider.value = String(song.bpm);
-  dom.bpmValue.textContent = String(song.bpm);
+  updateBpm(song.bpm);   // also updates Tone.Transport BPM
 
   renderLyrics(song.lyrics);
   resetProgress();
@@ -1681,6 +1691,8 @@ function loadSongAudio(song) {
       applyPreservePitch();
       setCharPlaying(true);
       startPracticeTimer();
+      // Auto-sync metronome to song beat phase when playback starts
+      if (state.metronomeOn) syncMetronomeToSong(Number(state.sound.seek()) || 0);
     },
 
     onpause: () => {
@@ -1689,6 +1701,7 @@ function loadSongAudio(song) {
       stopAnimationLoop();
       setCharPlaying(false);
       pausePracticeTimer();
+      if (state.metronomeOn && state.metroLoop) { state.metroLoop.stop(); Tone.Transport.stop(); }
     },
 
     onstop: () => {
@@ -1699,6 +1712,7 @@ function loadSongAudio(song) {
       updateTimedDisplays(0);
       setCharPlaying(false);
       commitPracticeSession();
+      if (state.metronomeOn && state.metroLoop) { state.metroLoop.stop(); Tone.Transport.stop(); }
     },
 
     onend: () => {
@@ -1708,6 +1722,7 @@ function loadSongAudio(song) {
       resetProgress();
       setCharPlaying(false);
       commitPracticeSession();
+      if (state.metronomeOn && state.metroLoop) { state.metroLoop.stop(); Tone.Transport.stop(); }
     }
   });
 }
@@ -1773,6 +1788,7 @@ function seekBy(deltaSeconds) {
   state.sound.seek(target);
   updateProgress(target);
   updateTimedDisplays(target);
+  if (state.metronomeOn && state.isPlaying) syncMetronomeToSong(target);
 }
 
 function setSpeed(speed) {
@@ -1798,6 +1814,7 @@ function seekFromPointer(clientX) {
   state.sound.seek(targetTime);
   updateProgress(targetTime);
   updateTimedDisplays(targetTime);
+  if (state.metronomeOn && state.isPlaying) syncMetronomeToSong(targetTime);
 }
 
 /* =========================
@@ -1906,6 +1923,20 @@ function getLyricLineEntries(lyrics) {
   return lyrics.filter(e => Array.isArray(e.line));
 }
 
+/**
+ * Scrolls `el` to near the top of `container` without touching the page scroll.
+ * Uses container.scrollTo() so only the panel scrolls, not the viewport.
+ */
+function scrollElIntoContainer(el, container) {
+  if (!el || !container) return;
+  const containerRect = container.getBoundingClientRect();
+  const elRect        = el.getBoundingClientRect();
+  const targetTop     = container.scrollTop
+                        + (elRect.top - containerRect.top)    // element's current offset inside container
+                        - 90;                                  // 80px gap from the top edge
+  container.scrollTo({ top: Math.max(0, targetTop), behavior: "smooth" });
+}
+
 function updateCurrentLyric(currentSeconds) {
   const lineEntries = getLyricLineEntries(state.selectedSong.lyrics);
   const nextIndex   = findCurrentTimedIndex(lineEntries, currentSeconds);
@@ -1920,7 +1951,7 @@ function updateCurrentLyric(currentSeconds) {
     current.classList.add("active");
     // Two gates: master toggle (autoScrollEnabled) + short pause after manual scroll
     if (state.autoScrollEnabled && !state.userScrolling) {
-      current.scrollIntoView({ behavior: "smooth", block: "center" });
+      scrollElIntoContainer(current, dom.lyricsContainer);
     }
   }
 
@@ -1960,17 +1991,18 @@ function setChordDisplay(chord) {
   }
 }
 
-/** Toggles chord diagram between portrait (vertical) and landscape (horizontal). */
+/** Cycles chord diagram through 4 rotations: 0° → 90° → 180° → 270° → 0°. */
 function toggleDiagramOrient() {
-  state.chordDiagramLandscape = !state.chordDiagramLandscape;
+  state.chordDiagramRotation = (state.chordDiagramRotation + 90) % 360;
   if (dom.chordDiagram) {
-    dom.chordDiagram.classList.toggle("landscape", state.chordDiagramLandscape);
+    dom.chordDiagram.classList.remove("rot-90", "rot-180", "rot-270");
+    if (state.chordDiagramRotation > 0) {
+      dom.chordDiagram.classList.add(`rot-${state.chordDiagramRotation}`);
+    }
   }
   if (dom.diagramOrientBtn) {
-    dom.diagramOrientBtn.setAttribute("aria-pressed", String(state.chordDiagramLandscape));
-    dom.diagramOrientBtn.title = state.chordDiagramLandscape
-      ? "เปลี่ยนเป็นแนวตั้ง"
-      : "เปลี่ยนเป็นแนวนอน";
+    dom.diagramOrientBtn.setAttribute("aria-pressed", String(state.chordDiagramRotation !== 0));
+    dom.diagramOrientBtn.title = `หมุน Chord Diagram (${state.chordDiagramRotation}°)`;
   }
 }
 
@@ -1990,19 +2022,108 @@ function updateCurrentChord(currentSeconds) {
 /* =========================
    Metronome Functions
 ========================= */
+
+/**
+ * Syncs the metronome Transport to the song's current playback position.
+ * Calculates which phase of the beat we're at (0–1) so the click fires
+ * exactly on the beat, even when starting mid-bar.
+ *
+ * @param {number} currentTimeSec  current song position in seconds
+ */
+async function syncMetronomeToSong(currentTimeSec) {
+  if (!state.metroLoop || !state.metroSynth) setupMetronome();
+  await Tone.start();
+  const bpm          = Number(dom.bpmSlider.value) || 100;
+  const beatDuration = 60 / bpm;                            // seconds per beat
+  const posInBeat    = currentTimeSec % beatDuration;       // how far into the current beat
+
+  Tone.Transport.bpm.value = bpm;
+  state.metroLoop.stop();
+  Tone.Transport.stop();
+  state.metroLoop.start(0);
+  Tone.Transport.start("+0", posInBeat);                    // start Transport from mid-beat
+}
+
+/** Creates a new Tone.js synth for the given sound ID. */
+function createMetroSynth(soundId) {
+  switch (soundId) {
+    case "kick":
+      return new Tone.MembraneSynth({
+        pitchDecay: 0.08, octaves: 7,
+        oscillator: { type: "sine" },
+        envelope: { attack: 0.001, decay: 0.25, sustain: 0, release: 0.1 }
+      }).toDestination();
+    case "hihat":
+      return new Tone.NoiseSynth({
+        noise: { type: "white" },
+        envelope: { attack: 0.001, decay: 0.06, sustain: 0, release: 0.01 }
+      }).toDestination();
+    case "bell":
+      return new Tone.Synth({
+        oscillator: { type: "triangle" },
+        envelope: { attack: 0.001, decay: 0.35, sustain: 0, release: 0.1 }
+      }).toDestination();
+    default: // wood
+      return new Tone.MembraneSynth({
+        pitchDecay: 0.015, octaves: 3,
+        oscillator: { type: "sine" },
+        envelope: { attack: 0.001, decay: 0.12, sustain: 0, release: 0.05 }
+      }).toDestination();
+  }
+}
+
+/** Triggers one beat for the current sound type. */
+function triggerMetroSound(time) {
+  if (!state.metroSynth) return;
+  switch (state.metroSoundId) {
+    case "kick":  state.metroSynth.triggerAttackRelease("C1", "16n", time); break;
+    case "hihat": state.metroSynth.triggerAttackRelease("16n", time);       break;
+    case "bell":  state.metroSynth.triggerAttackRelease("A5", "8n",  time); break;
+    default:      state.metroSynth.triggerAttackRelease("C5", "16n", time); break;
+  }
+}
+
 function setupMetronome() {
-  state.metroSynth = new Tone.MembraneSynth({
-    pitchDecay: 0.015, octaves: 3,
-    oscillator: { type: "sine" },
-    envelope: { attack: 0.001, decay: 0.12, sustain: 0, release: 0.05 }
-  }).toDestination();
+  state.metroSynth = createMetroSynth(state.metroSoundId);
 
   state.metroLoop = new Tone.Loop(time => {
-    state.metroSynth.triggerAttackRelease("C5", "16n", time);
+    triggerMetroSound(time);
     Tone.Draw.schedule(() => { flashMetronome(); }, time);
   }, "4n");
 
   Tone.Transport.bpm.value = Number(dom.bpmSlider.value);
+}
+
+/** Switches metronome sound. Restarts synth; loop keeps running if metronome is on. */
+function setMetroSound(soundId) {
+  state.metroSoundId = soundId;
+
+  // Update chip highlight
+  if (dom.metroSoundBtns) {
+    dom.metroSoundBtns.querySelectorAll(".chip").forEach(b => {
+      b.classList.toggle("active", b.dataset.soundId === soundId);
+    });
+  }
+
+  // Recreate synth with new sound (dispose old one first)
+  if (state.metroSynth) { state.metroSynth.dispose(); state.metroSynth = null; }
+  state.metroSynth = createMetroSynth(soundId);
+}
+
+/** Initialises the sound-selector chip row. */
+function initMetroSoundBtns() {
+  if (!dom.metroSoundBtns) return;
+  dom.metroSoundBtns.innerHTML = "";
+  METRO_SOUNDS.forEach(s => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "chip";
+    btn.dataset.soundId = s.id;
+    btn.textContent = s.label;
+    btn.classList.toggle("active", s.id === state.metroSoundId);
+    btn.addEventListener("click", () => setMetroSound(s.id));
+    dom.metroSoundBtns.appendChild(btn);
+  });
 }
 
 async function toggleMetronome() {
@@ -2011,16 +2132,20 @@ async function toggleMetronome() {
   state.metronomeOn = !state.metronomeOn;
 
   if (state.metronomeOn) {
-    Tone.Transport.bpm.value = Number(dom.bpmSlider.value);
-    state.metroLoop.start(0);
-    Tone.Transport.start();
+    if (state.isPlaying && state.sound) {
+      // Song is playing → sync beat phase to current position
+      await syncMetronomeToSong(Number(state.sound.seek()) || 0);
+    } else {
+      // No song playing → start independently
+      Tone.Transport.bpm.value = Number(dom.bpmSlider.value);
+      state.metroLoop.start(0);
+      Tone.Transport.start();
+    }
     dom.metroToggleBtn.innerHTML = `<i class="fa-solid fa-pause"></i> ปิด`;
-    dom.metroStateText.textContent = "Metronome เปิดอยู่";
   } else {
     state.metroLoop.stop();
     Tone.Transport.stop();
     dom.metroToggleBtn.innerHTML = `<i class="fa-solid fa-play"></i> เปิด`;
-    dom.metroStateText.textContent = "Metronome ปิดอยู่";
   }
 }
 
@@ -2438,6 +2563,7 @@ async function initApp() {
   bindEvents();
   initLottieDancer();
   initStrumVisualizer();
+  initMetroSoundBtns();
   updateBpm(dom.bpmSlider.value);
   await loadSongs();
 
