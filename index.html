@@ -162,18 +162,18 @@
               <p class="muted">Metronome</p>
               <h3><span id="bpmValue">100</span> BPM</h3>
             </div>
-            <button id="metroToggleBtn" class="icon-btn" type="button">
-              <i class="fa-solid fa-play"></i>
-              เปิด
-            </button>
+            <div class="metro-head-right">
+              <div id="metroVisual" class="metro-visual"></div>
+              <button id="metroToggleBtn" class="icon-btn" type="button">
+                <i class="fa-solid fa-play"></i>
+                เปิด
+              </button>
+            </div>
           </div>
 
           <input id="bpmSlider" class="range-input" type="range" min="30" max="200" value="100" />
 
-          <div class="metro-visual-wrap">
-            <div id="metroVisual" class="metro-visual"></div>
-            <span id="metroStateText">Metronome ปิดอยู่</span>
-          </div>
+          <div id="metroSoundBtns" class="metro-sound-btns"></div>
         </div>
       </section>
 

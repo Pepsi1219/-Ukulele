@@ -149,14 +149,15 @@ h1 i { color: var(--accent); }
 
 .main-grid {
   display: grid;
-  grid-template-columns: 340px 340px minmax(0, 1fr);
+  /* clamp(min, preferred, max) — panels grow proportionally on wide screens */
+  grid-template-columns: clamp(340px, 28vw, 480px) clamp(280px, 22vw, 420px) minmax(0, 1fr);
   gap: 18px;
   align-items: stretch;
 }
 
 /* Swapped layout: Chord panel moves to far right, Lyrics to center */
 .main-grid.panels-swapped {
-  grid-template-columns: 340px minmax(0, 1fr) 340px;
+  grid-template-columns: clamp(340px, 28vw, 480px) minmax(0, 1fr) clamp(280px, 22vw, 420px);
 }
 .main-grid.panels-swapped .chord-panel { order: 3; }
 
@@ -512,7 +513,9 @@ button.toggle-pill:hover { transform: translateY(-1px); }
 .metronome-head h3 { margin-bottom: 0; }
 .range-input { width: 100%; margin: 18px 0; accent-color: var(--primary); }
 
-.metro-visual-wrap { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 0.84rem; }
+/* LED dot + toggle button group */
+.metro-head-right { display: flex; align-items: center; gap: 8px; }
+
 .metro-visual {
   width: 18px;
   height: 18px;
@@ -525,6 +528,14 @@ button.toggle-pill:hover { transform: translateY(-1px); }
   transform: scale(1.32);
   box-shadow: 0 0 22px rgba(251, 191, 36, 0.9);
 }
+
+/* Sound selector chips */
+.metro-sound-btns {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.metro-sound-btns .chip { flex: 1; min-width: 0; font-size: 0.78rem; }
 
 /* =====================
    Chord Panel
@@ -602,25 +613,21 @@ button.toggle-pill:hover { transform: translateY(-1px); }
 .chord-diagram-wrap[hidden] { display: none !important; }
 
 .chord-diagram-svg {
-  width: 108px;
+  width: 160px;
   height: auto;
   overflow: visible;
+  transition: transform 300ms ease;
+  transform-origin: center;
 }
 
-/* ── Landscape (horizontal) orientation ── */
-/* SVG is 104 × 132 portrait → rotate -90deg → visually 132 × 104 */
-.chord-diagram-wrap.landscape {
-  padding: 10px 0 6px;
-}
-.chord-diagram-wrap.landscape .chord-diagram-svg {
-  /* Center the element then rotate — keeps visual centered in wrap */
-  transform: rotate(-90deg);
-  transform-origin: center;
-  width: 108px;
-  /* Shift layout footprint: add margin to compensate for rotated size */
-  margin-top:    14px;  /* (132 - 104) / 2 ≈ 14px */
-  margin-bottom: 14px;
-}
+/*
+ * Rotation classes — SVG natural size at 160px: 160 × 203px (ratio 104:132)
+ * For 90° / 270°: visual becomes 203 × 160px but layout box stays 160 × 203px
+ * margin compensation = (203 − 160) / 2 ≈ 22px
+ */
+.chord-diagram-wrap.rot-90  .chord-diagram-svg { transform: rotate(90deg);  margin-top: 22px; margin-bottom: 22px; }
+.chord-diagram-wrap.rot-180 .chord-diagram-svg { transform: rotate(180deg); }
+.chord-diagram-wrap.rot-270 .chord-diagram-svg { transform: rotate(270deg); margin-top: 22px; margin-bottom: 22px; }
 
 /* Chord panel: section-title actions group */
 .chord-panel-actions {
@@ -629,7 +636,7 @@ button.toggle-pill:hover { transform: translateY(-1px); }
   gap: 8px;
 }
 
-/* Orient button highlight when landscape is active */
+/* Orient button highlight when any rotation is active */
 #diagramOrientBtn[aria-pressed="true"] {
   color: var(--primary);
   background: rgba(56, 189, 248, 0.12);
@@ -1639,6 +1646,7 @@ select option { font-family: inherit; }
   width: 100%;
   min-height: 220px;
   padding-bottom: 10px;
+  margin-top: -100px;
   position: relative;
   overflow: visible;
 }
