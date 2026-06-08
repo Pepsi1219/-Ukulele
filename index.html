@@ -182,6 +182,10 @@
         <div class="section-title">
           <h2>คอร์ดอูคูเลเล่</h2>
           <div class="chord-panel-actions">
+            <button id="diagramModeBtn" class="icon-btn secondary" type="button"
+                    aria-pressed="false" aria-label="สลับโหมดคอร์ด/โน้ต" title="สลับโหมดคอร์ด/โน้ต (สำหรับฝึกดีดโน้ต)">
+              <i class="fa-solid fa-circle-dot"></i>
+            </button>
             <button id="diagramOrientBtn" class="icon-btn secondary" type="button"
                     aria-pressed="false" aria-label="สลับแนวนอน/แนวตั้ง" title="สลับแนวนอน/แนวตั้ง">
               <i class="fa-solid fa-rotate"></i>
@@ -199,10 +203,29 @@
           <!-- Chord diagram (finger positions) -->
           <div id="chordDiagram" class="chord-diagram-wrap" hidden></div>
 
+          <!-- Note-picking mode: compact trigger opens a bottom-sheet string picker -->
+          <button id="notePickModeTrigger" class="note-pick-trigger chip" type="button"
+                  aria-haspopup="dialog" aria-expanded="false" hidden
+                  aria-label="เลือกสายสำหรับฝึกโน้ต" title="เลือกสายสำหรับฝึกโน้ต">
+            <i class="fa-solid fa-music" aria-hidden="true"></i>
+            <span id="notePickModeTriggerLabel">Fingerstyle</span>
+            <i class="fa-solid fa-chevron-up note-pick-trigger-caret" aria-hidden="true"></i>
+          </button>
+
           <!-- Dancing character (Lottie) -->
           <div id="danceCharWrap" class="dance-char-wrap">
             <div id="lottieIdle"    class="lottie-player"></div>
             <div id="lottiePlaying" class="lottie-player" hidden></div>
+          </div>
+        </div>
+
+        <!-- Bottom-sheet: choose which string to play notes on (note-picking mode) -->
+        <div id="notePickSheet" class="note-pick-sheet" hidden>
+          <div id="notePickSheetBackdrop" class="note-pick-sheet-backdrop"></div>
+          <div class="note-pick-sheet-panel" role="dialog" aria-modal="true" aria-label="เลือกสายสำหรับฝึกโน้ต">
+            <div class="note-pick-sheet-handle" aria-hidden="true"></div>
+            <h3 class="note-pick-sheet-title">เล่นบนสาย</h3>
+            <div id="notePickSheetOptions" class="note-pick-sheet-options"></div>
           </div>
         </div>
       </section>

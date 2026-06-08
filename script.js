@@ -5,8 +5,12 @@ import { buildChordsFromLyrics,
          findCurrentTimedIndex }    from "./src/utils/chordEngine.js";
 import { buildSong }                from "./src/utils/songBuilder.js";
 import { getMp3PathFor as _getMp3 } from "./src/utils/playerUtils.js";
+import { getNotationImagePath }     from "./src/utils/notationImage.js";
 import { getChordData,
-         renderChordDiagramSVG }    from "./src/utils/chordDiagram.js";
+         renderChordDiagramSVG,
+         renderNoteDiagramSVG,
+         getRootNoteName,
+         pickNotePosition }         from "./src/utils/chordDiagram.js";
 import { findSectionBounds,
          normalizeABRange,
          shouldSeekBack,
@@ -111,6 +115,9 @@ const state = {
   chordAutoScroll:      true,    // auto-scroll chord list to active row while playing
   editorActiveChordIdx: -1,      // last chord row index highlighted by auto-scroll
   chordDiagramRotation: 0,       // 0 | 90 | 180 | 270 — current diagram rotation
+  chordDiagramMode: "chord",     // "chord" | "note" — full chord shape vs single-note picking view (not persisted)
+  notePickMode: "auto",          // "G" | "C" | "E" | "A" | "auto" — which string(s) to use in note-picking mode
+  notePickPosition: null,        // { stringIdx, fret } — last shown note position (drives "auto" hand-position memory)
   // ── Favorites ──
   favorites:       new Set(),   // Set of song IDs marked as favorites
   favFilterOn:     false,       // true = show only favorite songs in dropdown
@@ -181,6 +188,12 @@ const dom = {
   editorLyricBanner:   document.getElementById("editorLyricBanner"),
   chordAutoScrollBtn:  document.getElementById("chordAutoScrollBtn"),
   diagramOrientBtn:    document.getElementById("diagramOrientBtn"),
+  diagramModeBtn:      document.getElementById("diagramModeBtn"),
+  notePickModeTrigger:      document.getElementById("notePickModeTrigger"),
+  notePickModeTriggerLabel: document.getElementById("notePickModeTriggerLabel"),
+  notePickSheet:            document.getElementById("notePickSheet"),
+  notePickSheetBackdrop:    document.getElementById("notePickSheetBackdrop"),
+  notePickSheetOptions:     document.getElementById("notePickSheetOptions"),
   // Favorites + History
   favoriteBtn:    document.getElementById("favoriteBtn"),
   favoriteIcon:   document.getElementById("favoriteIcon"),
@@ -1587,6 +1600,7 @@ function showIdleState() {
   unloadSound();
   state.currentLyricIndex = -1;
   state.currentChordIndex = -1;
+  state.notePickPosition  = null; // new song — forget previous hand position
   state.duration = 0;
 
   dom.currentSongTitle.textContent = state.selectedSong
@@ -1647,12 +1661,13 @@ function loadSongAudio(song) {
 
   state.currentLyricIndex = -1;
   state.currentChordIndex = -1;
+  state.notePickPosition  = null; // new song — forget previous hand position
   state.duration = 0;
 
   dom.currentSongTitle.textContent = song.title;
   updateBpm(song.bpm);   // also updates Tone.Transport BPM
 
-  renderLyrics(song.lyrics);
+  renderLyrics(song.lyrics, song);
   resetProgress();
   setChordDisplay(null);
 
@@ -1870,10 +1885,10 @@ function updateTimedDisplays(currentSeconds) {
 /* =========================
    Lyrics Functions
 ========================= */
-function renderLyrics(lyrics) {
+function renderLyrics(lyrics, song = null) {
   dom.lyricsContainer.innerHTML = "";
   if (!lyrics || !lyrics.length) {
-    dom.lyricsContainer.innerHTML = `<p class="empty-state">ไม่มีเนื้อเพลง</p>`;
+    renderLyricsEmptyState(song);
     return;
   }
 
@@ -1917,6 +1932,50 @@ function renderLyrics(lyrics) {
   });
 
   dom.lyricsContainer.appendChild(fragment);
+}
+
+/**
+ * Renders what the lyrics panel shows when a song has no lyric lines.
+ *
+ * Most songs without lyrics are pure instrumental "Lesson" exercises that
+ * have a matching "Letter Note Notation" reference image (melody written as
+ * letter names above a staff) instead of sung lyrics. When one is available
+ * for the current song, show that image with a small caption; otherwise fall
+ * back to the plain "no lyrics" placeholder. If the image fails to load
+ * (e.g. no matching file exists for this song), we gracefully fall back to
+ * the placeholder too — this is a static file app with no way to check file
+ * existence ahead of time.
+ *
+ * @param {{ id: string, title: string } | null} song
+ */
+function renderLyricsEmptyState(song) {
+  const emptyMsg = `<p class="empty-state">ไม่มีเนื้อเพลง</p>`;
+  const notationPath = song ? getNotationImagePath(song.id) : null;
+
+  if (!notationPath) {
+    dom.lyricsContainer.innerHTML = emptyMsg;
+    return;
+  }
+
+  const wrap = document.createElement("div");
+  wrap.className = "notation-view";
+
+  const caption = document.createElement("p");
+  caption.className = "notation-caption muted";
+  caption.textContent = "Letter Note Notation";
+
+  const img = document.createElement("img");
+  img.className = "notation-image";
+  img.src = notationPath;
+  img.alt = `Letter Note Notation — ${song.title || song.id}`;
+  img.loading = "lazy";
+  img.addEventListener("error", () => {
+    dom.lyricsContainer.innerHTML = emptyMsg;
+  });
+
+  wrap.appendChild(caption);
+  wrap.appendChild(img);
+  dom.lyricsContainer.appendChild(wrap);
 }
 
 function getLyricLineEntries(lyrics) {
@@ -1983,12 +2042,164 @@ function setChordDisplay(chord) {
     const data = getChordData(chord);
     if (data) {
       dom.chordDiagram.innerHTML = "";
-      dom.chordDiagram.appendChild(renderChordDiagramSVG(data));
+      let svg;
+      if (state.chordDiagramMode === "note") {
+        const rootName = getRootNoteName(chord);
+        const position = rootName
+          ? pickNotePosition(rootName, state.notePickMode, state.notePickPosition)
+          : null;
+        // Remember this position so "auto" mode can keep the hand close by
+        // for the next note (only meaningful in fingerstyle/auto mode).
+        if (position) state.notePickPosition = position;
+        svg = renderNoteDiagramSVG(position, rootName);
+      } else {
+        svg = renderChordDiagramSVG(data);
+      }
+      dom.chordDiagram.appendChild(svg);
       dom.chordDiagram.hidden = false;
     } else {
       dom.chordDiagram.hidden = true;
     }
   }
+}
+
+/**
+ * Re-derives the currently displayed chord's name from state and re-runs
+ * setChordDisplay — used after switching diagram mode / note-pick mode so
+ * the diagram refreshes immediately without waiting for the next chord
+ * change. Reads from state.selectedSong.chords rather than the on-screen
+ * label, which may still hold the "-" placeholder before playback starts.
+ */
+function refreshChordDisplay() {
+  const idx          = state.currentChordIndex;
+  const chords       = state.selectedSong ? state.selectedSong.chords : null;
+  const currentChord = (chords && idx >= 0 && chords[idx]) ? chords[idx].chord : null;
+  setChordDisplay(currentChord);
+}
+
+/**
+ * Toggles the chord diagram between two display modes:
+ *  - "chord": full finger-position shape (default, for strumming)
+ *  - "note":  highlights a single fretboard position for the chord's root
+ *             note — for exercises that pick/pluck individual notes.
+ *             Reveals the compact string/fingerstyle picker trigger while active.
+ * Not persisted — always resets to "chord" mode on reload.
+ */
+function toggleDiagramMode() {
+  state.chordDiagramMode  = state.chordDiagramMode === "note" ? "chord" : "note";
+  state.notePickPosition  = null; // reset hand-position memory on mode entry/exit
+
+  const isNoteMode = state.chordDiagramMode === "note";
+
+  if (dom.diagramModeBtn) {
+    dom.diagramModeBtn.setAttribute("aria-pressed", String(isNoteMode));
+    dom.diagramModeBtn.title = isNoteMode
+      ? "โหมดโน้ตเดี่ยว (กดเพื่อกลับไปโหมดคอร์ด)"
+      : "สลับโหมดคอร์ด/โน้ต (สำหรับฝึกดีดโน้ต)";
+  }
+  if (dom.notePickModeTrigger) dom.notePickModeTrigger.hidden = !isNoteMode;
+  if (!isNoteMode) closeNotePickSheet();
+
+  refreshChordDisplay();
+}
+
+// String/fingerstyle picker options shown in the note-pick bottom-sheet
+const NOTE_PICK_MODES = [
+  { id: "G",    label: "สาย G",       icon: "fa-solid fa-music" },
+  { id: "C",    label: "สาย C",       icon: "fa-solid fa-music" },
+  { id: "E",    label: "สาย E",       icon: "fa-solid fa-music" },
+  { id: "A",    label: "สาย A",       icon: "fa-solid fa-music" },
+  { id: "auto", label: "Fingerstyle", icon: "fa-solid fa-hand-sparkles" },
+];
+
+/** Looks up the display label for the currently-selected note-pick mode. */
+function getNotePickModeLabel(modeId) {
+  const found = NOTE_PICK_MODES.find(m => m.id === modeId);
+  return found ? found.label : modeId;
+}
+
+/** Renders the bottom-sheet option list and wires the trigger/backdrop to open/close it. */
+function initNotePickSheet() {
+  if (dom.notePickModeTriggerLabel) {
+    dom.notePickModeTriggerLabel.textContent = getNotePickModeLabel(state.notePickMode);
+  }
+
+  if (dom.notePickSheetOptions) {
+    dom.notePickSheetOptions.innerHTML = "";
+
+    NOTE_PICK_MODES.forEach(({ id, label, icon }) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "note-pick-option";
+      btn.dataset.mode = id;
+      btn.setAttribute("aria-pressed", String(state.notePickMode === id));
+      if (state.notePickMode === id) btn.classList.add("active");
+
+      btn.innerHTML = `
+        <i class="${icon}" aria-hidden="true"></i>
+        <span>${label}</span>
+        <i class="fa-solid fa-check note-pick-option-check" aria-hidden="true"></i>
+      `;
+
+      btn.addEventListener("click", () => {
+        setNotePickMode(id);
+        closeNotePickSheet();
+      });
+      dom.notePickSheetOptions.appendChild(btn);
+    });
+  }
+
+  if (dom.notePickModeTrigger) {
+    dom.notePickModeTrigger.addEventListener("click", toggleNotePickSheet);
+  }
+  if (dom.notePickSheetBackdrop) {
+    dom.notePickSheetBackdrop.addEventListener("click", closeNotePickSheet);
+  }
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape" && dom.notePickSheet && !dom.notePickSheet.hidden) {
+      closeNotePickSheet();
+    }
+  });
+}
+
+/** Opens the bottom-sheet string/fingerstyle picker. */
+function openNotePickSheet() {
+  if (!dom.notePickSheet) return;
+  dom.notePickSheet.hidden = false;
+  if (dom.notePickModeTrigger) dom.notePickModeTrigger.setAttribute("aria-expanded", "true");
+}
+
+/** Closes the bottom-sheet string/fingerstyle picker. */
+function closeNotePickSheet() {
+  if (!dom.notePickSheet || dom.notePickSheet.hidden) return;
+  dom.notePickSheet.hidden = true;
+  if (dom.notePickModeTrigger) dom.notePickModeTrigger.setAttribute("aria-expanded", "false");
+}
+
+/** Toggles the bottom-sheet string/fingerstyle picker open/closed. */
+function toggleNotePickSheet() {
+  if (dom.notePickSheet && dom.notePickSheet.hidden) openNotePickSheet();
+  else closeNotePickSheet();
+}
+
+/** Switches which string(s) the note-picking diagram targets, then redraws. */
+function setNotePickMode(modeId) {
+  if (state.notePickMode === modeId) return;
+  state.notePickMode     = modeId;
+  state.notePickPosition = null; // hand-position memory resets — new string layout
+
+  if (dom.notePickModeTriggerLabel) {
+    dom.notePickModeTriggerLabel.textContent = getNotePickModeLabel(modeId);
+  }
+  if (dom.notePickSheetOptions) {
+    dom.notePickSheetOptions.querySelectorAll(".note-pick-option").forEach(btn => {
+      const isActive = btn.dataset.mode === modeId;
+      btn.classList.toggle("active", isActive);
+      btn.setAttribute("aria-pressed", String(isActive));
+    });
+  }
+
+  refreshChordDisplay();
 }
 
 /** Cycles chord diagram through 4 rotations: 0° → 90° → 180° → 270° → 0°. */
@@ -2261,6 +2472,7 @@ function bindEvents() {
 
   // Chord diagram orientation
   if (dom.diagramOrientBtn) dom.diagramOrientBtn.addEventListener("click", toggleDiagramOrient);
+  if (dom.diagramModeBtn) dom.diagramModeBtn.addEventListener("click", toggleDiagramMode);
 
   // Favorites + History
   if (dom.favoriteBtn)     dom.favoriteBtn.addEventListener("click", toggleFavorite);
@@ -2564,6 +2776,7 @@ async function initApp() {
   initLottieDancer();
   initStrumVisualizer();
   initMetroSoundBtns();
+  initNotePickSheet();
   updateBpm(dom.bpmSlider.value);
   await loadSongs();
 

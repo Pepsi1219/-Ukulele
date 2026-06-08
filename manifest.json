@@ -12,6 +12,48 @@
       "title": "At My Worst - Pink Sweat$",
       "mp3": "songs/pink-sweats-at-my-worst.mp3",
       "bpm": 67
+    },
+    {
+      "id": "happy-birthday",
+      "title": "Happy Birthday",
+      "mp3": "songs/happy-birthday.mp3",
+      "bpm": 100
+    },
+    {
+      "id": "lesson1-a-b-c",
+      "title": "Lesson 1: A B C",
+      "mp3": "songs/lesson1-a-b-c.mp3",
+      "bpm": 90
+    },
+    {
+      "id": "Lesson1-rockin-the-a-string",
+      "title": "Lesson 1: Rockin' the A String",
+      "mp3": "songs/lesson1-rockin-the-a-string.mp3",
+      "bpm": 95
+    },
+    {
+      "id": "lesson1-first-song",
+      "title": "Lesson 1: First Song",
+      "mp3": "songs/lesson1-first-song.mp3",
+      "bpm": 105
+    },
+    {
+      "id": "lesson2-uke-blues",
+      "title": "Lesson 2: Uke Blues",
+      "mp3": "songs/lesson2-uke-blues.mp3",
+      "bpm": 80
+    },
+    {
+      "id": "lesson2-bleacher-rock",
+      "title": "Lesson 2: Bleacher Rock",
+      "mp3": "songs/lesson2-bleacher-rock.mp3",
+      "bpm": 110
+    },
+    {
+      "id": "Lesson2-e-f-g",
+      "title": "Lesson 2: E F G",
+      "mp3": "songs/lesson2-e-f-g.mp3",
+      "bpm": 85
     }
   ]
 }

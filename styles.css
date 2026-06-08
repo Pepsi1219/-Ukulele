@@ -643,6 +643,133 @@ button.toggle-pill:hover { transform: translateY(-1px); }
   border-color: rgba(56, 189, 248, 0.3);
 }
 
+/* Note/Chord mode button highlight when single-note mode is active */
+#diagramModeBtn[aria-pressed="true"] {
+  color: var(--primary);
+  background: rgba(56, 189, 248, 0.12);
+  border-color: rgba(56, 189, 248, 0.3);
+}
+
+/* Note-picking mode trigger — compact "current selection" pill shown only in
+   note mode; tapping it opens the bottom-sheet string/fingerstyle picker. */
+.note-pick-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  align-self: center;
+  margin-top: 4px;
+  font-size: 0.82rem;
+  color: var(--text);
+  background: rgba(0, 0, 0, 0.15);
+  border: 1px solid var(--border);
+}
+[data-theme="light"] .note-pick-trigger { background: rgba(0, 0, 0, 0.04); }
+.note-pick-trigger[hidden] { display: none !important; }
+.note-pick-trigger i { color: var(--primary); font-size: 0.85em; }
+.note-pick-trigger-caret {
+  color: var(--muted) !important;
+  transition: transform 0.2s ease;
+}
+.note-pick-trigger[aria-expanded="true"] .note-pick-trigger-caret {
+  transform: rotate(180deg);
+}
+
+/* ── Bottom-sheet overlay ─────────────────────────────────────────────────── */
+.note-pick-sheet[hidden] { display: none !important; }
+.note-pick-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 250;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.note-pick-sheet-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  animation: notePickFadeIn 0.18s ease-out;
+}
+.note-pick-sheet-panel {
+  position: relative;
+  width: 100%;
+  max-width: 480px;
+  background: var(--panel);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--border);
+  border-bottom: none;
+  border-radius: 22px 22px 0 0;
+  padding: 12px 20px max(20px, env(safe-area-inset-bottom));
+  box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.35);
+  animation: notePickSlideUp 0.22s cubic-bezier(0.32, 0.72, 0, 1);
+}
+.note-pick-sheet-handle {
+  width: 40px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border);
+  margin: 0 auto 14px;
+}
+.note-pick-sheet-title {
+  margin: 0 0 12px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-align: center;
+  color: var(--muted);
+}
+.note-pick-sheet-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.note-pick-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.15);
+  color: var(--text);
+  font-size: 0.92rem;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.1s ease;
+}
+[data-theme="light"] .note-pick-option { background: rgba(0, 0, 0, 0.03); }
+.note-pick-option:active { transform: scale(0.98); }
+.note-pick-option i {
+  width: 20px;
+  text-align: center;
+  color: var(--muted);
+}
+.note-pick-option .note-pick-option-check {
+  margin-left: auto;
+  color: var(--accent);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.note-pick-option.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(251, 191, 36, 0.12);
+}
+.note-pick-option.active i { color: var(--accent); }
+.note-pick-option.active .note-pick-option-check { opacity: 1; }
+
+@keyframes notePickFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes notePickSlideUp {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+
 /* Grid */
 .cd-nut      { stroke: var(--text);   stroke-width: 4;   stroke-linecap: round; }
 .cd-fret-line{ stroke: var(--border); stroke-width: 1.5; }
@@ -658,6 +785,20 @@ button.toggle-pill:hover { transform: translateY(-1px); }
   font-size: 9px;
   fill: var(--muted);
   font-family: var(--lyric-font);
+}
+
+/* Note-name label (single-note practice mode) — sits centred on the dot */
+.cd-note-label {
+  font-size: 11px;
+  font-weight: 700;
+  fill: #fff;
+  font-family: var(--lyric-font);
+  pointer-events: none;
+}
+/* When the note is an open string, the label sits beside the open circle
+   rather than inside it (circle has no fill to hold light text) */
+.cd-note-label-open {
+  fill: var(--accent);
 }
 
 /* =====================
@@ -1687,6 +1828,35 @@ select option { font-family: inherit; }
 }
 [data-theme="light"] .lyrics-container {
   background: rgba(255, 255, 255, 0.65);
+}
+
+/* Letter Note Notation — shown in the lyrics panel for instrumental "Lesson"
+   exercises that have no sung lyrics, in place of the empty-state message */
+.notation-view {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 220px;
+  padding: 16px 12px;
+  text-align: center;
+}
+.notation-caption {
+  margin: 0 0 12px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.notation-image {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.28);
+  background: #fff;
 }
 
 .lyric-section-label {
