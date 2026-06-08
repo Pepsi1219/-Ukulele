@@ -11,12 +11,11 @@ const NOTATION_DIR = "Letter Note Notation";
  * Builds the candidate path to a song's Letter Note Notation image, given its
  * manifest `id`.
  *
- * The manifest's lesson-song ids are inconsistently cased (e.g. "lesson1-a-b-c"
- * vs "Lesson1-rockin-the-a-string"), but every actual image filename in
- * `Letter Note Notation/` begins with a capital "Lesson" followed by the exact
- * remainder of the id (e.g. "Lesson1-a-b-c.png", "Lesson1-rockin-the-a-string.png").
- * This normalises the leading "lesson" (any casing) to "Lesson" and keeps the
- * rest of the id untouched, which matches every currently-known image file.
+ * Every actual image filename in `Letter Note Notation/` is the song id in
+ * all-lowercase plus a `.png` extension (e.g. "lesson1-a-b-c.png",
+ * "lesson1-rockin-the-a-string.png"). Manifest ids are themselves all-lowercase,
+ * but this still lower-cases the id defensively so the lookup keeps working
+ * even if an id is ever entered with mixed case.
  *
  * Returns null for ids that don't start with "lesson" — i.e. regular songs that
  * have real lyrics and therefore no notation image to look for.
@@ -30,7 +29,7 @@ const NOTATION_DIR = "Letter Note Notation";
  */
 export function getNotationImagePath(songId) {
   if (!songId || typeof songId !== "string") return null;
-  const m = songId.match(/^lesson(.*)$/i);
-  if (!m) return null;
-  return `${NOTATION_DIR}/Lesson${m[1]}.png`;
+  const lower = songId.toLowerCase();
+  if (!lower.startsWith("lesson")) return null;
+  return `${NOTATION_DIR}/${lower}.png`;
 }

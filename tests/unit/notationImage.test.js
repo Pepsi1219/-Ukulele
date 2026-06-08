@@ -2,27 +2,27 @@ import { describe, it, expect } from "vitest";
 import { getNotationImagePath } from "../../src/utils/notationImage.js";
 
 describe("getNotationImagePath", () => {
-  it("normalises a lowercase 'lesson' prefix to 'Lesson' and keeps the rest of the id", () => {
+  it("builds a lowercase path from the (already-lowercase) lesson song id", () => {
     expect(getNotationImagePath("lesson1-a-b-c")).toBe(
-      "Letter Note Notation/Lesson1-a-b-c.png"
+      "Letter Note Notation/lesson1-a-b-c.png"
     );
     expect(getNotationImagePath("lesson1-first-song")).toBe(
-      "Letter Note Notation/Lesson1-first-song.png"
+      "Letter Note Notation/lesson1-first-song.png"
     );
     expect(getNotationImagePath("lesson2-uke-blues")).toBe(
-      "Letter Note Notation/Lesson2-uke-blues.png"
+      "Letter Note Notation/lesson2-uke-blues.png"
     );
     expect(getNotationImagePath("lesson2-bleacher-rock")).toBe(
-      "Letter Note Notation/Lesson2-bleacher-rock.png"
+      "Letter Note Notation/lesson2-bleacher-rock.png"
     );
   });
 
-  it("keeps an already-correct 'Lesson' prefix as-is", () => {
+  it("normalises a mixed-case 'Lesson' prefix to all-lowercase", () => {
     expect(getNotationImagePath("Lesson1-rockin-the-a-string")).toBe(
-      "Letter Note Notation/Lesson1-rockin-the-a-string.png"
+      "Letter Note Notation/lesson1-rockin-the-a-string.png"
     );
     expect(getNotationImagePath("Lesson2-e-f-g")).toBe(
-      "Letter Note Notation/Lesson2-e-f-g.png"
+      "Letter Note Notation/lesson2-e-f-g.png"
     );
   });
 
