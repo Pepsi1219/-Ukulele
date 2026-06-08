@@ -4,6 +4,10 @@ import {
   getChordData,
   calcBaseFret,
   buildDiagramModel,
+  getRootNoteName,
+  findFretForNote,
+  pickNotePosition,
+  buildNotePositionModel,
 } from "../../src/utils/chordDiagram.js";
 
 // ─── getChordData ────────────────────────────────────────────────────────────
@@ -131,5 +135,144 @@ describe("buildDiagramModel", () => {
     expect(dotStrings).not.toContain(1); // stringIdx 1 = C string (fret 8) clipped
     expect(dotStrings).toContain(0);    // G string fret 2 → rel 1 → included
     expect(dotStrings).toContain(2);    // E string fret 3 → rel 2 → included
+  });
+});
+
+// ─── getRootNoteName ─────────────────────────────────────────────────────────
+
+describe("getRootNoteName", () => {
+  it("extracts a plain root note", () => {
+    expect(getRootNoteName("C")).toBe("C");
+    expect(getRootNoteName("G")).toBe("G");
+  });
+
+  it("extracts the root from minor / 7th / extended chord names", () => {
+    expect(getRootNoteName("Cm")).toBe("C");
+    expect(getRootNoteName("Cm7")).toBe("C");
+    expect(getRootNoteName("Gmaj7")).toBe("G");
+    expect(getRootNoteName("Dsus4")).toBe("D");
+  });
+
+  it("extracts flat / sharp roots", () => {
+    expect(getRootNoteName("Bb")).toBe("Bb");
+    expect(getRootNoteName("Bbmaj7")).toBe("Bb");
+    expect(getRootNoteName("F#m")).toBe("F#");
+  });
+
+  it("trims whitespace before parsing", () => {
+    expect(getRootNoteName(" Am ")).toBe("A");
+  });
+
+  it("returns null for unparsable / non-note input", () => {
+    expect(getRootNoteName("Xyz")).toBeNull();
+    expect(getRootNoteName("")).toBeNull();
+    expect(getRootNoteName(null)).toBeNull();
+    expect(getRootNoteName(undefined)).toBeNull();
+  });
+});
+
+// ─── findFretForNote ─────────────────────────────────────────────────────────
+// GCEA tuning — open-string pitch classes: G=7, C=0, E=4, A=9 (index 0..3)
+
+describe("findFretForNote", () => {
+  it("returns fret 0 when the note matches the open string", () => {
+    expect(findFretForNote(0, "G")).toBe(0); // G string open
+    expect(findFretForNote(1, "C")).toBe(0); // C string open
+    expect(findFretForNote(2, "E")).toBe(0); // E string open
+    expect(findFretForNote(3, "A")).toBe(0); // A string open
+  });
+
+  it("computes the correct fret for a fretted note on the A string", () => {
+    // A string: 0=A, 1=A#/Bb, 2=B, 3=C — matches the user's reference mapping
+    expect(findFretForNote(3, "A")).toBe(0);
+    expect(findFretForNote(3, "Bb")).toBe(1);
+    expect(findFretForNote(3, "B")).toBe(2);
+    expect(findFretForNote(3, "C")).toBe(3);
+  });
+
+  it("finds the same note at different positions on different strings", () => {
+    // Note "C" exists at: C string open (fret 0) AND A string fret 3
+    expect(findFretForNote(1, "C")).toBe(0);
+    expect(findFretForNote(3, "C")).toBe(3);
+  });
+
+  it("wraps around correctly when the note is below the open pitch", () => {
+    // G string (open = G, pitch 7); note "E" (pitch 4) → (4-7+12)%12 = 9
+    expect(findFretForNote(0, "E")).toBe(9);
+  });
+
+  it("returns null for an unrecognised note name", () => {
+    expect(findFretForNote(0, "H")).toBeNull();
+    expect(findFretForNote(0, "")).toBeNull();
+  });
+});
+
+// ─── pickNotePosition ────────────────────────────────────────────────────────
+
+describe("pickNotePosition", () => {
+  it("forces the note onto the chosen string in single-string modes", () => {
+    expect(pickNotePosition("C", "A")).toEqual({ stringIdx: 3, fret: 3 });
+    expect(pickNotePosition("C", "C")).toEqual({ stringIdx: 1, fret: 0 });
+    expect(pickNotePosition("G", "G")).toEqual({ stringIdx: 0, fret: 0 });
+  });
+
+  it("returns null in single-string mode for an unrecognised note", () => {
+    expect(pickNotePosition("H", "A")).toBeNull();
+  });
+
+  it("returns null for an unrecognised mode", () => {
+    expect(pickNotePosition("C", "Z")).toBeNull();
+  });
+
+  it("auto mode with no previous position picks the lowest-fret option (easiest reach)", () => {
+    // Note "C": G str fret5, C str fret0, E str fret8, A str fret3 → lowest = C string open
+    expect(pickNotePosition("C", "auto", null)).toEqual({ stringIdx: 1, fret: 0 });
+  });
+
+  it("auto mode favours the position closest to the previous one (least hand movement)", () => {
+    // Coming from A string fret 3 (note C), next note "G":
+    // candidates → G:[0,0] C:[1,7] E:[2,3] A:[3,10]
+    // distance = |Δfret|*2 + |Δstring|  → G:9  C:10  E:1  A:14 → E string wins
+    const prev = { stringIdx: 3, fret: 3 };
+    expect(pickNotePosition("G", "auto", prev)).toEqual({ stringIdx: 2, fret: 3 });
+  });
+
+  it("auto mode returns null for an unrecognised note", () => {
+    expect(pickNotePosition("H", "auto", null)).toBeNull();
+  });
+});
+
+// ─── buildNotePositionModel ──────────────────────────────────────────────────
+
+describe("buildNotePositionModel", () => {
+  it("highlights an open string with a circle indicator", () => {
+    const model = buildNotePositionModel({ stringIdx: 1, fret: 0 }, "C");
+    expect(model.noteLabel).toBe("C");
+    expect(model.opens).toEqual([1]);
+    expect(model.dots).toEqual([]);
+    expect(model.mutes).toEqual([]);
+  });
+
+  it("highlights a fretted position with a single dot", () => {
+    const model = buildNotePositionModel({ stringIdx: 3, fret: 3 }, "C");
+    expect(model.noteLabel).toBe("C");
+    expect(model.dots).toEqual([{ stringIdx: 3, dotYIdx: 2 }]); // rel = 3-1+1 = 3 → idx 2
+    expect(model.opens).toEqual([]);
+    expect(model.baseFret).toBe(1);
+    expect(model.showFretNum).toBe(false);
+  });
+
+  it("shows the base-fret number when the position is high up the neck", () => {
+    const model = buildNotePositionModel({ stringIdx: 0, fret: 9 }, "E");
+    expect(model.baseFret).toBe(9);
+    expect(model.showFretNum).toBe(true);
+    expect(model.dots).toEqual([{ stringIdx: 0, dotYIdx: 0 }]);
+  });
+
+  it("returns an empty highlight (with label) when no position is given", () => {
+    const model = buildNotePositionModel(null, "C");
+    expect(model.noteLabel).toBe("C");
+    expect(model.dots).toEqual([]);
+    expect(model.opens).toEqual([]);
   });
 });

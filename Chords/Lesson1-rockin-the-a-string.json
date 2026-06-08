@@ -1,0 +1,58 @@
+[
+  {
+    "time": 2.5,
+    "chord": "A"
+  },
+  {
+    "time": 5,
+    "chord": "B"
+  },
+  {
+    "time": 5.5,
+    "chord": "A"
+  },
+  {
+    "time": 6.8,
+    "chord": "B"
+  },
+  {
+    "time": 7.655,
+    "chord": "A"
+  },
+  {
+    "time": 9.173,
+    "chord": "B"
+  },
+  {
+    "time": 9.745,
+    "chord": "A"
+  },
+  {
+    "time": 12.436,
+    "chord": "C"
+  },
+  {
+    "time": 13.529,
+    "chord": "B"
+  },
+  {
+    "time": 14.049,
+    "chord": "A"
+  },
+  {
+    "time": 15.5,
+    "chord": "C"
+  },
+  {
+    "time": 16.181,
+    "chord": "B"
+  },
+  {
+    "time": 16.814,
+    "chord": "C"
+  },
+  {
+    "time": 17.981,
+    "chord": "A"
+  }
+]
