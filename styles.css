@@ -625,9 +625,12 @@ button.toggle-pill:hover { transform: translateY(-1px); }
  * For 90° / 270°: visual becomes 203 × 160px but layout box stays 160 × 203px
  * margin compensation = (203 − 160) / 2 ≈ 22px
  */
-.chord-diagram-wrap.rot-90  .chord-diagram-svg { transform: rotate(90deg);  margin-top: 22px; margin-bottom: 22px; }
-.chord-diagram-wrap.rot-180 .chord-diagram-svg { transform: rotate(180deg); }
-.chord-diagram-wrap.rot-270 .chord-diagram-svg { transform: rotate(270deg); margin-top: 22px; margin-bottom: 22px; }
+.chord-diagram-wrap.rot-90  .chord-diagram-svg,
+.lyrics-fs-chord-diagram.rot-90  .chord-diagram-svg { transform: rotate(90deg);  margin-top: 22px; margin-bottom: 22px; }
+.chord-diagram-wrap.rot-180 .chord-diagram-svg,
+.lyrics-fs-chord-diagram.rot-180 .chord-diagram-svg { transform: rotate(180deg); }
+.chord-diagram-wrap.rot-270 .chord-diagram-svg,
+.lyrics-fs-chord-diagram.rot-270 .chord-diagram-svg { transform: rotate(270deg); margin-top: 22px; margin-bottom: 22px; }
 
 /* Chord panel: section-title actions group */
 .chord-panel-actions {
@@ -679,7 +682,7 @@ button.toggle-pill:hover { transform: translateY(-1px); }
 .note-pick-sheet {
   position: fixed;
   inset: 0;
-  z-index: 250;
+  z-index: 350;
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -1830,6 +1833,25 @@ select option { font-family: inherit; }
   background: rgba(255, 255, 255, 0.65);
 }
 
+/* ── Custom scrollbar for lyrics panels ── */
+.lyrics-container,
+.lyrics-fs-container {
+  scrollbar-width: thin;
+  scrollbar-color: var(--primary) transparent;
+}
+.lyrics-container::-webkit-scrollbar,
+.lyrics-fs-container::-webkit-scrollbar { width: 4px; }
+.lyrics-container::-webkit-scrollbar-track,
+.lyrics-fs-container::-webkit-scrollbar-track { background: transparent; }
+.lyrics-container::-webkit-scrollbar-thumb,
+.lyrics-fs-container::-webkit-scrollbar-thumb {
+  background: var(--primary);
+  border-radius: 99px;
+  opacity: 0.6;
+}
+.lyrics-container::-webkit-scrollbar-thumb:hover,
+.lyrics-fs-container::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+
 /* Letter Note Notation — shown in the lyrics panel for instrumental "Lesson"
    exercises that have no sung lyrics, in place of the empty-state message */
 .notation-view {
@@ -1941,6 +1963,243 @@ select option { font-family: inherit; }
   font-weight: 700;
 }
 
+/* Lyrics panel title actions row */
+.lyrics-title-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* =====================
+   Lyrics Fullscreen Overlay
+===================== */
+.lyrics-fs { display: none; }
+.lyrics-fs[hidden] { display: none !important; }
+.lyrics-fs:not([hidden]) {
+  display: flex;
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  flex-direction: column;
+  background: var(--bg);
+  animation: lyricsFsIn 0.32s cubic-bezier(0.32, 0.72, 0, 1);
+}
+@keyframes lyricsFsIn {
+  from { opacity: 0; transform: translateY(40px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.lyrics-fs-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.lyrics-fs-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 20px;
+  padding-top: max(14px, env(safe-area-inset-top));
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.lyrics-fs-header h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+/* Two-column main area: chord + lyrics */
+.lyrics-fs-main {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+/* ── Chord column ── */
+.lyrics-fs-chord-col {
+  width: 260px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 12px;
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+}
+.lyrics-fs-chord-badge-wrap {
+  display: flex;
+  justify-content: center;
+}
+.lyrics-fs-chord-display {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 140px;
+  width: 100%;
+}
+.lyrics-fs-chord-display .chord-badge {
+  position: relative;
+  width: clamp(120px, 16vw, 160px);
+  height: clamp(120px, 16vw, 160px);
+  font-size: clamp(3.5rem, 8vw, 5.5rem);
+  border-radius: 28px;
+}
+.lyrics-fs-chord-diagram {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+}
+.lyrics-fs-chord-diagram .chord-diagram-svg {
+  width: 140px;
+}
+
+/* Chord column header (title + action buttons) */
+.lyrics-fs-chord-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  margin-bottom: 4px;
+}
+.lyrics-fs-chord-header h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  white-space: nowrap;
+}
+.lyrics-fs-chord-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.lyrics-fs-chord-actions .icon-btn { min-height: 34px; padding: 0 10px; }
+
+/* Swap layout — chord column moves to the right */
+.lyrics-fs-main.fs-swapped { flex-direction: row-reverse; }
+.lyrics-fs-main.fs-swapped .lyrics-fs-chord-col {
+  border-right: none;
+  border-left: 1px solid var(--border);
+}
+
+/* Swap button highlight when active */
+#lyricsFsSwapBtn[aria-pressed="true"] {
+  color: var(--primary);
+  background: rgba(56, 189, 248, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.45);
+}
+#lyricsFsSwapBtn[aria-pressed="true"] i {
+  transform: rotate(180deg);
+}
+#lyricsFsSwapBtn i {
+  transition: transform 320ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Note-pick trigger inside fullscreen chord column */
+.lyrics-fs-chord-col .note-pick-trigger { align-self: center; }
+.lyrics-fs-chord-col .note-pick-trigger[hidden] { display: none !important; }
+
+/* Mirror orientation button highlight in fullscreen */
+#lyricsFsDiagramOrientBtn[aria-pressed="true"] {
+  color: var(--primary);
+  background: rgba(56, 189, 248, 0.12);
+  border-color: rgba(56, 189, 248, 0.3);
+}
+#lyricsFsDiagramModeBtn[aria-pressed="true"] {
+  color: var(--primary);
+  background: rgba(56, 189, 248, 0.12);
+  border-color: rgba(56, 189, 248, 0.3);
+}
+
+.lyrics-fs-container {
+  flex: 1;
+  overflow-y: auto;
+  scroll-behavior: smooth;
+  padding: 16px 20px;
+  padding-left: max(20px, env(safe-area-inset-left));
+  padding-right: max(20px, env(safe-area-inset-right));
+}
+
+/* ── Fullscreen Player Bar ── */
+.lyrics-fs-player {
+  flex-shrink: 0;
+  background: var(--panel);
+  border-top: 1px solid var(--border);
+  backdrop-filter: blur(16px);
+  padding: 6px 20px;
+  padding-left: max(20px, env(safe-area-inset-left));
+  padding-right: max(20px, env(safe-area-inset-right));
+  padding-bottom: max(6px, env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.lyrics-fs-player-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.lyrics-fs-player-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+.lyrics-fs-player-art {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  border-radius: 6px;
+  background: linear-gradient(135deg, var(--primary), var(--accent));
+  color: #020617;
+  font-size: 0.72rem;
+}
+.lyrics-fs-player-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lyrics-fs-player-transport {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+.lyrics-fs-player-transport .control-btn {
+  width: 30px;
+  height: 30px;
+  font-size: 0.78rem;
+}
+.lyrics-fs-player-transport .control-btn.primary {
+  width: 36px;
+  height: 36px;
+  font-size: 0.9rem;
+}
+
+.lyrics-fs-player-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.lyrics-fs-player-timeline .time-row {
+  font-size: 0.7rem;
+}
+
 /* =====================
    Responsive
 ===================== */
@@ -1950,6 +2209,35 @@ select option { font-family: inherit; }
   /* Swap still works: chord-panel order:3 from base rule reorders it after lyrics */
   .player-panel { grid-column: 1 / -1; min-height: auto; }
   .lyrics-container { min-height: 520px; }
+}
+
+@media (max-width: 900px) {
+  .lyrics-fs-main { flex-direction: column; }
+  .lyrics-fs-chord-col {
+    width: 100%;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+    padding: 10px 16px;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    overflow-y: visible;
+  }
+  .lyrics-fs-chord-display { min-height: auto; width: auto; }
+  .lyrics-fs-chord-display .chord-badge {
+    width: 80px; height: 80px; font-size: 2.5rem; border-radius: 18px;
+  }
+  .lyrics-fs-chord-diagram .chord-diagram-svg { width: 100px; }
+  .lyrics-fs-main.fs-swapped { flex-direction: column-reverse; }
+  .lyrics-fs-main.fs-swapped .lyrics-fs-chord-col {
+    border-left: none;
+    border-top: 1px solid var(--border);
+    border-bottom: none;
+  }
+  .lyrics-fs-player { padding: 8px 14px; gap: 4px; }
+  .lyrics-fs-player-transport .control-btn { width: 30px; height: 30px; font-size: 0.78rem; }
+  .lyrics-fs-player-transport .control-btn.primary { width: 36px; height: 36px; font-size: 0.88rem; }
 }
 
 @media (max-width: 760px) {

@@ -118,6 +118,8 @@ const state = {
   chordDiagramMode: "chord",     // "chord" | "note" — full chord shape vs single-note picking view (not persisted)
   notePickMode: "auto",          // "G" | "C" | "E" | "A" | "auto" — which string(s) to use in note-picking mode
   notePickPosition: null,        // { stringIdx, fret } — last shown note position (drives "auto" hand-position memory)
+  lyricsFullscreen: false,       // true when lyrics are displayed in fullscreen overlay
+  lyricsFsSwapped: false,        // true = chord column on right side in fullscreen
   // ── Favorites ──
   favorites:       new Set(),   // Set of song IDs marked as favorites
   favFilterOn:     false,       // true = show only favorite songs in dropdown
@@ -218,6 +220,34 @@ const dom = {
   editorDurationTime: document.getElementById("editorDurationTime"),
   editorProgressTrack:document.getElementById("editorProgressTrack"),
   editorProgressFill: document.getElementById("editorProgressFill"),
+
+  // Lyrics Fullscreen
+  lyricsExpandBtn:           document.getElementById("lyricsExpandBtn"),
+  lyricsFullscreen:          document.getElementById("lyricsFullscreen"),
+  lyricsFullscreenContainer: document.getElementById("lyricsFullscreenContainer"),
+  lyricsCollapseBtn:         document.getElementById("lyricsCollapseBtn"),
+  lyricsFullscreenAutoScroll:document.getElementById("lyricsFullscreenAutoScroll"),
+  lyricsFsMain:              document.getElementById("lyricsFsMain"),
+  lyricsFsSwapBtn:           document.getElementById("lyricsFsSwapBtn"),
+  lyricsFsChordLabel:        document.getElementById("lyricsFsChordLabel"),
+  lyricsFsChordDisplay:      document.getElementById("lyricsFsChordDisplay"),
+  lyricsFsChordDiagram:      document.getElementById("lyricsFsChordDiagram"),
+  lyricsFsDiagramModeBtn:    document.getElementById("lyricsFsDiagramModeBtn"),
+  lyricsFsDiagramOrientBtn:  document.getElementById("lyricsFsDiagramOrientBtn"),
+  lyricsFsNotePickTrigger:   document.getElementById("lyricsFsNotePickTrigger"),
+  lyricsFsNotePickLabel:     document.getElementById("lyricsFsNotePickLabel"),
+  lyricsFsPlayerTitle:       document.getElementById("lyricsFsPlayerTitle"),
+  lyricsFsPlayPause:         document.getElementById("lyricsFsPlayPause"),
+  lyricsFsPrev:              document.getElementById("lyricsFsPrev"),
+  lyricsFsNext:              document.getElementById("lyricsFsNext"),
+  lyricsFsStop:              document.getElementById("lyricsFsStop"),
+  lyricsFsSeekBack:          document.getElementById("lyricsFsSeekBack"),
+  lyricsFsSeekFwd:           document.getElementById("lyricsFsSeekFwd"),
+  lyricsFsProgressTrack:     document.getElementById("lyricsFsProgressTrack"),
+  lyricsFsProgressFill:      document.getElementById("lyricsFsProgressFill"),
+  lyricsFsProgressThumb:     document.getElementById("lyricsFsProgressThumb"),
+  lyricsFsCurrentTime:       document.getElementById("lyricsFsCurrentTime"),
+  lyricsFsDurationTime:      document.getElementById("lyricsFsDurationTime"),
 
   // Strumming Pattern Panel (overlay)
   strumBtn:          document.getElementById("strumBtn"),
@@ -1403,11 +1433,12 @@ function toggleTheme() {
 ========================= */
 function applyAutoScroll(enabled) {
   state.autoScrollEnabled = !!enabled;
-  if (dom.autoScrollToggle) {
-    dom.autoScrollToggle.classList.toggle("is-on",  state.autoScrollEnabled);
-    dom.autoScrollToggle.classList.toggle("is-off", !state.autoScrollEnabled);
-    dom.autoScrollToggle.setAttribute("aria-pressed", String(state.autoScrollEnabled));
-  }
+  [dom.autoScrollToggle, dom.lyricsFullscreenAutoScroll].forEach(btn => {
+    if (!btn) return;
+    btn.classList.toggle("is-on",  state.autoScrollEnabled);
+    btn.classList.toggle("is-off", !state.autoScrollEnabled);
+    btn.setAttribute("aria-pressed", String(state.autoScrollEnabled));
+  });
   localStorage.setItem("ukulele-autoscroll", state.autoScrollEnabled ? "on" : "off");
 }
 
@@ -1793,6 +1824,7 @@ function stopSong() {
 function updatePlayPauseIcon() {
   dom.playPauseBtn.innerHTML = `<i class="fa-solid ${state.isPlaying ? "fa-pause" : "fa-play"}"></i>`;
   updateEditorPlayPauseIcon();
+  syncFsPlayPauseIcon();
 }
 
 // Seek by a relative offset in seconds (negative = backward, positive = forward)
@@ -1874,6 +1906,12 @@ function updateProgress(currentSeconds) {
   dom.durationTime.textContent = formatTime(duration);
   dom.progressFill.style.width = `${percent}%`;
   dom.progressThumb.style.left = `${percent}%`;
+  if (state.lyricsFullscreen) {
+    if (dom.lyricsFsProgressFill)  dom.lyricsFsProgressFill.style.width = `${percent}%`;
+    if (dom.lyricsFsProgressThumb) dom.lyricsFsProgressThumb.style.left = `${percent}%`;
+    if (dom.lyricsFsCurrentTime)   dom.lyricsFsCurrentTime.textContent = formatTime(currentSeconds);
+    if (dom.lyricsFsDurationTime)  dom.lyricsFsDurationTime.textContent = formatTime(duration);
+  }
 }
 
 function updateTimedDisplays(currentSeconds) {
@@ -1932,6 +1970,11 @@ function renderLyrics(lyrics, song = null) {
   });
 
   dom.lyricsContainer.appendChild(fragment);
+
+  if (state.lyricsFullscreen) {
+    syncFullscreenLyrics();
+    syncFsPlayer();
+  }
 }
 
 /**
@@ -1976,6 +2019,11 @@ function renderLyricsEmptyState(song) {
   wrap.appendChild(caption);
   wrap.appendChild(img);
   dom.lyricsContainer.appendChild(wrap);
+
+  if (state.lyricsFullscreen) {
+    syncFullscreenLyrics();
+    syncFsPlayer();
+  }
 }
 
 function getLyricLineEntries(lyrics) {
@@ -2015,6 +2063,103 @@ function updateCurrentLyric(currentSeconds) {
   }
 
   state.currentLyricIndex = nextIndex;
+
+  // Mirror highlight into fullscreen container when open
+  if (state.lyricsFullscreen) {
+    const fsPrev = dom.lyricsFullscreenContainer.querySelector(".lyric-row.active");
+    if (fsPrev) fsPrev.classList.remove("active");
+    const fsCurrent = dom.lyricsFullscreenContainer.querySelector(`.lyric-row[data-index="${nextIndex}"]`);
+    if (fsCurrent) {
+      fsCurrent.classList.add("active");
+      if (state.autoScrollEnabled && !state.userScrolling) {
+        scrollElIntoContainer(fsCurrent, dom.lyricsFullscreenContainer);
+      }
+    }
+  }
+}
+
+/* =========================
+   Lyrics Fullscreen
+========================= */
+function openLyricsFullscreen() {
+  state.lyricsFullscreen = true;
+  dom.lyricsFullscreen.hidden = false;
+
+  // Clone lyrics content into fullscreen container
+  syncFullscreenLyrics();
+
+  // Sync chord display
+  const chords = state.selectedSong ? state.selectedSong.chords : null;
+  const idx = state.currentChordIndex;
+  const currentChord = (chords && idx >= 0 && chords[idx]) ? chords[idx].chord : null;
+  syncFullscreenChord(currentChord);
+
+  // Sync chord control button states
+  syncFsChordControls();
+
+  // Sync mini player state
+  syncFsPlayer();
+}
+
+function closeLyricsFullscreen() {
+  state.lyricsFullscreen = false;
+  dom.lyricsFullscreen.hidden = true;
+  dom.lyricsFullscreenContainer.innerHTML = "";
+}
+
+function syncFullscreenLyrics() {
+  dom.lyricsFullscreenContainer.innerHTML = dom.lyricsContainer.innerHTML;
+
+  // Wire up section-label click (loop-to-section) in fullscreen copy
+  dom.lyricsFullscreenContainer.querySelectorAll(".lyric-section-label").forEach(el => {
+    el.addEventListener("click", () => {
+      const label = el.dataset.section;
+      if (label) handleSectionClick(label);
+    });
+  });
+}
+
+function syncFsPlayer() {
+  const title = state.selectedSong ? state.selectedSong.title : "—";
+  dom.lyricsFsPlayerTitle.textContent = title;
+  syncFsPlayPauseIcon();
+  syncFsProgress();
+
+  // Sync auto-scroll toggle
+  const btn = dom.lyricsFullscreenAutoScroll;
+  if (btn) {
+    btn.classList.toggle("is-on",  state.autoScrollEnabled);
+    btn.classList.toggle("is-off", !state.autoScrollEnabled);
+    btn.setAttribute("aria-pressed", String(state.autoScrollEnabled));
+  }
+}
+
+function syncFsPlayPauseIcon() {
+  if (!dom.lyricsFsPlayPause) return;
+  dom.lyricsFsPlayPause.innerHTML = `<i class="fa-solid ${state.isPlaying ? "fa-pause" : "fa-play"}"></i>`;
+}
+
+function syncFsProgress() {
+  if (!dom.lyricsFsProgressFill) return;
+  const duration = state.duration || 0;
+  const current = state.sound ? (Number(state.sound.seek()) || 0) : 0;
+  const percent = duration > 0 ? Math.min((current / duration) * 100, 100) : 0;
+  dom.lyricsFsProgressFill.style.width = `${percent}%`;
+  dom.lyricsFsProgressThumb.style.left = `${percent}%`;
+  if (dom.lyricsFsCurrentTime) dom.lyricsFsCurrentTime.textContent = formatTime(current);
+  if (dom.lyricsFsDurationTime) dom.lyricsFsDurationTime.textContent = formatTime(duration);
+}
+
+
+function seekFromFsProgress(clientX) {
+  if (!state.sound || !state.duration) return;
+  const rect = dom.lyricsFsProgressTrack.getBoundingClientRect();
+  const ratio = Math.min(Math.max((clientX - rect.left) / rect.width, 0), 1);
+  const targetTime = ratio * state.duration;
+  state.sound.seek(targetTime);
+  updateProgress(targetTime);
+  updateTimedDisplays(targetTime);
+  if (state.metronomeOn && state.isPlaying) syncMetronomeToSong(targetTime);
 }
 
 /* =========================
@@ -2061,6 +2206,88 @@ function setChordDisplay(chord) {
       dom.chordDiagram.hidden = true;
     }
   }
+
+  // Mirror into fullscreen chord area
+  if (state.lyricsFullscreen) syncFullscreenChord(chord);
+}
+
+function syncFullscreenChord(chord) {
+  if (!dom.lyricsFsChordDisplay) return;
+
+  dom.lyricsFsChordLabel.textContent = chord || "-";
+
+  dom.lyricsFsChordDisplay.innerHTML = "";
+  if (chord) {
+    const badge = document.createElement("div");
+    badge.className = "chord-badge";
+    badge.textContent = chord;
+    dom.lyricsFsChordDisplay.appendChild(badge);
+  } else {
+    dom.lyricsFsChordDisplay.innerHTML = `<span class="empty-state">รอคอร์ดแรก...</span>`;
+  }
+
+  dom.lyricsFsChordDiagram.innerHTML = "";
+  dom.lyricsFsChordDiagram.classList.remove("rot-90", "rot-180", "rot-270");
+  if (state.chordDiagramRotation) {
+    dom.lyricsFsChordDiagram.classList.add(`rot-${state.chordDiagramRotation}`);
+  }
+  if (chord) {
+    const data = getChordData(chord);
+    if (data) {
+      let svg;
+      if (state.chordDiagramMode === "note") {
+        const rootName = getRootNoteName(chord);
+        const position = rootName
+          ? pickNotePosition(rootName, state.notePickMode, state.notePickPosition)
+          : null;
+        svg = renderNoteDiagramSVG(position, rootName);
+      } else {
+        svg = renderChordDiagramSVG(data);
+      }
+      dom.lyricsFsChordDiagram.appendChild(svg);
+    }
+  }
+}
+
+function syncFsChordControls() {
+  // Diagram mode button
+  if (dom.lyricsFsDiagramModeBtn) {
+    const isNote = state.chordDiagramMode === "note";
+    dom.lyricsFsDiagramModeBtn.setAttribute("aria-pressed", String(isNote));
+  }
+  // Diagram orientation button
+  if (dom.lyricsFsDiagramOrientBtn) {
+    dom.lyricsFsDiagramOrientBtn.setAttribute("aria-pressed", String(state.chordDiagramRotation !== 0));
+  }
+  // Note-pick trigger visibility + label
+  if (dom.lyricsFsNotePickTrigger) {
+    dom.lyricsFsNotePickTrigger.hidden = state.chordDiagramMode !== "note";
+    if (dom.lyricsFsNotePickLabel) {
+      dom.lyricsFsNotePickLabel.textContent = dom.notePickModeTriggerLabel
+        ? dom.notePickModeTriggerLabel.textContent
+        : "Fingerstyle";
+    }
+  }
+  // Chord diagram rotation class
+  if (dom.lyricsFsChordDiagram) {
+    dom.lyricsFsChordDiagram.classList.remove("rot-90", "rot-180", "rot-270");
+    if (state.chordDiagramRotation) {
+      dom.lyricsFsChordDiagram.classList.add(`rot-${state.chordDiagramRotation}`);
+    }
+  }
+  // Swap state
+  if (dom.lyricsFsMain) {
+    dom.lyricsFsMain.classList.toggle("fs-swapped", state.lyricsFsSwapped);
+  }
+  if (dom.lyricsFsSwapBtn) {
+    dom.lyricsFsSwapBtn.setAttribute("aria-pressed", String(state.lyricsFsSwapped));
+  }
+}
+
+function toggleFsSwap() {
+  state.lyricsFsSwapped = !state.lyricsFsSwapped;
+  if (dom.lyricsFsMain) dom.lyricsFsMain.classList.toggle("fs-swapped", state.lyricsFsSwapped);
+  if (dom.lyricsFsSwapBtn) dom.lyricsFsSwapBtn.setAttribute("aria-pressed", String(state.lyricsFsSwapped));
 }
 
 /**
@@ -2100,6 +2327,7 @@ function toggleDiagramMode() {
   if (dom.notePickModeTrigger) dom.notePickModeTrigger.hidden = !isNoteMode;
   if (!isNoteMode) closeNotePickSheet();
 
+  if (state.lyricsFullscreen) syncFsChordControls();
   refreshChordDisplay();
 }
 
@@ -2188,9 +2416,9 @@ function setNotePickMode(modeId) {
   state.notePickMode     = modeId;
   state.notePickPosition = null; // hand-position memory resets — new string layout
 
-  if (dom.notePickModeTriggerLabel) {
-    dom.notePickModeTriggerLabel.textContent = getNotePickModeLabel(modeId);
-  }
+  const label = getNotePickModeLabel(modeId);
+  if (dom.notePickModeTriggerLabel) dom.notePickModeTriggerLabel.textContent = label;
+  if (dom.lyricsFsNotePickLabel) dom.lyricsFsNotePickLabel.textContent = label;
   if (dom.notePickSheetOptions) {
     dom.notePickSheetOptions.querySelectorAll(".note-pick-option").forEach(btn => {
       const isActive = btn.dataset.mode === modeId;
@@ -2215,6 +2443,7 @@ function toggleDiagramOrient() {
     dom.diagramOrientBtn.setAttribute("aria-pressed", String(state.chordDiagramRotation !== 0));
     dom.diagramOrientBtn.title = `หมุน Chord Diagram (${state.chordDiagramRotation}°)`;
   }
+  if (state.lyricsFullscreen) syncFsChordControls();
 }
 
 function updateCurrentChord(currentSeconds) {
@@ -2502,6 +2731,42 @@ function bindEvents() {
   if (dom.swapPanelsBtn) {
     dom.swapPanelsBtn.addEventListener("click", togglePanelSwap);
   }
+
+  // ── Lyrics Fullscreen ──
+  if (dom.lyricsExpandBtn) dom.lyricsExpandBtn.addEventListener("click", openLyricsFullscreen);
+  if (dom.lyricsCollapseBtn) dom.lyricsCollapseBtn.addEventListener("click", closeLyricsFullscreen);
+  if (dom.lyricsFsPlayPause)  dom.lyricsFsPlayPause.addEventListener("click", togglePlayPause);
+  if (dom.lyricsFsPrev)       dom.lyricsFsPrev.addEventListener("click", () => changeSong(-1));
+  if (dom.lyricsFsNext)       dom.lyricsFsNext.addEventListener("click", () => changeSong(1));
+  if (dom.lyricsFsStop)       dom.lyricsFsStop.addEventListener("click", stopSong);
+  if (dom.lyricsFsSeekBack)   dom.lyricsFsSeekBack.addEventListener("click", () => seekBy(-5));
+  if (dom.lyricsFsSeekFwd)    dom.lyricsFsSeekFwd.addEventListener("click", () => seekBy(5));
+  if (dom.lyricsFsProgressTrack) {
+    dom.lyricsFsProgressTrack.addEventListener("click", e => seekFromFsProgress(e.clientX));
+  }
+  if (dom.lyricsFullscreenAutoScroll) {
+    dom.lyricsFullscreenAutoScroll.addEventListener("click", toggleAutoScroll);
+  }
+  if (dom.lyricsFullscreenContainer) {
+    dom.lyricsFullscreenContainer.addEventListener("scroll", () => {
+      state.userScrolling = true;
+      clearTimeout(state.userScrollTimer);
+      state.userScrollTimer = setTimeout(() => { state.userScrolling = false; }, 3000);
+    }, { passive: true });
+  }
+  // Fullscreen chord controls — delegate to the same toggle functions as main panel
+  if (dom.lyricsFsSwapBtn) dom.lyricsFsSwapBtn.addEventListener("click", toggleFsSwap);
+  if (dom.lyricsFsDiagramModeBtn) dom.lyricsFsDiagramModeBtn.addEventListener("click", toggleDiagramMode);
+  if (dom.lyricsFsDiagramOrientBtn) dom.lyricsFsDiagramOrientBtn.addEventListener("click", toggleDiagramOrient);
+  if (dom.lyricsFsNotePickTrigger) dom.lyricsFsNotePickTrigger.addEventListener("click", toggleNotePickSheet);
+
+  // Escape key closes fullscreen lyrics
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape" && state.lyricsFullscreen) {
+      e.preventDefault();
+      closeLyricsFullscreen();
+    }
+  });
 
   // ===== Mobile: block pinch zoom & double-tap zoom =====
   // iOS Safari ignores user-scalable=no in meta — handle via JS gesture events.

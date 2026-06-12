@@ -219,25 +219,22 @@
           </div>
         </div>
 
-        <!-- Bottom-sheet: choose which string to play notes on (note-picking mode) -->
-        <div id="notePickSheet" class="note-pick-sheet" hidden>
-          <div id="notePickSheetBackdrop" class="note-pick-sheet-backdrop"></div>
-          <div class="note-pick-sheet-panel" role="dialog" aria-modal="true" aria-label="เลือกสายสำหรับฝึกโน้ต">
-            <div class="note-pick-sheet-handle" aria-hidden="true"></div>
-            <h3 class="note-pick-sheet-title">เล่นบนสาย</h3>
-            <div id="notePickSheetOptions" class="note-pick-sheet-options"></div>
-          </div>
-        </div>
       </section>
 
       <!-- Right Panel: Lyrics -->
       <section class="panel lyrics-panel">
         <div class="section-title">
           <h2>เนื้อเพลง</h2>
-          <button id="autoScrollToggle" class="status-pill toggle-pill is-on" type="button" aria-pressed="true" title="เปิด/ปิด Auto Scroll">
-            <i class="fa-solid fa-arrows-up-down"></i>
-            <span>Auto Scroll</span>
-          </button>
+          <div class="lyrics-title-actions">
+            <button id="autoScrollToggle" class="status-pill toggle-pill is-on" type="button" aria-pressed="true" title="เปิด/ปิด Auto Scroll">
+              <i class="fa-solid fa-arrows-up-down"></i>
+              <span>Auto Scroll</span>
+            </button>
+            <button id="lyricsExpandBtn" class="icon-btn secondary" type="button"
+                    aria-label="ขยายเนื้อเพลงเต็มจอ" title="ขยายเนื้อเพลงเต็มจอ">
+              <i class="fa-solid fa-expand"></i>
+            </button>
+          </div>
         </div>
         <div id="lyricsContainer" class="lyrics-container">
           <p class="empty-state">ยังไม่มีเนื้อเพลง</p>
@@ -246,6 +243,115 @@
 
     </main>
   </div>
+
+  <!-- Bottom-sheet: choose which string to play notes on (note-picking mode) -->
+  <div id="notePickSheet" class="note-pick-sheet" hidden>
+    <div id="notePickSheetBackdrop" class="note-pick-sheet-backdrop"></div>
+    <div class="note-pick-sheet-panel" role="dialog" aria-modal="true" aria-label="เลือกสายสำหรับฝึกโน้ต">
+      <div class="note-pick-sheet-handle" aria-hidden="true"></div>
+      <h3 class="note-pick-sheet-title">เล่นบนสาย</h3>
+      <div id="notePickSheetOptions" class="note-pick-sheet-options"></div>
+    </div>
+  </div>
+
+  <!-- ===== Lyrics Fullscreen Overlay ===== -->
+  <div id="lyricsFullscreen" class="lyrics-fs" hidden>
+    <div class="lyrics-fs-body">
+      <div class="lyrics-fs-header">
+        <h2>เนื้อเพลง</h2>
+        <div class="lyrics-title-actions">
+          <button id="lyricsFsSwapBtn" class="icon-btn secondary" type="button"
+                  aria-pressed="false" aria-label="สลับตำแหน่ง Chord ↔ Lyrics" title="สลับตำแหน่ง Chord ↔ Lyrics">
+            <i class="fa-solid fa-arrow-right-arrow-left"></i>
+          </button>
+          <button id="lyricsFullscreenAutoScroll" class="status-pill toggle-pill is-on" type="button" aria-pressed="true" title="เปิด/ปิด Auto Scroll">
+            <i class="fa-solid fa-arrows-up-down"></i>
+            <span>Auto Scroll</span>
+          </button>
+          <button id="lyricsCollapseBtn" class="icon-btn secondary" type="button"
+                  aria-label="ย่อกลับ" title="ย่อกลับ">
+            <i class="fa-solid fa-compress"></i>
+          </button>
+        </div>
+      </div>
+      <div class="lyrics-fs-main" id="lyricsFsMain">
+        <!-- Chord column — mirrors the main chord panel content -->
+        <div class="lyrics-fs-chord-col">
+          <div class="lyrics-fs-chord-header">
+            <h3>คอร์ดอูคูเลเล่</h3>
+            <div class="lyrics-fs-chord-actions">
+              <button id="lyricsFsDiagramModeBtn" class="icon-btn secondary" type="button"
+                      aria-pressed="false" aria-label="สลับโหมดคอร์ด/โน้ต" title="สลับโหมดคอร์ด/โน้ต">
+                <i class="fa-solid fa-circle-dot"></i>
+              </button>
+              <button id="lyricsFsDiagramOrientBtn" class="icon-btn secondary" type="button"
+                      aria-pressed="false" aria-label="สลับแนวนอน/แนวตั้ง" title="สลับแนวนอน/แนวตั้ง">
+                <i class="fa-solid fa-rotate"></i>
+              </button>
+              <span id="lyricsFsChordLabel" class="status-pill accent">-</span>
+            </div>
+          </div>
+          <div id="lyricsFsChordDisplay" class="lyrics-fs-chord-display">
+            <span class="empty-state">รอคอร์ดแรก...</span>
+          </div>
+          <div id="lyricsFsChordDiagram" class="lyrics-fs-chord-diagram"></div>
+          <button id="lyricsFsNotePickTrigger" class="note-pick-trigger chip" type="button"
+                  aria-haspopup="dialog" aria-expanded="false" hidden
+                  aria-label="เลือกสายสำหรับฝึกโน้ต" title="เลือกสายสำหรับฝึกโน้ต">
+            <i class="fa-solid fa-music" aria-hidden="true"></i>
+            <span id="lyricsFsNotePickLabel">Fingerstyle</span>
+            <i class="fa-solid fa-chevron-up note-pick-trigger-caret" aria-hidden="true"></i>
+          </button>
+        </div>
+        <!-- Lyrics column -->
+        <div id="lyricsFullscreenContainer" class="lyrics-fs-container"></div>
+      </div>
+    </div>
+    <div class="lyrics-fs-player">
+      <div class="lyrics-fs-player-top">
+        <div class="lyrics-fs-player-info">
+          <div class="lyrics-fs-player-art"><i class="fa-solid fa-music"></i></div>
+          <span id="lyricsFsPlayerTitle" class="lyrics-fs-player-title">—</span>
+        </div>
+      </div>
+
+      <div class="lyrics-fs-player-transport">
+        <button id="lyricsFsPrev" class="control-btn" type="button" aria-label="เพลงก่อนหน้า" title="เพลงก่อนหน้า">
+          <i class="fa-solid fa-backward-step"></i>
+        </button>
+        <button id="lyricsFsSeekBack" class="control-btn" type="button" aria-label="ถอยหลัง 5 วินาที" title="ถอยหลัง 5 วิ">
+          <i class="fa-solid fa-backward"></i>
+        </button>
+        <button id="lyricsFsPlayPause" class="control-btn primary" type="button" aria-label="Play / Pause">
+          <i class="fa-solid fa-play"></i>
+        </button>
+        <button id="lyricsFsStop" class="control-btn" type="button" aria-label="Stop" title="Stop">
+          <i class="fa-solid fa-stop"></i>
+        </button>
+        <button id="lyricsFsSeekFwd" class="control-btn" type="button" aria-label="ไปข้างหน้า 5 วินาที" title="ไปข้างหน้า 5 วิ">
+          <i class="fa-solid fa-forward"></i>
+        </button>
+        <button id="lyricsFsNext" class="control-btn" type="button" aria-label="เพลงถัดไป" title="เพลงถัดไป">
+          <i class="fa-solid fa-forward-step"></i>
+        </button>
+      </div>
+
+      <div class="lyrics-fs-player-timeline">
+        <div class="time-row">
+          <span id="lyricsFsCurrentTime">00:00</span>
+          <span id="lyricsFsDurationTime">00:00</span>
+        </div>
+        <div id="lyricsFsProgressTrack" class="progress-track" role="slider" tabindex="0">
+          <div id="lyricsFsProgressFill" class="progress-fill"></div>
+          <div id="lyricsFsLoopRegion" class="loop-region" hidden></div>
+          <div id="lyricsFsLoopMarkerA" class="loop-marker loop-marker-a" hidden></div>
+          <div id="lyricsFsLoopMarkerB" class="loop-marker loop-marker-b" hidden></div>
+          <div id="lyricsFsProgressThumb" class="progress-thumb"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- ===== /Lyrics Fullscreen Overlay ===== -->
 
   <!-- ===== Timestamp Editor (full-screen overlay) ===== -->
   <div id="editorPanel" class="editor-panel" hidden>
