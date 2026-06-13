@@ -1871,6 +1871,16 @@ select option { font-family: inherit; }
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
+
+/* Header toggle button — pressed state means "image mode" is active */
+#notationToggleBtn.is-on {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+#notationToggleBtn[hidden] {
+  display: none !important;
+}
 .notation-image {
   display: block;
   max-width: 100%;
@@ -1881,6 +1891,88 @@ select option { font-family: inherit; }
   background: #fff;
 }
 
+/* ── Interactive Note Staff ─────────────────────────────────────────────── */
+.lyrics-container.has-staff {
+  overflow-x: hidden;
+  overflow-y: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px 16px;
+  gap: 0;
+}
+
+.staff-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  width: 100%;
+  padding-bottom: 8px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--primary) transparent;
+}
+.staff-scroll::-webkit-scrollbar { height: 4px; }
+.staff-scroll::-webkit-scrollbar-track { background: transparent; }
+.staff-scroll::-webkit-scrollbar-thumb { background: var(--primary); border-radius: 99px; }
+
+.note-staff-svg {
+  display: block;
+  overflow: visible;
+}
+
+.staff-line {
+  stroke: var(--border);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+}
+
+.staff-clef {
+  user-select: none;
+  pointer-events: none;
+}
+
+.barline {
+  stroke: var(--text);
+  stroke-width: 1.2;
+}
+
+/* ── Noteheads ── */
+.note-head-fill {
+  stroke: var(--text);
+  stroke-width: 1.2;
+  transition: fill 0.12s ease, stroke 0.12s ease, filter 0.12s ease;
+}
+.quarter-fill { fill: var(--text); }   /* filled = quarter / eighth */
+.half-fill    { fill: none; }          /* hollow = half note */
+.whole-fill   { fill: none; }          /* hollow = whole note */
+
+/* Stem */
+.note-stem {
+  stroke: var(--text);
+  stroke-width: 1.5;
+  stroke-linecap: butt;
+  transition: stroke 0.12s ease;
+}
+
+/* Letter label below/above notehead */
+.note-label {
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 600;
+  fill: var(--text-muted, var(--text));
+  text-anchor: middle;
+  pointer-events: none;
+  transition: fill 0.12s ease;
+}
+
+/* ── Active (currently playing) note — label only ── */
+.note-head.active .note-label {
+  fill: var(--primary);
+  font-weight: 700;
+  font-size: 11px;
+}
+
+/* ────────────────────────────────────────────────────────────────────────── */
 .lyric-section-label {
   display: inline-block;
   margin: 20px 0 10px;

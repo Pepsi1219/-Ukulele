@@ -6,6 +6,7 @@ import { buildChordsFromLyrics,
 import { buildSong }                from "./src/utils/songBuilder.js";
 import { getMp3PathFor as _getMp3 } from "./src/utils/playerUtils.js";
 import { getNotationImagePath }     from "./src/utils/notationImage.js";
+import { renderNoteStaff }          from "./src/utils/staffRenderer.js";
 import { getChordData,
          renderChordDiagramSVG,
          renderNoteDiagramSVG,
@@ -120,6 +121,8 @@ const state = {
   notePickPosition: null,        // { stringIdx, fret } — last shown note position (drives "auto" hand-position memory)
   lyricsFullscreen: false,       // true when lyrics are displayed in fullscreen overlay
   lyricsFsSwapped: false,        // true = chord column on right side in fullscreen
+  activeStaffNoteIdx: -1,        // index of the highlighted note in the SVG staff (-1 = none)
+  notationMode: "interactive",   // "interactive" | "image" — toggle in renderLyricsEmptyState
   // ── Favorites ──
   favorites:       new Set(),   // Set of song IDs marked as favorites
   favFilterOn:     false,       // true = show only favorite songs in dropdown
@@ -222,6 +225,7 @@ const dom = {
   editorProgressFill: document.getElementById("editorProgressFill"),
 
   // Lyrics Fullscreen
+  notationToggleBtn:         document.getElementById("notationToggleBtn"),
   lyricsExpandBtn:           document.getElementById("lyricsExpandBtn"),
   lyricsFullscreen:          document.getElementById("lyricsFullscreen"),
   lyricsFullscreenContainer: document.getElementById("lyricsFullscreenContainer"),
@@ -1924,6 +1928,10 @@ function updateTimedDisplays(currentSeconds) {
    Lyrics Functions
 ========================= */
 function renderLyrics(lyrics, song = null) {
+  state.notationMode = "interactive";
+  dom.lyricsContainer.classList.remove("has-staff");
+  state.activeStaffNoteIdx = -1;
+  syncNotationBtns(false, false); // hide notation header buttons for songs with lyrics
   dom.lyricsContainer.innerHTML = "";
   if (!lyrics || !lyrics.length) {
     renderLyricsEmptyState(song);
@@ -1991,39 +1999,67 @@ function renderLyrics(lyrics, song = null) {
  *
  * @param {{ id: string, title: string } | null} song
  */
+function syncNotationBtns(hasInteractive, hasImage) {
+  const showToggle = hasInteractive && hasImage;
+  const btn = dom.notationToggleBtn;
+  if (!btn) return;
+  btn.hidden = !showToggle;
+  const isImage = state.notationMode === "image";
+  btn.classList.toggle("is-on", isImage);
+  btn.setAttribute("aria-pressed", isImage ? "true" : "false");
+  btn.title = isImage
+    ? "กดเพื่อกลับไปแบบ Interactive"
+    : "กดเพื่อแสดงรูปภาพ Letter Note Notation";
+}
+
 function renderLyricsEmptyState(song) {
   const emptyMsg = `<p class="empty-state">ไม่มีเนื้อเพลง</p>`;
-  const notationPath = song ? getNotationImagePath(song.id) : null;
 
-  if (!notationPath) {
+  const hasInteractive = !!(song && song.id.startsWith("lesson") && song.chords && song.chords.length);
+  const notationPath   = song ? getNotationImagePath(song.id) : null;
+  const hasImage       = !!notationPath;
+  const useInteractive = hasInteractive && (!hasImage || state.notationMode === "interactive");
+
+  syncNotationBtns(hasInteractive, hasImage);
+
+  if (useInteractive) {
+    dom.lyricsContainer.innerHTML = "";
+    dom.lyricsContainer.classList.add("has-staff");
+    state.activeStaffNoteIdx = -1;
+
+    const staffWrap = document.createElement("div");
+    staffWrap.className = "staff-scroll";
+    staffWrap.innerHTML = renderNoteStaff(song.chords, song.bpm);
+    dom.lyricsContainer.appendChild(staffWrap);
+
+    if (state.lyricsFullscreen) { syncFullscreenLyrics(); syncFsPlayer(); }
+    return;
+  }
+
+  dom.lyricsContainer.innerHTML = "";
+  dom.lyricsContainer.classList.remove("has-staff");
+  state.activeStaffNoteIdx = -1;
+
+  if (!hasImage) {
     dom.lyricsContainer.innerHTML = emptyMsg;
+    if (state.lyricsFullscreen) { syncFullscreenLyrics(); syncFsPlayer(); }
     return;
   }
 
   const wrap = document.createElement("div");
   wrap.className = "notation-view";
 
-  const caption = document.createElement("p");
-  caption.className = "notation-caption muted";
-  caption.textContent = "Letter Note Notation";
-
   const img = document.createElement("img");
   img.className = "notation-image";
   img.src = notationPath;
   img.alt = `Letter Note Notation — ${song.title || song.id}`;
   img.loading = "lazy";
-  img.addEventListener("error", () => {
-    dom.lyricsContainer.innerHTML = emptyMsg;
-  });
+  img.addEventListener("error", () => { dom.lyricsContainer.innerHTML = emptyMsg; });
 
-  wrap.appendChild(caption);
   wrap.appendChild(img);
   dom.lyricsContainer.appendChild(wrap);
 
-  if (state.lyricsFullscreen) {
-    syncFullscreenLyrics();
-    syncFsPlayer();
-  }
+  if (state.lyricsFullscreen) { syncFullscreenLyrics(); syncFsPlayer(); }
 }
 
 function getLyricLineEntries(lyrics) {
@@ -2109,6 +2145,18 @@ function closeLyricsFullscreen() {
 
 function syncFullscreenLyrics() {
   dom.lyricsFullscreenContainer.innerHTML = dom.lyricsContainer.innerHTML;
+
+  // Scale up the note staff SVG for fullscreen
+  const fsSvg = dom.lyricsFullscreenContainer.querySelector(".note-staff-svg");
+  if (fsSvg) {
+    const scale = 2.0;
+    const w = parseFloat(fsSvg.getAttribute("width"));
+    const h = parseFloat(fsSvg.getAttribute("height"));
+    if (w && h) {
+      fsSvg.setAttribute("width",  Math.round(w * scale));
+      fsSvg.setAttribute("height", Math.round(h * scale));
+    }
+  }
 
   // Wire up section-label click (loop-to-section) in fullscreen copy
   dom.lyricsFullscreenContainer.querySelectorAll(".lyric-section-label").forEach(el => {
@@ -2457,6 +2505,45 @@ function updateCurrentChord(currentSeconds) {
   }
 
   state.currentChordIndex = nextIndex;
+
+  if (dom.lyricsContainer.classList.contains("has-staff")) {
+    updateStaffHighlight(nextIndex);
+  }
+}
+
+function updateStaffHighlight(idx) {
+  _applyStaffHighlight(dom.lyricsContainer, idx);
+  if (state.lyricsFullscreen) {
+    _applyStaffHighlight(dom.lyricsFullscreenContainer, idx);
+  }
+}
+
+function _applyStaffHighlight(container, idx) {
+  const svg = container.querySelector(".note-staff-svg");
+  if (!svg) return;
+
+  svg.querySelectorAll(".note-head").forEach(g => g.classList.remove("active", "next"));
+
+  if (idx < 0) return;
+
+  const activeEl = svg.querySelector(`.note-head[data-idx="${idx}"]`);
+  if (activeEl) {
+    activeEl.classList.add("active");
+
+    // Auto-scroll: keep active note at ~35% from left edge of the scroll wrapper.
+    // cx is in SVG coordinate space; multiply by the SVG's CSS-pixel scale factor
+    // so the scroll offset is correct even when the SVG is scaled up (e.g. fullscreen).
+    const head = activeEl.querySelector("ellipse");
+    const cx = head ? parseFloat(head.getAttribute("cx")) : 0;
+    const scrollEl = container.querySelector(".staff-scroll");
+    if (scrollEl) {
+      const svgAttrW = parseFloat(svg.getAttribute("width"));
+      const vbW = svg.viewBox?.baseVal?.width || svgAttrW;
+      const scaleX = (svgAttrW && vbW) ? svgAttrW / vbW : 1;
+      const containerW = scrollEl.clientWidth;
+      scrollEl.scrollLeft = Math.max(0, cx * scaleX - containerW * 0.35);
+    }
+  }
 }
 
 /* =========================
@@ -2730,6 +2817,14 @@ function bindEvents() {
   }
   if (dom.swapPanelsBtn) {
     dom.swapPanelsBtn.addEventListener("click", togglePanelSwap);
+  }
+
+  // ── Notation toggle (header button) ──
+  if (dom.notationToggleBtn) {
+    dom.notationToggleBtn.addEventListener("click", () => {
+      state.notationMode = state.notationMode === "image" ? "interactive" : "image";
+      renderLyricsEmptyState(state.selectedSong);
+    });
   }
 
   // ── Lyrics Fullscreen ──
