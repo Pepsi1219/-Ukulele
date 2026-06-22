@@ -1,0 +1,34 @@
+{
+  "config": {
+    "clef": "treble",
+    "key": "C",
+    "timeSignature": [4, 4],
+    "measuresPerRow": 3,
+    "pickupBeats": 0
+  },
+  "notes": [
+    { "pitch": "A4", "dur": "quarter", "time": 2.787 },
+    { "pitch": "A4", "dur": "quarter", "time": 3.163 },
+    { "pitch": "B4", "dur": "quarter", "time": 3.829 },
+    { "pitch": "B4", "dur": "quarter", "time": 4.389 },
+
+    { "pitch": "A4", "dur": "quarter", "time": 5.063 },
+    { "pitch": "C5", "dur": "quarter", "time": 6.391 },
+    { "pitch": "C5", "dur": "quarter", "time": 7.549 },
+    { "pitch": "B4", "dur": "quarter", "time": 8.466 },
+
+    { "pitch": "A4", "dur": "half",    "time": 9.698 },
+    { "pitch": "B4", "dur": "half",    "time": 12.042 },
+
+    { "pitch": "C5", "dur": "quarter", "time": 13.113 },
+    { "pitch": "A4", "dur": "quarter", "time": 14.279 },
+    { "pitch": "B4", "dur": "quarter", "time": 15.329 },
+    { "pitch": "B4", "dur": "quarter", "time": 16.429 },
+
+    { "pitch": "C5", "dur": "half",    "time": 17.107 },
+    { "pitch": "B4", "dur": "half",    "time": 17.654 },
+
+    { "pitch": "A4", "dur": "half",    "time": 18.854 },
+    { "pitch": "A4", "dur": "half",    "time": 19.911 }
+  ]
+}

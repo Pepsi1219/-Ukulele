@@ -1378,6 +1378,159 @@ button.toggle-pill:hover { transform: translateY(-1px); }
 .editor-chord-row:hover   .editor-del-row-btn,
 .editor-chord-row.focused .editor-del-row-btn { opacity: 0.7; }
 
+/* ── Notation editor (โน้ต tab) ── */
+.editor-notation-config {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+}
+/* class+attr beats the plain class rule, so this correctly hides when toggled */
+.editor-notation-config[hidden] { display: none; }
+.ntcfg-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px 14px;
+}
+.ntcfg-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 0.72rem;
+  color: var(--text-muted, var(--text));
+  font-weight: 600;
+}
+.ntcfg-field select,
+.ntcfg-field input {
+  background: var(--panel-strong);
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 0.9rem;
+  font-family: inherit;
+  padding: 5px 8px;
+  outline: none;
+}
+.ntcfg-field input { width: 84px; }
+.ntcfg-field select:focus,
+.ntcfg-field input:focus { border-color: var(--primary); }
+.ntcfg-controls .chip { align-self: flex-end; }
+
+.ntcfg-preview {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel-strong);
+  padding: 8px 10px;
+  max-height: 240px;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+.ntcfg-preview-hint {
+  color: var(--text-muted, var(--text));
+  font-size: 0.85rem;
+  text-align: center;
+  padding: 18px 0;
+  opacity: 0.7;
+}
+
+.editor-notation-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1.5px solid transparent;
+  background: var(--panel);
+  margin-bottom: 4px;
+  cursor: pointer;
+  transition: background 100ms ease, border-color 100ms ease, box-shadow 100ms ease;
+}
+.editor-notation-row:hover   { background: var(--panel-strong); }
+.editor-notation-row.focused {
+  background: var(--panel-strong);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(56,189,248,0.15);
+}
+.editor-pitch-input {
+  width: 72px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px dashed var(--text-muted, var(--border));
+  color: var(--text);
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  padding: 2px 4px;
+  outline: none;
+  font-family: inherit;
+  text-transform: none;
+}
+.editor-pitch-input::placeholder { color: var(--text-muted, var(--border)); font-weight: 400; }
+.editor-pitch-input:focus {
+  background: rgba(56,189,248,0.06);
+  border-radius: 4px;
+  border-bottom-color: var(--primary);
+}
+.editor-dur-select {
+  flex: 1;
+  min-width: 110px;
+  background: var(--panel-strong);
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 0.86rem;
+  font-family: inherit;
+  padding: 5px 8px;
+  outline: none;
+}
+.editor-dur-select:focus { border-color: var(--primary); }
+.editor-del-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted, var(--text));
+  cursor: pointer;
+  padding: 6px 8px;
+  border-radius: 8px;
+  opacity: 0.55;
+  transition: opacity 100ms ease, color 100ms ease, background 100ms ease;
+}
+.editor-del-btn:hover { opacity: 1; color: #ef4444; background: rgba(239,68,68,0.1); }
+
+/* "Measure complete" divider — appears once a measure's worth of beats is filled */
+.editor-measure-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 6px 4px;
+  user-select: none;
+}
+.editor-measure-divider .emd-line {
+  flex: 1;
+  height: 0;
+  border-top: 2px solid var(--primary);
+  opacity: 0.55;
+}
+.editor-measure-divider .emd-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--primary);
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+}
+
+/* A note whose duration spills across a bar line — flag it for the user */
+.editor-notation-row.overflow {
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.15);
+}
+.editor-notation-row.overflow .editor-dur-select {
+  border-color: #f59e0b;
+  color: #f59e0b;
+}
+
 /* Playback-position highlight (auto-scroll) — distinct from keyboard focus */
 .editor-chord-row.playing {
   border-left: 3px solid var(--primary);
@@ -1894,29 +2047,24 @@ select option { font-family: inherit; }
 /* ── Interactive Note Staff ─────────────────────────────────────────────── */
 .lyrics-container.has-staff {
   overflow-x: hidden;
-  overflow-y: hidden;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 20px 16px;
+  align-items: stretch;
+  padding: 16px 14px;
   gap: 0;
 }
 
 .staff-scroll {
-  overflow-x: auto;
-  overflow-y: hidden;
   width: 100%;
-  padding-bottom: 8px;
-  scrollbar-width: thin;
-  scrollbar-color: var(--primary) transparent;
+  overflow: visible;
 }
-.staff-scroll::-webkit-scrollbar { height: 4px; }
-.staff-scroll::-webkit-scrollbar-track { background: transparent; }
-.staff-scroll::-webkit-scrollbar-thumb { background: var(--primary); border-radius: 99px; }
 
 .note-staff-svg {
   display: block;
+  width: 100%;
+  height: auto;
+  max-width: 100%;
   overflow: visible;
 }
 
@@ -1927,6 +2075,7 @@ select option { font-family: inherit; }
 }
 
 .staff-clef {
+  fill: var(--text);
   user-select: none;
   pointer-events: none;
 }
@@ -1935,6 +2084,28 @@ select option { font-family: inherit; }
   stroke: var(--text);
   stroke-width: 1.2;
 }
+.barline-final {
+  stroke: var(--text);
+  stroke-width: 3;
+  stroke-linecap: butt;
+}
+
+/* ── Clef / key signature / time signature glyphs ── */
+.staff-accidental {
+  font-family: "Times New Roman", Georgia, serif;
+  font-size: 19px;
+  fill: var(--text);
+  user-select: none;
+  pointer-events: none;
+}
+.staff-timesig {
+  font-family: "Times New Roman", Georgia, serif;
+  font-size: 20px;
+  font-weight: 700;
+  fill: var(--text);
+  user-select: none;
+  pointer-events: none;
+}
 
 /* ── Noteheads ── */
 .note-head-fill {
@@ -1942,16 +2113,39 @@ select option { font-family: inherit; }
   stroke-width: 1.2;
   transition: fill 0.12s ease, stroke 0.12s ease, filter 0.12s ease;
 }
-.quarter-fill { fill: var(--text); }   /* filled = quarter / eighth */
-.half-fill    { fill: none; }          /* hollow = half note */
-.whole-fill   { fill: none; }          /* hollow = whole note */
+.note-head-fill.filled { fill: var(--text); }  /* quarter / eighth / sixteenth */
+.note-head-fill.hollow { fill: none; }         /* half note */
+.whole-fill            { fill: none; }          /* whole note */
 
-/* Stem */
+/* Stem + flags + dot */
 .note-stem {
   stroke: var(--text);
   stroke-width: 1.5;
   stroke-linecap: butt;
   transition: stroke 0.12s ease;
+}
+.note-flag {
+  fill: none;
+  stroke: var(--text);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+}
+.note-dot { fill: var(--text); }
+
+/* Ledger lines for notes above/below the staff */
+.ledger-line {
+  stroke: var(--text);
+  stroke-width: 1.4;
+  stroke-linecap: round;
+}
+
+/* Rests */
+.rest-block { fill: var(--text); }
+.rest-mark  {
+  fill: none;
+  stroke: var(--text);
+  stroke-width: 2.2;
+  stroke-linejoin: round;
 }
 
 /* Letter label below/above notehead */

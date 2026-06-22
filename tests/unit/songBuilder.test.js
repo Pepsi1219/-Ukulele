@@ -98,4 +98,20 @@ describe("buildSong", () => {
     const song = buildSong({ ...baseMeta, bpm: "98" }, [], []);
     expect(song.bpm).toBe(98);
   });
+
+  it("defaults notation to null when not provided", () => {
+    const song = buildSong(baseMeta, [], []);
+    expect(song.notation).toBeNull();
+  });
+
+  it("keeps a notation object that has notes", () => {
+    const notation = { config: { key: "C" }, notes: [{ pitch: "A4", dur: "quarter" }] };
+    const song = buildSong(baseMeta, [], [], notation);
+    expect(song.notation).toBe(notation);
+  });
+
+  it("drops a notation object with no notes", () => {
+    const song = buildSong(baseMeta, [], [], { config: {}, notes: [] });
+    expect(song.notation).toBeNull();
+  });
 });

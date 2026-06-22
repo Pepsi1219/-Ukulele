@@ -6,7 +6,9 @@ import { buildChordsFromLyrics,
 import { buildSong }                from "./src/utils/songBuilder.js";
 import { getMp3PathFor as _getMp3 } from "./src/utils/playerUtils.js";
 import { getNotationImagePath }     from "./src/utils/notationImage.js";
-import { renderNoteStaff }          from "./src/utils/staffRenderer.js";
+import { parseNotation,
+         chordsToNotation }         from "./src/utils/notationModel.js";
+import { renderStaff }              from "./src/utils/staffRenderer.js";
 import { getChordData,
          renderChordDiagramSVG,
          renderNoteDiagramSVG,
@@ -49,6 +51,17 @@ import { buildChordRows,
          importChordsFromLyrics,
          buildLyricContext,
          findLyricContextAt }      from "./src/utils/chordEditor.js";
+import { buildNotationConfig,
+         buildNoteRows,
+         updateNoteField,
+         stampNoteTime,
+         shiftNoteTime,
+         insertNoteRow,
+         removeNoteRow,
+         updateConfigField,
+         countNotationStamped,
+         exportToNotationJson,
+         computeMeasureMap }       from "./src/utils/notationEditor.js";
 
 /* =========================
    Metronome Sound Definitions
@@ -64,8 +77,9 @@ const METRO_SOUNDS = [
    State
 ========================= */
 const MANIFEST_JSON_PATH = "manifest.json";
-const LYRICS_DIR  = "Lyrics";
-const CHORDS_DIR  = "Chords";
+const LYRICS_DIR   = "Lyrics";
+const CHORDS_DIR   = "Chords";
+const NOTATION_DIR = "Notation";
 
 const fallbackSongs = {
   songs: [
@@ -107,11 +121,14 @@ const state = {
   lottiePlaying: null,    // Lottie instance — playing/wave-sound animation
   strumPatternId: "island", // currently selected strumming pattern id
   editorOpen:      false,   // true when Timestamp Editor is visible
-  editorTab:            "lyrics",// "lyrics" | "chords"
+  editorTab:            "lyrics",// "lyrics" | "chords" | "notation"
   editorRows:           [],      // current lyrics editor row objects
   editorFocusIdx:       -1,      // focused lyrics row index (-1 = none)
   chordRows:            [],      // current chord editor row objects
   chordFocusIdx:        -1,      // focused chord row index (-1 = none)
+  notationRows:         [],      // current notation editor note rows
+  notationConfig:       null,    // current notation editor config object
+  notationFocusIdx:     -1,      // focused notation row index (-1 = none)
   editorBannerLyricIdx: -1,      // cached lyric-row index shown in banner
   chordAutoScroll:      true,    // auto-scroll chord list to active row while playing
   editorActiveChordIdx: -1,      // last chord row index highlighted by auto-scroll
@@ -121,7 +138,8 @@ const state = {
   notePickPosition: null,        // { stringIdx, fret } — last shown note position (drives "auto" hand-position memory)
   lyricsFullscreen: false,       // true when lyrics are displayed in fullscreen overlay
   lyricsFsSwapped: false,        // true = chord column on right side in fullscreen
-  activeStaffNoteIdx: -1,        // index of the highlighted note in the SVG staff (-1 = none)
+  activeStaffNoteIdx: -1,        // data-idx of the highlighted note in the SVG staff (-1 = none)
+  staffNoteTimes: [],            // [{time, idx}] for the current staff — drives highlight sync
   notationMode: "interactive",   // "interactive" | "image" — toggle in renderLyricsEmptyState
   // ── Favorites ──
   favorites:       new Set(),   // Set of song IDs marked as favorites
@@ -189,6 +207,15 @@ const dom = {
   // Timestamp / Chord Editor
   editorTabLyrics:    document.getElementById("editorTabLyrics"),
   editorTabChords:    document.getElementById("editorTabChords"),
+  editorTabNotation:  document.getElementById("editorTabNotation"),
+  editorNotationConfig: document.getElementById("editorNotationConfig"),
+  ntClef:             document.getElementById("ntClef"),
+  ntKey:              document.getElementById("ntKey"),
+  ntTimeSig:          document.getElementById("ntTimeSig"),
+  ntMeasPerRow:       document.getElementById("ntMeasPerRow"),
+  ntPickup:           document.getElementById("ntPickup"),
+  ntAddNoteBtn:       document.getElementById("ntAddNoteBtn"),
+  ntPreview:          document.getElementById("ntPreview"),
   editorImportBtn:     document.getElementById("editorImportBtn"),
   editorLyricBanner:   document.getElementById("editorLyricBanner"),
   chordAutoScrollBtn:  document.getElementById("chordAutoScrollBtn"),
@@ -308,6 +335,9 @@ function openEditor() {
   state.editorFocusIdx = -1;
   state.chordRows      = buildChordRows(state.selectedSong.chords ?? []);
   state.chordFocusIdx  = -1;
+  state.notationRows   = buildNoteRows(state.selectedSong.notation);
+  state.notationConfig = buildNotationConfig(state.selectedSong.notation);
+  state.notationFocusIdx = -1;
 
   if (dom.editorSongTitle)    dom.editorSongTitle.textContent    = state.selectedSong.title;
   if (dom.editorDurationTime) dom.editorDurationTime.textContent = formatTime(state.duration);
@@ -323,23 +353,31 @@ function openEditor() {
   if (dom.mainGrid)    dom.mainGrid.hidden    = true;
 }
 
-/** Switches between the "lyrics" and "chords" editor tabs. */
+/** Switches between the "lyrics", "chords" and "notation" editor tabs. */
 function switchEditorTab(tab) {
   state.editorTab              = tab;
   state.editorBannerLyricIdx   = -1;  // reset banner cache on every tab switch
   state.editorActiveChordIdx   = -1;  // force highlight re-apply after tab switch
 
-  if (dom.editorTabLyrics) dom.editorTabLyrics.classList.toggle("active", tab === "lyrics");
-  if (dom.editorTabChords) dom.editorTabChords.classList.toggle("active", tab === "chords");
+  if (dom.editorTabLyrics)   dom.editorTabLyrics.classList.toggle("active", tab === "lyrics");
+  if (dom.editorTabChords)   dom.editorTabChords.classList.toggle("active", tab === "chords");
+  if (dom.editorTabNotation) dom.editorTabNotation.classList.toggle("active", tab === "notation");
 
-  // Show/hide chord-only controls
-  const onChords = tab === "chords";
-  if (dom.editorImportBtn)   dom.editorImportBtn.hidden   = !onChords;
-  if (dom.editorLyricBanner) dom.editorLyricBanner.hidden = !onChords;
+  // Show/hide per-tab controls
+  const onChords   = tab === "chords";
+  const onNotation = tab === "notation";
+  if (dom.editorImportBtn)       dom.editorImportBtn.hidden       = !onChords;
+  if (dom.editorLyricBanner)     dom.editorLyricBanner.hidden     = !onChords;
+  if (dom.editorNotationConfig)  dom.editorNotationConfig.hidden  = !onNotation;
 
   if (tab === "lyrics") {
     state.editorFocusIdx = -1;
     renderEditorLines();
+  } else if (tab === "notation") {
+    state.notationFocusIdx = -1;
+    syncNotationConfigControls();
+    renderNotationRows();
+    renderNotationPreview();
   } else {
     state.chordFocusIdx = -1;
     renderChordRows();
@@ -1027,14 +1065,291 @@ function refreshChordRowBadge(idx) {
   badge.textContent = hasTime ? formatEditorTime(row.time) : "--:--";
 }
 
+/* =========================
+   Notation Editor (โน้ต tab)
+========================= */
+
+/** Duration options offered in each note row's dropdown. */
+const DUR_OPTIONS = [
+  { value: "whole",      label: "โน้ตกลม (4)" },
+  { value: "half",       label: "ขาว (2)" },
+  { value: "quarter",    label: "ดำ (1)" },
+  { value: "eighth",     label: "เขบ็ต 1 ชั้น (½)" },
+  { value: "sixteenth",  label: "เขบ็ต 2 ชั้น (¼)" },
+  { value: "half.",      label: "ขาวประจุด (3)" },
+  { value: "quarter.",   label: "ดำประจุด (1½)" },
+  { value: "eighth.",    label: "เขบ็ตประจุด (¾)" },
+];
+
+/** Sets the config controls to match state.notationConfig. */
+function syncNotationConfigControls() {
+  const c = state.notationConfig;
+  if (!c) return;
+  if (dom.ntClef)       dom.ntClef.value       = c.clef;
+  if (dom.ntKey)        dom.ntKey.value        = c.key;
+  if (dom.ntTimeSig)    dom.ntTimeSig.value    = `${c.timeSignature[0]}/${c.timeSignature[1]}`;
+  if (dom.ntMeasPerRow) dom.ntMeasPerRow.value = c.measuresPerRow;
+  if (dom.ntPickup)     dom.ntPickup.value     = c.pickupBeats;
+}
+
+/** Re-renders the live staff preview from the current config + note rows. */
+function renderNotationPreview() {
+  if (!dom.ntPreview) return;
+  const hasNotes = state.notationRows.some(r => String(r.pitch).trim());
+  if (!hasNotes) {
+    dom.ntPreview.innerHTML = `<p class="ntcfg-preview-hint">เพิ่มโน้ตเพื่อดูตัวอย่าง…</p>`;
+    return;
+  }
+  const model = parseNotation({ config: state.notationConfig, notes: state.notationRows });
+  dom.ntPreview.innerHTML = renderStaff(model);
+}
+
+/** Insert-a-note divider shown between/around note rows. */
+function makeNotationInsertDivider(afterIdx) {
+  const div     = document.createElement("div");
+  div.className = "editor-row-divider";
+
+  const addBtn     = document.createElement("button");
+  addBtn.type      = "button";
+  addBtn.className = "editor-insert-btn";
+  addBtn.innerHTML = `<i class="fa-solid fa-plus"></i> โน้ต`;
+  addBtn.title     = "เพิ่มโน้ตใหม่";
+  addBtn.addEventListener("click", e => {
+    e.stopPropagation();
+    state.notationRows = insertNoteRow(state.notationRows, afterIdx);
+    reRenderNotationRows();
+    setTimeout(() => {
+      const newEl = dom.editorLinesList.querySelector(
+        `[data-notation-index="${afterIdx + 1}"] .editor-pitch-input`
+      );
+      if (newEl) newEl.focus();
+    }, 30);
+  });
+  div.appendChild(addBtn);
+  return div;
+}
+
+/** Builds and inserts all note row elements into the editor lines list. */
+function renderNotationRows() {
+  if (!dom.editorLinesList) return;
+  dom.editorLinesList.innerHTML = "";
+  dom.editorLinesList.appendChild(makeNotationInsertDivider(-1));
+
+  if (!state.notationRows.length) {
+    const empty       = document.createElement("p");
+    empty.className   = "empty-state";
+    empty.style.padding = "24px";
+    empty.textContent = "ยังไม่มีโน้ต — กด + โน้ต เพื่อเริ่มเพิ่ม";
+    dom.editorLinesList.appendChild(empty);
+    return;
+  }
+
+  // Running-beat map → drives the "measure complete" dividers + overflow flags.
+  const mmap = computeMeasureMap(state.notationRows, state.notationConfig.timeSignature);
+
+  state.notationRows.forEach((row, i) => {
+    const el = document.createElement("div");
+    el.className = "editor-row editor-notation-row";
+    el.dataset.notationIndex = String(i);
+    el.tabIndex = 0;
+    if (mmap[i] && mmap[i].overflowsBar) el.classList.add("overflow");
+
+    // Time badge + fine-tune buttons
+    const timeDiv = document.createElement("div");
+    timeDiv.className = "editor-row-time";
+
+    const badge = document.createElement("span");
+    badge.className = `editor-time-badge ${row.time !== null ? "stamped" : "unstamped"}`;
+    badge.textContent = row.time !== null ? formatEditorTime(row.time) : "--:--";
+    timeDiv.appendChild(badge);
+
+    const fineBtns = document.createElement("div");
+    fineBtns.className = "editor-fine-btns";
+    [-0.1, 0.1].forEach(delta => {
+      const btn       = document.createElement("button");
+      btn.type        = "button";
+      btn.className   = "editor-fine-btn";
+      btn.textContent = delta < 0 ? "−" : "+";
+      btn.title       = `${delta > 0 ? "+" : ""}${delta.toFixed(1)}s`;
+      btn.addEventListener("click", e => {
+        e.stopPropagation();
+        state.notationRows = shiftNoteTime(state.notationRows, i, delta);
+        refreshNotationRowBadge(i);
+        updateEditorStampCount();
+      });
+      fineBtns.appendChild(btn);
+    });
+    timeDiv.appendChild(fineBtns);
+    el.appendChild(timeDiv);
+
+    // Pitch input (e.g. A4, F#4, rest)
+    const pitchInput       = document.createElement("input");
+    pitchInput.type        = "text";
+    pitchInput.className    = "editor-pitch-input";
+    pitchInput.value        = row.pitch;
+    pitchInput.placeholder  = "A4";
+    pitchInput.title        = "ระดับเสียง เช่น A4, F#4, Bb3 หรือ rest";
+    pitchInput.addEventListener("input", () => {
+      state.notationRows = updateNoteField(state.notationRows, i, { pitch: pitchInput.value });
+      renderNotationPreview();
+    });
+    el.appendChild(pitchInput);
+
+    // Duration dropdown
+    const durSelect      = document.createElement("select");
+    durSelect.className  = "editor-dur-select";
+    durSelect.title      = "ค่าความยาวโน้ต";
+    DUR_OPTIONS.forEach(opt => {
+      const o = document.createElement("option");
+      o.value = opt.value;
+      o.textContent = opt.label;
+      durSelect.appendChild(o);
+    });
+    durSelect.value = row.dur;
+    durSelect.addEventListener("change", () => {
+      state.notationRows = updateNoteField(state.notationRows, i, { dur: durSelect.value });
+      reRenderNotationRows();   // re-flow measure dividers as the rhythm changes
+    });
+    el.appendChild(durSelect);
+
+    // Stamp button
+    const stampBtn     = document.createElement("button");
+    stampBtn.type      = "button";
+    stampBtn.className  = "editor-stamp-btn chip";
+    stampBtn.innerHTML = `<i class="fa-solid fa-clock"></i> Stamp`;
+    stampBtn.addEventListener("click", e => {
+      e.stopPropagation();
+      notationStampRow(i);
+    });
+    el.appendChild(stampBtn);
+
+    // Delete button
+    const delBtn     = document.createElement("button");
+    delBtn.type      = "button";
+    delBtn.className  = "editor-del-btn";
+    delBtn.innerHTML = `<i class="fa-solid fa-trash"></i>`;
+    delBtn.title     = "ลบโน้ตนี้";
+    delBtn.addEventListener("click", e => {
+      e.stopPropagation();
+      state.notationRows = removeNoteRow(state.notationRows, i);
+      reRenderNotationRows();
+    });
+    el.appendChild(delBtn);
+
+    el.addEventListener("click", ev => {
+      if (ev.target.closest("input, button, select")) return;
+      notationFocusRow(i);
+    });
+
+    dom.editorLinesList.appendChild(el);
+    if (mmap[i] && mmap[i].completesMeasure) {
+      dom.editorLinesList.appendChild(makeMeasureCompleteDivider(mmap[i].measureIndex + 1));
+    }
+    dom.editorLinesList.appendChild(makeNotationInsertDivider(i));
+  });
+}
+
+/** A "measure complete" bar-line divider shown after a note that fills a measure. */
+function makeMeasureCompleteDivider(measureNum) {
+  const div = document.createElement("div");
+  div.className = "editor-measure-divider";
+  div.innerHTML =
+    `<span class="emd-line"></span>` +
+    `<span class="emd-label"><i class="fa-solid fa-grip-lines-vertical"></i> จบห้องที่ ${measureNum}</span>` +
+    `<span class="emd-line"></span>`;
+  return div;
+}
+
+/** Sets focus highlight on note row at `idx`. */
+function notationFocusRow(idx) {
+  if (idx < 0 || idx >= state.notationRows.length) return;
+  state.notationFocusIdx = idx;
+  dom.editorLinesList.querySelectorAll(".editor-notation-row.focused").forEach(el => {
+    el.classList.remove("focused");
+  });
+  const el = dom.editorLinesList.querySelector(`.editor-notation-row[data-notation-index="${idx}"]`);
+  if (el) {
+    el.classList.add("focused");
+    el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }
+}
+
+/** Stamps the focused note row with the current playback time. */
+function notationStampRow(idx) {
+  if (!state.sound) return;
+  const t = Number(state.sound.seek()) || 0;
+  state.notationRows = stampNoteTime(state.notationRows, idx, t);
+  refreshNotationRowBadge(idx);
+  updateEditorStampCount();
+  if (idx < state.notationRows.length - 1) notationFocusRow(idx + 1);
+}
+
+/** Refreshes a single note row's time badge in-place. */
+function refreshNotationRowBadge(idx) {
+  const row = state.notationRows[idx];
+  if (!row) return;
+  const el = dom.editorLinesList.querySelector(`.editor-notation-row[data-notation-index="${idx}"]`);
+  if (!el) return;
+  const badge = el.querySelector(".editor-time-badge");
+  if (!badge) return;
+  const hasTime = row.time !== null;
+  badge.className   = `editor-time-badge ${hasTime ? "stamped" : "unstamped"}`;
+  badge.textContent = hasTime ? formatEditorTime(row.time) : "--:--";
+}
+
+/** Re-renders note rows after a structural change and refreshes the preview. */
+function reRenderNotationRows() {
+  state.notationFocusIdx = -1;
+  renderNotationRows();
+  renderNotationPreview();
+  updateEditorStampCount();
+}
+
+/** Applies a config patch and refreshes the live preview. */
+function applyNotationConfig(patch) {
+  state.notationConfig = updateConfigField(state.notationConfig, patch);
+  renderNotationPreview();
+}
+
+/** Wires the notation config controls + add-note button (once, at init). */
+function wireNotationConfigControls() {
+  if (dom.ntClef)    dom.ntClef.addEventListener("change", () => applyNotationConfig({ clef: dom.ntClef.value }));
+  if (dom.ntKey)     dom.ntKey.addEventListener("change", () => applyNotationConfig({ key: dom.ntKey.value }));
+  if (dom.ntTimeSig) dom.ntTimeSig.addEventListener("change", () => {
+    const [n, d] = dom.ntTimeSig.value.split("/").map(Number);
+    state.notationConfig = updateConfigField(state.notationConfig, { timeSignature: [n, d] });
+    reRenderNotationRows();   // measure dividers depend on the time signature
+  });
+  if (dom.ntMeasPerRow) dom.ntMeasPerRow.addEventListener("change", () =>
+    applyNotationConfig({ measuresPerRow: Number(dom.ntMeasPerRow.value) }));
+  if (dom.ntPickup) dom.ntPickup.addEventListener("change", () =>
+    applyNotationConfig({ pickupBeats: Number(dom.ntPickup.value) }));
+
+  if (dom.ntAddNoteBtn) dom.ntAddNoteBtn.addEventListener("click", () => {
+    state.notationRows = insertNoteRow(state.notationRows, state.notationRows.length - 1);
+    reRenderNotationRows();
+    setTimeout(() => {
+      const rows = dom.editorLinesList.querySelectorAll(".editor-pitch-input");
+      const last = rows[rows.length - 1];
+      if (last) last.focus();
+    }, 30);
+  });
+}
+
 /** Updates the stamp-count badge in the topbar (tab-aware). */
 function updateEditorStampCount() {
   if (!dom.editorStampCount) return;
-  const isChords = state.editorTab === "chords";
-  const { stamped, total } = isChords
-    ? countChordStamped(state.chordRows)
-    : countStamped(state.editorRows);
-  const unit = isChords ? "คอร์ด" : "บรรทัด";
+  let stamped, total, unit;
+  if (state.editorTab === "chords") {
+    ({ stamped, total } = countChordStamped(state.chordRows));
+    unit = "คอร์ด";
+  } else if (state.editorTab === "notation") {
+    ({ stamped, total } = countNotationStamped(state.notationRows));
+    unit = "โน้ต";
+  } else {
+    ({ stamped, total } = countStamped(state.editorRows));
+    unit = "บรรทัด";
+  }
   dom.editorStampCount.textContent = `${stamped} / ${total} ${unit}`;
   dom.editorStampCount.classList.toggle("all-done", stamped === total && total > 0);
 }
@@ -1059,18 +1374,24 @@ function updateEditorPlayPauseIcon() {
 
 /** Copies the active tab's data as JSON to the clipboard. */
 function handleEditorExport() {
-  const isChords = state.editorTab === "chords";
-  const rows = isChords ? state.chordRows : state.editorRows;
+  let rows, json, stamped, total, unit;
+  if (state.editorTab === "chords") {
+    rows = state.chordRows;
+    json = exportToChordJson(state.chordRows);
+    ({ stamped, total } = countChordStamped(state.chordRows));
+    unit = "คอร์ด";
+  } else if (state.editorTab === "notation") {
+    rows = state.notationRows;
+    json = exportToNotationJson(state.notationConfig, state.notationRows);
+    ({ stamped, total } = countNotationStamped(state.notationRows));
+    unit = "โน้ต";
+  } else {
+    rows = state.editorRows;
+    json = exportToLyricsJson(state.editorRows);
+    ({ stamped, total } = countStamped(state.editorRows));
+    unit = "บรรทัด";
+  }
   if (!rows.length) return;
-
-  const json = isChords
-    ? exportToChordJson(state.chordRows)
-    : exportToLyricsJson(state.editorRows);
-
-  const { stamped, total } = isChords
-    ? countChordStamped(state.chordRows)
-    : countStamped(state.editorRows);
-  const unit = isChords ? "คอร์ด" : "บรรทัด";
 
   navigator.clipboard.writeText(json)
     .then(() => {
@@ -1097,7 +1418,32 @@ function handleEditorExport() {
  * Routes to chord handler when chords tab is active.
  */
 function handleEditorKeydown(e) {
-  if (e.target.tagName === "INPUT") return;
+  if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
+
+  if (state.editorTab === "notation") {
+    // ── Notation tab ────────────────────────────────────────────────────
+    switch (e.key) {
+      case " ":
+      case "Enter":
+        e.preventDefault();
+        if (state.notationFocusIdx >= 0) notationStampRow(state.notationFocusIdx);
+        break;
+      case "ArrowDown":
+      case "Tab":
+        if (e.key === "Tab") e.preventDefault();
+        if (state.notationFocusIdx < state.notationRows.length - 1)
+          notationFocusRow(state.notationFocusIdx + 1);
+        break;
+      case "ArrowUp":
+        e.preventDefault();
+        if (state.notationFocusIdx > 0) notationFocusRow(state.notationFocusIdx - 1);
+        break;
+      case "Escape":
+        closeEditor();
+        break;
+    }
+    return;
+  }
 
   if (state.editorTab === "chords") {
     // ── Chords tab ──────────────────────────────────────────────────────
@@ -1548,11 +1894,11 @@ async function loadSongs() {
       throw new Error("manifest.json ต้องมี key ชื่อ songs และเป็น Array");
     }
 
-    // For each song in manifest, fetch its lyrics + chords files in parallel.
-    // Missing files are tolerated — that song just gets empty data.
+    // For each song in manifest, fetch its lyrics + chords + notation files in
+    // parallel. Missing files are tolerated — that song just gets empty data.
     const songs = await Promise.all(manifest.songs.map(async meta => {
       const id = meta.id;
-      const [lyricsArr, chordsArr] = await Promise.all([
+      const [lyricsArr, chordsArr, notationObj] = await Promise.all([
         fetchJson(`${LYRICS_DIR}/${id}.json`).catch(err => {
           console.warn(`Lyrics/${id}.json not loaded:`, err.message);
           return [];
@@ -1560,9 +1906,10 @@ async function loadSongs() {
         fetchJson(`${CHORDS_DIR}/${id}.json`).catch(err => {
           console.warn(`Chords/${id}.json not loaded:`, err.message);
           return null;
-        })
+        }),
+        fetchJson(`${NOTATION_DIR}/${id}.json`).catch(() => null) // optional, no warning
       ]);
-      return buildSong(meta, lyricsArr, chordsArr);
+      return buildSong(meta, lyricsArr, chordsArr, notationObj);
     }));
 
     state.songs = songs;
@@ -1922,6 +2269,7 @@ function updateTimedDisplays(currentSeconds) {
   if (!state.selectedSong) return;
   updateCurrentLyric(currentSeconds);
   updateCurrentChord(currentSeconds);
+  updateStaffActiveNote(currentSeconds);
 }
 
 /* =========================
@@ -1931,6 +2279,7 @@ function renderLyrics(lyrics, song = null) {
   state.notationMode = "interactive";
   dom.lyricsContainer.classList.remove("has-staff");
   state.activeStaffNoteIdx = -1;
+  state.staffNoteTimes = [];
   syncNotationBtns(false, false); // hide notation header buttons for songs with lyrics
   dom.lyricsContainer.innerHTML = "";
   if (!lyrics || !lyrics.length) {
@@ -2015,7 +2364,13 @@ function syncNotationBtns(hasInteractive, hasImage) {
 function renderLyricsEmptyState(song) {
   const emptyMsg = `<p class="empty-state">ไม่มีเนื้อเพลง</p>`;
 
-  const hasInteractive = !!(song && song.id.startsWith("lesson") && song.chords && song.chords.length);
+  // Interactive staff is available when the song has a Notation/<id>.json file,
+  // or (legacy fallback) when it's a lesson whose Chords file holds melody notes.
+  const hasNotationFile = !!(song && song.notation);
+  const hasLegacyMelody = !hasNotationFile &&
+    !!(song && song.id.startsWith("lesson") && song.chords && song.chords.length);
+  const hasInteractive  = hasNotationFile || hasLegacyMelody;
+
   const notationPath   = song ? getNotationImagePath(song.id) : null;
   const hasImage       = !!notationPath;
   const useInteractive = hasInteractive && (!hasImage || state.notationMode === "interactive");
@@ -2027,9 +2382,14 @@ function renderLyricsEmptyState(song) {
     dom.lyricsContainer.classList.add("has-staff");
     state.activeStaffNoteIdx = -1;
 
+    const model = hasNotationFile
+      ? parseNotation(song.notation)
+      : chordsToNotation(song.chords, song.bpm);
+    state.staffNoteTimes = buildStaffNoteTimes(model);
+
     const staffWrap = document.createElement("div");
     staffWrap.className = "staff-scroll";
-    staffWrap.innerHTML = renderNoteStaff(song.chords, song.bpm);
+    staffWrap.innerHTML = renderStaff(model);
     dom.lyricsContainer.appendChild(staffWrap);
 
     if (state.lyricsFullscreen) { syncFullscreenLyrics(); syncFsPlayer(); }
@@ -2039,6 +2399,7 @@ function renderLyricsEmptyState(song) {
   dom.lyricsContainer.innerHTML = "";
   dom.lyricsContainer.classList.remove("has-staff");
   state.activeStaffNoteIdx = -1;
+  state.staffNoteTimes = [];
 
   if (!hasImage) {
     dom.lyricsContainer.innerHTML = emptyMsg;
@@ -2145,18 +2506,6 @@ function closeLyricsFullscreen() {
 
 function syncFullscreenLyrics() {
   dom.lyricsFullscreenContainer.innerHTML = dom.lyricsContainer.innerHTML;
-
-  // Scale up the note staff SVG for fullscreen
-  const fsSvg = dom.lyricsFullscreenContainer.querySelector(".note-staff-svg");
-  if (fsSvg) {
-    const scale = 2.0;
-    const w = parseFloat(fsSvg.getAttribute("width"));
-    const h = parseFloat(fsSvg.getAttribute("height"));
-    if (w && h) {
-      fsSvg.setAttribute("width",  Math.round(w * scale));
-      fsSvg.setAttribute("height", Math.round(h * scale));
-    }
-  }
 
   // Wire up section-label click (loop-to-section) in fullscreen copy
   dom.lyricsFullscreenContainer.querySelectorAll(".lyric-section-label").forEach(el => {
@@ -2505,10 +2854,36 @@ function updateCurrentChord(currentSeconds) {
   }
 
   state.currentChordIndex = nextIndex;
+}
 
-  if (dom.lyricsContainer.classList.contains("has-staff")) {
-    updateStaffHighlight(nextIndex);
-  }
+/**
+ * Builds the time-index used to sync the staff highlight with playback.
+ * Only notes that carry a finite `time` participate; each entry keeps the
+ * note's `idx` so it maps back to the matching `data-idx` in the SVG.
+ *
+ * @param {{notes:Array}} model  parsed notation model
+ * @returns {Array<{time:number, idx:number}>}  sorted ascending by time
+ */
+function buildStaffNoteTimes(model) {
+  if (!model || !Array.isArray(model.notes)) return [];
+  return model.notes
+    .filter(n => !n.isRest && Number.isFinite(n.time))
+    .map(n => ({ time: n.time, idx: n.idx }))
+    .sort((a, b) => a.time - b.time);
+}
+
+/** Highlights the staff note matching the current playback time. */
+function updateStaffActiveNote(currentSeconds) {
+  if (!dom.lyricsContainer.classList.contains("has-staff")) return;
+  const times = state.staffNoteTimes;
+  if (!times || !times.length) return;
+
+  const pos     = findCurrentTimedIndex(times, currentSeconds);
+  const noteIdx = pos >= 0 ? times[pos].idx : -1;
+  if (noteIdx === state.activeStaffNoteIdx) return;
+
+  state.activeStaffNoteIdx = noteIdx;
+  updateStaffHighlight(noteIdx);
 }
 
 function updateStaffHighlight(idx) {
@@ -2527,22 +2902,21 @@ function _applyStaffHighlight(container, idx) {
   if (idx < 0) return;
 
   const activeEl = svg.querySelector(`.note-head[data-idx="${idx}"]`);
-  if (activeEl) {
-    activeEl.classList.add("active");
+  if (!activeEl) return;
+  activeEl.classList.add("active");
 
-    // Auto-scroll: keep active note at ~35% from left edge of the scroll wrapper.
-    // cx is in SVG coordinate space; multiply by the SVG's CSS-pixel scale factor
-    // so the scroll offset is correct even when the SVG is scaled up (e.g. fullscreen).
-    const head = activeEl.querySelector("ellipse");
-    const cx = head ? parseFloat(head.getAttribute("cx")) : 0;
-    const scrollEl = container.querySelector(".staff-scroll");
-    if (scrollEl) {
-      const svgAttrW = parseFloat(svg.getAttribute("width"));
-      const vbW = svg.viewBox?.baseVal?.width || svgAttrW;
-      const scaleX = (svgAttrW && vbW) ? svgAttrW / vbW : 1;
-      const containerW = scrollEl.clientWidth;
-      scrollEl.scrollLeft = Math.max(0, cx * scaleX - containerW * 0.35);
-    }
+  // Vertical auto-scroll: keep the active note in view inside the lyrics container.
+  const activeRect    = activeEl.getBoundingClientRect();
+  const containerRect = container.getBoundingClientRect();
+  const noteTopRel    = activeRect.top - containerRect.top;
+  const noteBotRel    = activeRect.bottom - containerRect.top;
+
+  // Only scroll when the active note is outside the comfortable viewing band
+  const margin = container.clientHeight * 0.15;
+  if (noteTopRel < margin || noteBotRel > container.clientHeight - margin) {
+    const targetTop = activeRect.top - containerRect.top + container.scrollTop
+                    - container.clientHeight * 0.3;
+    container.scrollTop = Math.max(0, targetTop);
   }
 }
 
@@ -2752,6 +3126,8 @@ function bindEvents() {
   if (dom.editorExportBtn) dom.editorExportBtn.addEventListener("click",  handleEditorExport);
   if (dom.editorTabLyrics) dom.editorTabLyrics.addEventListener("click", () => switchEditorTab("lyrics"));
   if (dom.editorTabChords) dom.editorTabChords.addEventListener("click", () => switchEditorTab("chords"));
+  if (dom.editorTabNotation) dom.editorTabNotation.addEventListener("click", () => switchEditorTab("notation"));
+  wireNotationConfigControls();
   if (dom.editorImportBtn)    dom.editorImportBtn.addEventListener("click", handleEditorImport);
   if (dom.chordAutoScrollBtn) dom.chordAutoScrollBtn.addEventListener("click", () => {
     applyChordAutoScroll(!state.chordAutoScroll);
