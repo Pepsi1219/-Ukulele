@@ -367,6 +367,7 @@
         <span>กลับ</span>
       </button>
       <span id="editorSongTitle" class="editor-song-name"></span>
+      <span id="editorNowPlaying" class="editor-now-playing">Now playing: —</span>
       <div class="editor-topbar-end">
         <button id="editorImportBtn" class="chip editor-import-btn" type="button" hidden
                 title="นำเข้าคอร์ด + timestamp จากเนื้อร้องที่ stamp ไว้แล้ว">
@@ -436,6 +437,10 @@
         <button id="ntAddNoteBtn" class="chip" type="button">
           <i class="fa-solid fa-plus"></i> เพิ่มโน้ต
         </button>
+      </div>
+      <div class="ntcfg-summary" aria-live="polite">
+        <span id="ntSummaryMeasure">Measure —</span>
+        <span id="ntSummaryRemaining">0 unstamped</span>
       </div>
       <div id="ntPreview" class="ntcfg-preview"></div>
     </div>

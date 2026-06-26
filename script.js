@@ -53,6 +53,7 @@ import { buildChordRows,
          findLyricContextAt }      from "./src/utils/chordEditor.js";
 import { buildNotationConfig,
          buildNoteRows,
+         buildNotationTimeline,
          updateNoteField,
          stampNoteTime,
          shiftNoteTime,
@@ -60,6 +61,8 @@ import { buildNotationConfig,
          removeNoteRow,
          updateConfigField,
          countNotationStamped,
+         countNotationStampable,
+         findNextNotationFocusIndex,
          exportToNotationJson,
          computeMeasureMap }       from "./src/utils/notationEditor.js";
 
@@ -129,6 +132,8 @@ const state = {
   notationRows:         [],      // current notation editor note rows
   notationConfig:       null,    // current notation editor config object
   notationFocusIdx:     -1,      // focused notation row index (-1 = none)
+  notationPlayheadIdx:  -1,      // playback-highlighted notation row index (-1 = none)
+  notationTimeline:     [],      // sorted playback times for the active notation rows
   editorBannerLyricIdx: -1,      // cached lyric-row index shown in banner
   chordAutoScroll:      true,    // auto-scroll chord list to active row while playing
   editorActiveChordIdx: -1,      // last chord row index highlighted by auto-scroll
@@ -216,6 +221,8 @@ const dom = {
   ntPickup:           document.getElementById("ntPickup"),
   ntAddNoteBtn:       document.getElementById("ntAddNoteBtn"),
   ntPreview:          document.getElementById("ntPreview"),
+  ntSummaryMeasure:   document.getElementById("ntSummaryMeasure"),
+  ntSummaryRemaining: document.getElementById("ntSummaryRemaining"),
   editorImportBtn:     document.getElementById("editorImportBtn"),
   editorLyricBanner:   document.getElementById("editorLyricBanner"),
   chordAutoScrollBtn:  document.getElementById("chordAutoScrollBtn"),
@@ -239,6 +246,7 @@ const dom = {
   editorPanel:        document.getElementById("editorPanel"),
   editorCloseBtn:     document.getElementById("editorCloseBtn"),
   editorSongTitle:    document.getElementById("editorSongTitle"),
+  editorNowPlaying:   document.getElementById("editorNowPlaying"),
   editorStampCount:   document.getElementById("editorStampCount"),
   editorExportBtn:    document.getElementById("editorExportBtn"),
   editorLinesList:    document.getElementById("editorLinesList"),
@@ -348,6 +356,8 @@ function openEditor() {
 
   const t = state.sound ? (Number(state.sound.seek()) || 0) : 0;
   updateEditorProgress(t);
+  updateNotationNowPlaying(t);
+  updateNotationSummary(t);
 
   if (dom.editorPanel) dom.editorPanel.hidden = false;
   if (dom.mainGrid)    dom.mainGrid.hidden    = true;
@@ -378,6 +388,8 @@ function switchEditorTab(tab) {
     syncNotationConfigControls();
     renderNotationRows();
     renderNotationPreview();
+    updateNotationNowPlaying(getCurrentPlaybackSeconds());
+    updateNotationSummary(getCurrentPlaybackSeconds());
   } else {
     state.chordFocusIdx = -1;
     renderChordRows();
@@ -1098,10 +1110,132 @@ function renderNotationPreview() {
   const hasNotes = state.notationRows.some(r => String(r.pitch).trim());
   if (!hasNotes) {
     dom.ntPreview.innerHTML = `<p class="ntcfg-preview-hint">เพิ่มโน้ตเพื่อดูตัวอย่าง…</p>`;
+    state.notationTimeline = [];
+    state.notationPlayheadIdx = -1;
+    updateNotationSummary(getCurrentPlaybackSeconds());
     return;
   }
   const model = parseNotation({ config: state.notationConfig, notes: state.notationRows });
+  state.notationTimeline = buildNotationTimeline(state.notationRows);
   dom.ntPreview.innerHTML = renderStaff(model);
+  syncNotationPlaybackHighlight(getCurrentPlaybackSeconds(), true);
+  updateNotationNowPlaying(getCurrentPlaybackSeconds());
+  updateNotationSummary(getCurrentPlaybackSeconds());
+}
+
+/** Returns the current playback position in seconds, or 0 when idle. */
+function getCurrentPlaybackSeconds() {
+  return state.sound ? (Number(state.sound.seek()) || 0) : 0;
+}
+
+/**
+ * Updates the notation editor's playback highlight using the cached timeline.
+ * When `force` is true, the DOM classes are refreshed even if the active row
+ * did not change (useful after a re-render).
+ */
+function syncNotationPlaybackHighlight(currentSeconds, force = false) {
+  if (!state.editorOpen || state.editorTab !== "notation") return;
+
+  const timeline = state.notationTimeline || [];
+  if (!timeline.length) {
+    applyNotationPlaybackHighlight(-1);
+    state.notationPlayheadIdx = -1;
+    return;
+  }
+
+  const pos = findCurrentTimedIndex(timeline, currentSeconds);
+  const noteIdx = pos >= 0 ? timeline[pos].idx : -1;
+  if (!force && noteIdx === state.notationPlayheadIdx) return;
+
+  state.notationPlayheadIdx = noteIdx;
+  applyNotationPlaybackHighlight(noteIdx);
+
+  if (noteIdx >= 0 && state.isPlaying && shouldAutoFollowNotationPlayhead()) {
+    notationFocusRow(noteIdx);
+  }
+}
+
+/** Applies the active playback highlight to the notation row list and preview. */
+function applyNotationPlaybackHighlight(idx) {
+  if (dom.editorLinesList) {
+    dom.editorLinesList.querySelectorAll(".editor-notation-row.playing").forEach(el => {
+      el.classList.remove("playing");
+    });
+
+    if (idx >= 0) {
+      const el = dom.editorLinesList.querySelector(`.editor-notation-row[data-notation-index="${idx}"]`);
+      if (el) {
+        el.classList.add("playing");
+        if (state.isPlaying && !state.userScrolling) {
+          el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+        }
+      }
+    }
+  }
+
+  _applyStaffHighlight(dom.ntPreview, idx);
+  updateNotationNowPlaying(getCurrentPlaybackSeconds());
+  updateNotationSummary(getCurrentPlaybackSeconds());
+}
+
+/** Returns true when playback can safely auto-follow the active notation row. */
+function shouldAutoFollowNotationPlayhead() {
+  const active = document.activeElement;
+  if (!active) return true;
+  if (active.closest?.(".editor-notation-row")) return false;
+  if (active.closest?.(".editor-notation-config")) return false;
+  return true;
+}
+
+/**
+ * Updates the topbar label that tells the user which notation row is active.
+ */
+function updateNotationNowPlaying(currentSeconds) {
+  if (!dom.editorNowPlaying) return;
+  if (state.editorTab !== "notation") {
+    dom.editorNowPlaying.textContent = "Now playing: —";
+    return;
+  }
+
+  const timeline = state.notationTimeline || [];
+  const pos = findCurrentTimedIndex(timeline, currentSeconds);
+  if (pos < 0) {
+    dom.editorNowPlaying.textContent = "Now playing: —";
+    return;
+  }
+
+  const row = state.notationRows[timeline[pos].idx];
+  if (!row) {
+    dom.editorNowPlaying.textContent = "Now playing: —";
+    return;
+  }
+
+  const pitch = String(row.pitch || "").trim() || "—";
+  const dur = String(row.dur || "").trim();
+  dom.editorNowPlaying.textContent = dur
+    ? `Now playing: ${pitch} • ${dur}`
+    : `Now playing: ${pitch}`;
+}
+
+/** Updates the small summary bar in the Notation tab. */
+function updateNotationSummary(currentSeconds = getCurrentPlaybackSeconds()) {
+  if (!dom.ntSummaryMeasure || !dom.ntSummaryRemaining) return;
+  if (state.editorTab !== "notation") return;
+
+  const { pending } = countNotationStampable(state.notationRows);
+  dom.ntSummaryRemaining.textContent = `${pending} unstamped`;
+
+  const timeline = state.notationTimeline || [];
+  const pos = findCurrentTimedIndex(timeline, currentSeconds);
+  const activeIdx = pos >= 0 ? timeline[pos].idx : state.notationFocusIdx;
+  if (activeIdx < 0) {
+    dom.ntSummaryMeasure.textContent = "Measure —";
+    return;
+  }
+
+  const mmap = computeMeasureMap(state.notationRows, state.notationConfig.timeSignature);
+  const active = mmap[activeIdx];
+  dom.ntSummaryMeasure.textContent = active ? `Measure ${active.measureIndex + 1}` : "Measure —";
 }
 
 /** Insert-a-note divider shown between/around note rows. */
@@ -1174,8 +1308,10 @@ function renderNotationRows() {
       btn.addEventListener("click", e => {
         e.stopPropagation();
         state.notationRows = shiftNoteTime(state.notationRows, i, delta);
+        state.notationTimeline = buildNotationTimeline(state.notationRows);
         refreshNotationRowBadge(i);
         updateEditorStampCount();
+        syncNotationPlaybackHighlight(getCurrentPlaybackSeconds(), true);
       });
       fineBtns.appendChild(btn);
     });
@@ -1216,10 +1352,10 @@ function renderNotationRows() {
     const stampBtn     = document.createElement("button");
     stampBtn.type      = "button";
     stampBtn.className  = "editor-stamp-btn chip";
-    stampBtn.innerHTML = `<i class="fa-solid fa-clock"></i> Stamp`;
+    stampBtn.innerHTML = `<i class="fa-solid fa-clock"></i> Stamp &amp; Next`;
     stampBtn.addEventListener("click", e => {
       e.stopPropagation();
-      notationStampRow(i);
+      notationStampRow(i, true);
     });
     el.appendChild(stampBtn);
 
@@ -1275,13 +1411,20 @@ function notationFocusRow(idx) {
 }
 
 /** Stamps the focused note row with the current playback time. */
-function notationStampRow(idx) {
+function notationStampRow(idx, advanceToNext = true) {
   if (!state.sound) return;
   const t = Number(state.sound.seek()) || 0;
   state.notationRows = stampNoteTime(state.notationRows, idx, t);
+  state.notationTimeline = buildNotationTimeline(state.notationRows);
   refreshNotationRowBadge(idx);
   updateEditorStampCount();
-  if (idx < state.notationRows.length - 1) notationFocusRow(idx + 1);
+  syncNotationPlaybackHighlight(t, true);
+  updateNotationNowPlaying(t);
+  updateNotationSummary(t);
+  if (advanceToNext) {
+    const nextIdx = findNextNotationFocusIndex(state.notationRows, idx);
+    if (nextIdx >= 0) notationFocusRow(nextIdx);
+  }
 }
 
 /** Refreshes a single note row's time badge in-place. */
@@ -1303,12 +1446,14 @@ function reRenderNotationRows() {
   renderNotationRows();
   renderNotationPreview();
   updateEditorStampCount();
+  updateNotationSummary(getCurrentPlaybackSeconds());
 }
 
 /** Applies a config patch and refreshes the live preview. */
 function applyNotationConfig(patch) {
   state.notationConfig = updateConfigField(state.notationConfig, patch);
   renderNotationPreview();
+  updateNotationSummary(getCurrentPlaybackSeconds());
 }
 
 /** Wires the notation config controls + add-note button (once, at init). */
@@ -1363,6 +1508,9 @@ function updateEditorProgress(currentSeconds) {
   if (dom.editorProgressFill) dom.editorProgressFill.style.width = `${percent}%`;
   updateEditorLyricBanner(currentSeconds);
   updateChordAutoScroll(currentSeconds);
+  if (state.editorTab === "notation") {
+    syncNotationPlaybackHighlight(currentSeconds);
+  }
 }
 
 /** Syncs the editor play/pause button icon with current playback state. */
@@ -1424,9 +1572,12 @@ function handleEditorKeydown(e) {
     // ── Notation tab ────────────────────────────────────────────────────
     switch (e.key) {
       case " ":
+        e.preventDefault();
+        if (state.notationFocusIdx >= 0) notationStampRow(state.notationFocusIdx, false);
+        break;
       case "Enter":
         e.preventDefault();
-        if (state.notationFocusIdx >= 0) notationStampRow(state.notationFocusIdx);
+        if (state.notationFocusIdx >= 0) notationStampRow(state.notationFocusIdx, true);
         break;
       case "ArrowDown":
       case "Tab":

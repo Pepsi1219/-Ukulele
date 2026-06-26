@@ -10,8 +10,11 @@ import {
   removeNoteRow,
   updateConfigField,
   countNotationStamped,
+  countNotationStampable,
+  buildNotationTimeline,
   exportToNotationJson,
   computeMeasureMap,
+  findNextNotationFocusIndex,
 } from "../../src/utils/notationEditor.js";
 
 /** Quick row factory for measure-map tests. */
@@ -114,6 +117,64 @@ describe("updateConfigField", () => {
 describe("countNotationStamped", () => {
   it("counts stamped vs total", () => {
     expect(countNotationStamped(buildNoteRows(sample))).toEqual({ stamped: 1, total: 2 });
+  });
+});
+
+describe("countNotationStampable", () => {
+  it("counts only rows that still need stamping", () => {
+    const rows = [
+      { pitch: "A4", dur: "quarter", time: 1 },
+      { pitch: "B4", dur: "quarter", time: null },
+      { pitch: "", dur: "quarter", time: null },
+    ];
+
+    expect(countNotationStampable(rows)).toEqual({
+      stamped: 1,
+      total: 3,
+      stampable: 2,
+      pending: 1,
+    });
+  });
+});
+
+describe("buildNotationTimeline", () => {
+  it("returns only timed rows sorted by time while preserving row index", () => {
+    const rows = [
+      { pitch: "C5", dur: "quarter", time: 9 },
+      { pitch: "A4", dur: "quarter", time: null },
+      { pitch: "B4", dur: "quarter", time: 1 },
+    ];
+
+    expect(buildNotationTimeline(rows)).toEqual([
+      { time: 1, idx: 2 },
+      { time: 9, idx: 0 },
+    ]);
+  });
+
+  it("returns [] for non-array input", () => {
+    expect(buildNotationTimeline(null)).toEqual([]);
+  });
+});
+
+describe("findNextNotationFocusIndex", () => {
+  it("skips empty and already stamped rows", () => {
+    const rows = [
+      { pitch: "A4", dur: "quarter", time: 1 },
+      { pitch: "", dur: "quarter", time: null },
+      { pitch: "B4", dur: "quarter", time: 2 },
+      { pitch: "C5", dur: "quarter", time: null },
+    ];
+
+    expect(findNextNotationFocusIndex(rows, 0)).toBe(3);
+  });
+
+  it("returns -1 when there is no next unfinished note", () => {
+    const rows = [
+      { pitch: "A4", dur: "quarter", time: 1 },
+      { pitch: "", dur: "quarter", time: null },
+    ];
+
+    expect(findNextNotationFocusIndex(rows, 0)).toBe(-1);
   });
 });
 

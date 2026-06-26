@@ -126,6 +126,64 @@ export function countNotationStamped(rows) {
 }
 
 /**
+ * Counts rows that can still be stamped.
+ *
+ * Empty pitch rows are treated as placeholders and excluded from the pending
+ * count so the UI can focus on the real notes that still need work.
+ */
+export function countNotationStampable(rows) {
+  if (!Array.isArray(rows)) {
+    return { stamped: 0, total: 0, stampable: 0, pending: 0 };
+  }
+
+  const stampable = rows.filter(r => String(r && r.pitch || "").trim());
+  const stamped = stampable.filter(r => r.time !== null).length;
+  return {
+    stamped,
+    total: rows.length,
+    stampable: stampable.length,
+    pending: stampable.length - stamped,
+  };
+}
+
+/** Returns the next note row that still needs a timestamp, skipping blanks. */
+export function findNextNotationFocusIndex(rows, fromIdx) {
+  if (!Array.isArray(rows)) return -1;
+  for (let i = Math.max(0, fromIdx + 1); i < rows.length; i += 1) {
+    const row = rows[i];
+    if (!String(row && row.pitch || "").trim()) continue;
+    if (row.time !== null) continue;
+    return i;
+  }
+  return -1;
+}
+
+/**
+ * Builds a playback timeline from note rows.
+ *
+ * Each entry keeps the source row index so the UI can highlight the matching
+ * editor row and the matching note in the staff preview.
+ *
+ * @param {Array} rows
+ * @returns {Array<{time:number, idx:number}>}
+ */
+export function buildNotationTimeline(rows) {
+  if (!Array.isArray(rows)) return [];
+
+  return rows
+    .map((row, idx) => {
+      const rawTime = row && row.time;
+      const time =
+        rawTime !== undefined && rawTime !== null && Number.isFinite(Number(rawTime))
+          ? Number(rawTime)
+          : null;
+      return { time, idx };
+    })
+    .filter(entry => entry.time !== null)
+    .sort((a, b) => a.time - b.time || a.idx - b.idx);
+}
+
+/**
  * Serialises config + note rows into the Notation JSON format.
  * Empty-pitch rows are dropped; row order is preserved (NOT sorted by time).
  *
