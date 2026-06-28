@@ -1,0 +1,84 @@
+{
+  "config": {
+    "clef": "treble",
+    "key": "C",
+    "timeSignature": [
+      4,
+      4
+    ],
+    "measuresPerRow": 4,
+    "pickupBeats": 0
+  },
+  "notes": [
+    {
+      "pitch": "E4",
+      "dur": "quarter",
+      "time": 3.123
+    },
+    {
+      "pitch": "E4",
+      "dur": "quarter",
+      "time": 3.767
+    },
+    {
+      "pitch": "E4",
+      "dur": "quarter",
+      "time": 4.571
+    },
+    {
+      "pitch": "F4",
+      "dur": "quarter",
+      "time": 5.137
+    },
+    {
+      "pitch": "G4",
+      "dur": "quarter",
+      "time": 5.75
+    },
+    {
+      "pitch": "G4",
+      "dur": "quarter",
+      "time": 6.25
+    },
+    {
+      "pitch": "G4",
+      "dur": "half",
+      "time": 7.045
+    },
+    {
+      "pitch": "F4",
+      "dur": "quarter",
+      "time": 8.499
+    },
+    {
+      "pitch": "F4",
+      "dur": "quarter",
+      "time": 8.991
+    },
+    {
+      "pitch": "G4",
+      "dur": "quarter",
+      "time": 9.74
+    },
+    {
+      "pitch": "F4",
+      "dur": "quarter",
+      "time": 10.306
+    },
+    {
+      "pitch": "E4",
+      "dur": "quarter",
+      "time": 11.163
+    },
+    {
+      "pitch": "G4",
+      "dur": "quarter",
+      "time": 11.821
+    },
+    {
+      "pitch": "E4",
+      "dur": "half",
+      "time": 12.457
+    }
+  ]
+}

@@ -1,0 +1,139 @@
+{
+  "config": {
+    "clef": "treble",
+    "key": "C",
+    "timeSignature": [
+      4,
+      4
+    ],
+    "measuresPerRow": 3,
+    "pickupBeats": 0
+  },
+  "notes": [
+    {
+      "pitch": "C5",
+      "dur": "quarter",
+      "time": 2.942
+    },
+    {
+      "pitch": "G4",
+      "dur": "quarter",
+      "time": 3.645
+    },
+    {
+      "pitch": "A4",
+      "dur": "quarter",
+      "time": 4.248
+    },
+    {
+      "pitch": "B4",
+      "dur": "quarter",
+      "time": 4.848
+    },
+    {
+      "pitch": "C5",
+      "dur": "quarter",
+      "time": 5.53
+    },
+    {
+      "pitch": "G4",
+      "dur": "quarter",
+      "time": 6.01
+    },
+    {
+      "pitch": "A4",
+      "dur": "quarter",
+      "time": 6.635
+    },
+    {
+      "pitch": "B4",
+      "dur": "quarter",
+      "time": 7.288
+    },
+    {
+      "pitch": "C5",
+      "dur": "quarter",
+      "time": 7.831
+    },
+    {
+      "pitch": "G4",
+      "dur": "quarter",
+      "time": 8.275
+    },
+    {
+      "pitch": "A4",
+      "dur": "quarter",
+      "time": 8.838
+    },
+    {
+      "pitch": "B4",
+      "dur": "quarter",
+      "time": 9.495
+    },
+    {
+      "pitch": "C5",
+      "dur": "quarter",
+      "time": 10.003
+    },
+    {
+      "pitch": "G4",
+      "dur": "quarter",
+      "time": 10.609
+    },
+    {
+      "pitch": "A4",
+      "dur": "quarter",
+      "time": 11.018
+    },
+    {
+      "pitch": "B4",
+      "dur": "quarter",
+      "time": 11.525
+    },
+    {
+      "pitch": "C5",
+      "dur": "quarter",
+      "time": 12.04
+    },
+    {
+      "pitch": "G4",
+      "dur": "quarter",
+      "time": 12.501
+    },
+    {
+      "pitch": "A4",
+      "dur": "quarter",
+      "time": 12.95
+    },
+    {
+      "pitch": "B4",
+      "dur": "quarter",
+      "time": 13.391
+    },
+    {
+      "pitch": "C5",
+      "dur": "quarter",
+      "time": 13.972
+    },
+    {
+      "pitch": "G4",
+      "dur": "quarter",
+      "time": 14.431
+    },
+    {
+      "pitch": "A4",
+      "dur": "quarter",
+      "time": 14.839
+    },
+    {
+      "pitch": "B4",
+      "dur": "quarter",
+      "time": 15.313
+    },
+    {
+      "pitch": "C5",
+      "dur": "whole",
+      "time": 15.808
+    }
+  ]
+}
