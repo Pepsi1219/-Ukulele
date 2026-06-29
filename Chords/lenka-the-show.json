@@ -84,14 +84,11 @@
   { "time": 213.0,"chord": "G"  },
   { "time": 215.0, "chord": "Am" },
 
-
   { "time": 216.5,"chord": "F"  },
   { "time": 218.5, "chord": "C"  },
   { "time": 220.0, "chord": "C"  },
 
-
   { "time": 220.5, "chord": "G"  },
-
 
   { "time": 222.5, "chord": "Am" },
   { "time": 224.5, "chord": "F"  },
