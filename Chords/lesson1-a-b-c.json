@@ -1,30 +1,29 @@
 [
-  {
-    "time": 3.6,
-    "chord": "A"
-  },
-  {
-    "time": 6.1,
-    "chord": "B"
-  },
-  {
-    "time": 8.7,
-    "chord": "C"
-  },
-  {
-    "time": 13.7,
-    "chord": "A"
-  },
-  {
-    "time": 16.5,
-    "chord": "C"
-  },
-  {
-    "time": 19.4,
-    "chord": "B"
-  },
-  {
-    "time": 21.8,
-    "chord": "A"
-  }
+  { "time": 3.15, "chord": "A" },
+  { "time": 3.75, "chord": "A" },
+  { "time": 4.44, "chord": "A" },
+  { "time": 5.05, "chord": "A" },
+  { "time": 5.79, "chord": "B" },
+  { "time": 6.46, "chord": "B" },
+  { "time": 7.13, "chord": "B" },
+  { "time": 7.79, "chord": "B" },
+  { "time": 8.53, "chord": "C" },
+  { "time": 9.22, "chord": "C" },
+  { "time": 9.87, "chord": "C" },
+  { "time": 10.53, "chord": "C" },
+  { "time": 11.15, "chord": "C" },
+  { "time": 12.46, "chord": "C" },
+  { "time": 13.85, "chord": "A" },
+  { "time": 14.43, "chord": "A" },
+  { "time": 15.09, "chord": "A" },
+  { "time": 15.88, "chord": "A" },
+  { "time": 16.51, "chord": "C" },
+  { "time": 17.13, "chord": "C" },
+  { "time": 17.73, "chord": "C" },
+  { "time": 18.40, "chord": "C" },
+  { "time": 19.03, "chord": "B" },
+  { "time": 19.70, "chord": "B" },
+  { "time": 20.45, "chord": "B" },
+  { "time": 21.10, "chord": "B" },
+  { "time": 21.84, "chord": "A" }
 ]
