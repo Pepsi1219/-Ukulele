@@ -1,0 +1,132 @@
+[
+  {
+    "section": "PreChorus"
+  },
+  {
+    "time": 0.5,
+    "line": [
+      {
+        "lyric": "Happy "
+      },
+      {
+        "chord": "C",
+        "lyric": "Birthday To "
+      },
+      {
+        "chord": "G7",
+        "lyric": "You     "
+      },
+      {
+        "lyric": "Happy "
+      },
+      {
+        "chord": "G7",
+        "lyric": "Birthday To "
+      },
+      {
+        "chord": "C",
+        "lyric": "You"
+      }
+    ]
+  },
+  {
+    "time": 5.5,
+    "line": [
+      {
+        "lyric": "Happy "
+      },
+      {
+        "chord": "C",
+        "lyric": "Birthday            "
+      },
+      {
+        "lyric": "Happy "
+      },
+      {
+        "chord": "F",
+        "lyric": "Birthday"
+      }
+    ]
+  },
+  {
+    "time": 8,
+    "line": [
+      {
+        "lyric": "Happy "
+      },
+      {
+        "chord": "C",
+        "lyric": "Birthday To "
+      },
+      {
+        "chord": "G7",
+        "lyric": "you"
+      }
+    ]
+  },
+  {
+    "section": "Chorus"
+  },
+  {
+    "time": 11.5,
+    "line": [
+      {
+        "lyric": "Happy "
+      },
+      {
+        "chord": "C",
+        "lyric": "Birthday To "
+      },
+      {
+        "chord": "G7",
+        "lyric": "You     "
+      },
+      {
+        "lyric": "Happy "
+      },
+      {
+        "chord": "G7",
+        "lyric": "Birthday To"
+      },
+      {
+        "chord": "C",
+        "lyric": "You"
+      }
+    ]
+  },
+  {
+    "time": 16.5,
+    "line": [
+      {
+        "lyric": "Happy "
+      },
+      {
+        "chord": "C",
+        "lyric": "Birthday            "
+      },
+      {
+        "lyric": "Happy "
+      },
+      {
+        "chord": "F",
+        "lyric": "Birthday "
+      }
+    ]
+  },
+  {
+    "time": 19,
+    "line": [
+      {
+        "lyric": "Happy "
+      },
+      {
+        "chord": "(C     G7)",
+        "lyric": "Birthday To "
+      },
+      {
+        "chord": "C",
+        "lyric": "You"
+      }
+    ]
+  }
+]
