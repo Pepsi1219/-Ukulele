@@ -240,6 +240,32 @@ describe("pickNotePosition", () => {
   it("auto mode returns null for an unrecognised note", () => {
     expect(pickNotePosition("H", "auto", null)).toBeNull();
   });
+
+  it("multi-string array with one entry behaves like single-string mode", () => {
+    expect(pickNotePosition("C", ["A"])).toEqual({ stringIdx: 3, fret: 3 });
+  });
+
+  it("multi-string array picks the lowest-fret option among the selected strings when no previous position", () => {
+    // Note "C" on E string = fret 8, on A string = fret 3 → A string wins (closer/easier)
+    expect(pickNotePosition("C", ["E", "A"])).toEqual({ stringIdx: 3, fret: 3 });
+  });
+
+  it("multi-string array favours the position closest to the previous one, restricted to the subset", () => {
+    // Hand already on E string fret 9; next note "C": E candidate fret8, A candidate fret3
+    // distance = |Δfret|*2 + |Δstring| → E: |8-9|*2+0=2  A: |3-9|*2+1=13 → E string wins
+    // (even though A's fret 3 would be the lowest-fret option in isolation)
+    const prev = { stringIdx: 2, fret: 9 };
+    expect(pickNotePosition("C", ["E", "A"], prev)).toEqual({ stringIdx: 2, fret: 8 });
+  });
+
+  it("multi-string array ignores duplicate/invalid letters and dedupes", () => {
+    expect(pickNotePosition("C", ["A", "A", "Z"])).toEqual({ stringIdx: 3, fret: 3 });
+  });
+
+  it("returns null for an empty or all-invalid array", () => {
+    expect(pickNotePosition("C", [])).toBeNull();
+    expect(pickNotePosition("C", ["Z", "Y"])).toBeNull();
+  });
 });
 
 // ─── buildNotePositionModel ──────────────────────────────────────────────────

@@ -146,44 +146,72 @@ export function findFretForNote(stringIdx, noteName) {
 }
 
 /**
+ * Resolves a note-pick mode value to the list of string letters it allows.
+ *
+ *  - "auto" → all four strings (Fingerstyle)
+ *  - "G" | "C" | "E" | "A" → that one string
+ *  - string[] (e.g. ["E", "A"]) → exactly those strings, deduped + validated
+ *
+ * @param {string|string[]} mode
+ * @returns {string[] | null} null when the mode can't be resolved to any string
+ * @private
+ */
+function resolveStrings(mode) {
+  if (mode === "auto") return STRING_NAMES;
+  if (Array.isArray(mode)) {
+    const valid = mode.filter(letter => STRING_NAMES.includes(letter));
+    return valid.length ? [...new Set(valid)] : null;
+  }
+  return STRING_NAMES.includes(mode) ? [mode] : null;
+}
+
+/**
  * Picks the best fretboard position to play a given note, according to
  * the selected practice mode:
  *
  *  - "G" | "C" | "E" | "A": always play on that one string (its lowest
  *    fret that sounds the note) — for single-string picking exercises.
+ *  - string[] (e.g. ["E", "A"]): considers only the given strings and
+ *    picks whichever is closest to the previous position, so the hand
+ *    barely has to move — same logic as "auto" but restricted to the
+ *    selected subset. With a single string in the array this behaves
+ *    identically to the single-string mode above.
  *  - "auto" (Fingerstyle): considers all four strings and picks whichever
  *    is closest to the previous position, so the hand barely has to move.
  *    With no previous position yet, picks the lowest-fret option overall
  *    (the easiest first reach, closest to the nut).
  *
  * @param {string} noteName — e.g. "C", "Bb", "F#"
- * @param {"G"|"C"|"E"|"A"|"auto"} mode
+ * @param {"G"|"C"|"E"|"A"|"auto"|string[]} mode
  * @param {{ stringIdx: number, fret: number } | null} [prevPosition]
  * @returns {{ stringIdx: number, fret: number } | null}
  */
 export function pickNotePosition(noteName, mode, prevPosition = null) {
   if (NOTE_PITCH_CLASS[noteName] === undefined) return null;
 
-  if (mode !== "auto") {
-    const stringIdx = STRING_NAMES.indexOf(mode);
-    if (stringIdx === -1) return null;
-    return { stringIdx, fret: findFretForNote(stringIdx, noteName) };
-  }
+  const strings = resolveStrings(mode);
+  if (!strings) return null;
 
-  // Fingerstyle (auto) — evaluate the note's lowest-fret position on every string
-  const candidates = STRING_NAMES.map((_, stringIdx) => ({
-    stringIdx,
-    fret: findFretForNote(stringIdx, noteName),
-  }));
+  const candidates = strings.map(letter => {
+    const stringIdx = STRING_NAMES.indexOf(letter);
+    return { stringIdx, fret: findFretForNote(stringIdx, noteName) };
+  });
+
+  if (candidates.length === 1) return candidates[0];
 
   if (!prevPosition) {
     return candidates.reduce((best, c) => (c.fret < best.fret ? c : best));
   }
 
   // "Closest to the hand" — minimise neck (fret) movement first, string
-  // (lateral) movement second; fret shifts cost more than string changes
-  const distance = (c) =>
-    Math.abs(c.fret - prevPosition.fret) * 2 + Math.abs(c.stringIdx - prevPosition.stringIdx);
+  // (lateral) movement second; fret shifts cost more than string changes.
+  // An open string (fret 0) needs no finger placement at all, so it's
+  // treated as free to reach — only the string-crossing cost applies —
+  // rather than penalising it by its raw distance from the previous fret.
+  const distance = (c) => {
+    const fretCost = c.fret === 0 ? 0 : Math.abs(c.fret - prevPosition.fret) * 2;
+    return fretCost + Math.abs(c.stringIdx - prevPosition.stringIdx);
+  };
 
   return candidates.reduce((best, c) => (distance(c) < distance(best) ? c : best));
 }

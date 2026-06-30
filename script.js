@@ -139,7 +139,7 @@ const state = {
   editorActiveChordIdx: -1,      // last chord row index highlighted by auto-scroll
   chordDiagramRotation: 0,       // 0 | 90 | 180 | 270 — current diagram rotation
   chordDiagramMode: "chord",     // "chord" | "note" — full chord shape vs single-note picking view (not persisted)
-  notePickMode: "auto",          // "G" | "C" | "E" | "A" | "auto" — which string(s) to use in note-picking mode
+  notePickMode: "auto",          // "G"|"C"|"E"|"A" | string[] (e.g. ["E","A"]) | "auto" — which string(s) to use in note-picking mode
   notePickPosition: null,        // { stringIdx, fret } — last shown note position (drives "auto" hand-position memory)
   lyricsFullscreen: false,       // true when lyrics are displayed in fullscreen overlay
   lyricsFsSwapped: false,        // true = chord column on right side in fullscreen
@@ -2888,10 +2888,20 @@ const NOTE_PICK_MODES = [
   { id: "auto", label: "Fingerstyle", icon: "fa-solid fa-hand-sparkles" },
 ];
 
+/** True when the given option id (string letter or "auto") is currently active. */
+function isNotePickModeActive(id) {
+  if (id === "auto") return state.notePickMode === "auto";
+  return Array.isArray(state.notePickMode) && state.notePickMode.includes(id);
+}
+
 /** Looks up the display label for the currently-selected note-pick mode. */
-function getNotePickModeLabel(modeId) {
-  const found = NOTE_PICK_MODES.find(m => m.id === modeId);
-  return found ? found.label : modeId;
+function getNotePickModeLabel(mode) {
+  if (mode === "auto") return "Fingerstyle";
+  if (Array.isArray(mode) && mode.length) {
+    return mode.length === 1 ? `สาย ${mode[0]}` : `สาย ${mode.join("+")}`;
+  }
+  const found = NOTE_PICK_MODES.find(m => m.id === mode);
+  return found ? found.label : String(mode);
 }
 
 /** Renders the bottom-sheet option list and wires the trigger/backdrop to open/close it. */
@@ -2908,8 +2918,9 @@ function initNotePickSheet() {
       btn.type = "button";
       btn.className = "note-pick-option";
       btn.dataset.mode = id;
-      btn.setAttribute("aria-pressed", String(state.notePickMode === id));
-      if (state.notePickMode === id) btn.classList.add("active");
+      const active = isNotePickModeActive(id);
+      btn.setAttribute("aria-pressed", String(active));
+      if (active) btn.classList.add("active");
 
       btn.innerHTML = `
         <i class="${icon}" aria-hidden="true"></i>
@@ -2917,10 +2928,10 @@ function initNotePickSheet() {
         <i class="fa-solid fa-check note-pick-option-check" aria-hidden="true"></i>
       `;
 
-      btn.addEventListener("click", () => {
-        setNotePickMode(id);
-        closeNotePickSheet();
-      });
+      // Toggles selection without closing the sheet — picking a 2nd (or 3rd)
+      // string requires the sheet to stay open. It only closes via the
+      // backdrop, the trigger button, or Escape (wired below).
+      btn.addEventListener("click", () => toggleNotePickMode(id));
       dom.notePickSheetOptions.appendChild(btn);
     });
   }
@@ -2958,24 +2969,55 @@ function toggleNotePickSheet() {
   else closeNotePickSheet();
 }
 
-/** Switches which string(s) the note-picking diagram targets, then redraws. */
-function setNotePickMode(modeId) {
-  if (state.notePickMode === modeId) return;
-  state.notePickMode     = modeId;
+/** Applies a fully-resolved note-pick mode ("auto" or a string[] of letters), then redraws. */
+function applyNotePickMode(mode) {
+  state.notePickMode     = mode;
   state.notePickPosition = null; // hand-position memory resets — new string layout
 
-  const label = getNotePickModeLabel(modeId);
+  const label = getNotePickModeLabel(mode);
   if (dom.notePickModeTriggerLabel) dom.notePickModeTriggerLabel.textContent = label;
   if (dom.lyricsFsNotePickLabel) dom.lyricsFsNotePickLabel.textContent = label;
   if (dom.notePickSheetOptions) {
     dom.notePickSheetOptions.querySelectorAll(".note-pick-option").forEach(btn => {
-      const isActive = btn.dataset.mode === modeId;
+      const isActive = isNotePickModeActive(btn.dataset.mode);
       btn.classList.toggle("active", isActive);
       btn.setAttribute("aria-pressed", String(isActive));
     });
   }
 
   refreshChordDisplay();
+}
+
+/**
+ * Toggles one note-pick option on/off:
+ *  - "auto" (Fingerstyle) always replaces the selection outright — it's a
+ *    distinct "search all 4 strings" mode, not a 5th checkbox.
+ *  - A string letter (G/C/E/A) toggles membership in the selected set.
+ *    Picking a letter while in "auto" mode starts a fresh single-string
+ *    selection. At least one string must stay selected — clicking the
+ *    last remaining one is a no-op.
+ */
+function toggleNotePickMode(id) {
+  if (id === "auto") {
+    if (state.notePickMode === "auto") return;
+    applyNotePickMode("auto");
+    return;
+  }
+
+  let next;
+  if (state.notePickMode === "auto") {
+    next = [id];
+  } else {
+    const current = state.notePickMode;
+    if (current.includes(id)) {
+      if (current.length === 1) return; // keep at least one string selected
+      next = current.filter(s => s !== id);
+    } else {
+      next = [...current, id];
+    }
+  }
+
+  applyNotePickMode(next);
 }
 
 /** Cycles chord diagram through 4 rotations: 0° → 90° → 180° → 270° → 0°. */
