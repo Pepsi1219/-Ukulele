@@ -1,3 +1,16 @@
+// ── Architecture note ────────────────────────────────────────────────────────
+// script.js is intentionally a single controller file (no bundler). All DOM
+// wiring, event handlers, and application state live here. Pure business logic
+// is extracted into src/utils/ modules (testable in Node via vitest).
+//
+// TECH DEBT: as the file grows past ~3500 lines it should be split into:
+//   playback.js  — play/pause/seek/speed/loop
+//   editor.js    — timestamp/chord/notation editors
+//   ui.js        — theme, panels, auto-scroll, metronome UI
+//   history.js   — favorites, practice log, history panel
+// For now, keep all imports at the top and state/constants right below them.
+// ─────────────────────────────────────────────────────────────────────────────
+
 // ── Utility imports (pure functions — also used by unit tests) ──────────────
 import { formatTime }               from "./src/utils/formatTime.js";
 import { createUUID }               from "./src/utils/createUUID.js";
@@ -83,6 +96,11 @@ const MANIFEST_JSON_PATH = "manifest.json";
 const LYRICS_DIR   = "Lyrics";
 const CHORDS_DIR   = "Chords";
 const NOTATION_DIR = "Notation";
+
+// UI timing / layout constants
+const USER_SCROLL_COOLDOWN_MS   = 3000;  // ms before userScrolling flag resets after last scroll
+const STAFF_SCROLL_MARGIN_RATIO = 0.15;  // fraction of container height kept as comfortable margin
+const STAFF_SCROLL_CENTER_RATIO = 0.30;  // fraction down from top to place active note when scrolling
 
 const fallbackSongs = {
   songs: [
@@ -1001,6 +1019,14 @@ function renderChordRows() {
     chordInput.addEventListener("input", () => {
       state.chordRows = updateChordName(state.chordRows, i, chordInput.value);
       autoResizeInput(chordInput);
+      // Visual feedback: mark unrecognised chord names so the user notices typos.
+      // Empty string is allowed (means "no chord at this timestamp").
+      const val = chordInput.value.trim();
+      const unknown = val !== "" && !getChordData(val);
+      chordInput.classList.toggle("editor-chname-unknown", unknown);
+      chordInput.title = unknown
+        ? `"${val}" ไม่อยู่ในฐานข้อมูลคอร์ด — diagram จะไม่แสดง`
+        : "ชื่อคอร์ด เช่น Am, G7, Cmaj7/E";
     });
     autoResizeInput(chordInput);
     el.appendChild(chordInput);
@@ -2038,7 +2064,27 @@ async function fetchJson(path) {
   return res.json();
 }
 
+/**
+ * Clears `container` and appends a single `<p class="empty-state">` with
+ * `textContent = msg`. Using textContent (not innerHTML) ensures that any
+ * special characters in msg are escaped automatically — no XSS risk.
+ * Centralises the repeated "clear + show placeholder" pattern used across
+ * the lyrics panel, chord display, and history panel.
+ *
+ * @param {HTMLElement} container
+ * @param {string} msg
+ * @param {"p"|"span"} [tag="p"]
+ */
+function setEmptyState(container, msg, tag = "p") {
+  container.innerHTML = "";
+  const el = document.createElement(tag);
+  el.className = "empty-state";
+  el.textContent = msg;
+  container.appendChild(el);
+}
+
 async function loadSongs() {
+  if (dom.songSelect) dom.songSelect.disabled = true; // prevent selection mid-load
   try {
     const manifest = await fetchJson(MANIFEST_JSON_PATH);
     if (!manifest || !Array.isArray(manifest.songs)) {
@@ -2072,6 +2118,8 @@ async function loadSongs() {
       buildSong(s, s.lyrics, null)
     );
     setLoadStatus("error", "โหลดไม่สำเร็จ — ใช้ข้อมูลตัวอย่าง");
+  } finally {
+    if (dom.songSelect) dom.songSelect.disabled = false;
   }
 
   renderSongSelect();
@@ -2145,8 +2193,8 @@ function showIdleState() {
             : !state.selectedSong                     ? "กรุณาเลือกเพลง"
             : "";
 
-  dom.lyricsContainer.innerHTML = `<p class="empty-state">${msg}</p>`;
-  dom.chordDisplay.innerHTML    = `<span class="empty-state">${msg || "เลือกเพลงแล้วกด Play"}</span>`;
+  setEmptyState(dom.lyricsContainer, msg);
+  setEmptyState(dom.chordDisplay, msg || "เลือกเพลงแล้วกด Play", "span");
   dom.currentChordLabel.textContent = "-";
 
   resetProgress();
@@ -2240,7 +2288,7 @@ function loadSongAudio(song) {
       setCharPlaying(true);
       startPracticeTimer();
       // Auto-sync metronome to song beat phase when playback starts
-      if (state.metronomeOn) syncMetronomeToSong(Number(state.sound.seek()) || 0);
+      if (state.metronomeOn) syncMetronomeToSong(Number(state.sound.seek()) || 0).catch(err => console.error("Metronome sync failed:", err));
     },
 
     onpause: () => {
@@ -2337,7 +2385,7 @@ function seekBy(deltaSeconds) {
   state.sound.seek(target);
   updateProgress(target);
   updateTimedDisplays(target);
-  if (state.metronomeOn && state.isPlaying) syncMetronomeToSong(target);
+  if (state.metronomeOn && state.isPlaying) syncMetronomeToSong(target).catch(err => console.error("Metronome sync failed:", err));
 }
 
 function setSpeed(speed) {
@@ -2363,7 +2411,7 @@ function seekFromPointer(clientX) {
   state.sound.seek(targetTime);
   updateProgress(targetTime);
   updateTimedDisplays(targetTime);
-  if (state.metronomeOn && state.isPlaying) syncMetronomeToSong(targetTime);
+  if (state.metronomeOn && state.isPlaying) syncMetronomeToSong(targetTime).catch(err => console.error("Metronome sync failed:", err));
 }
 
 /* =========================
@@ -2518,6 +2566,10 @@ function renderLyricsEmptyState(song) {
   // Interactive staff is available when the song has a Notation/<id>.json file,
   // or (legacy fallback) when it's a lesson whose Chords file holds melody notes.
   const hasNotationFile = !!(song && song.notation);
+  // Legacy fallback: lesson songs that pre-date the Notation JSON format stored
+  // their melody as the Chords timeline. chordsToNotation() converts that into a
+  // staff. Only apply this to songs whose id begins with "lesson" so that regular
+  // songs with chord data don't unexpectedly show a melody staff instead of lyrics.
   const hasLegacyMelody = !hasNotationFile &&
     !!(song && song.id.startsWith("lesson") && song.chords && song.chords.length);
   const hasInteractive  = hasNotationFile || hasLegacyMelody;
@@ -2707,21 +2759,20 @@ function seekFromFsProgress(clientX) {
   state.sound.seek(targetTime);
   updateProgress(targetTime);
   updateTimedDisplays(targetTime);
-  if (state.metronomeOn && state.isPlaying) syncMetronomeToSong(targetTime);
+  if (state.metronomeOn && state.isPlaying) syncMetronomeToSong(targetTime).catch(err => console.error("Metronome sync failed:", err));
 }
 
 /* =========================
    Chord Functions
 ========================= */
 function setChordDisplay(chord) {
-  dom.chordDisplay.innerHTML = "";
-
   if (!chord) {
-    dom.chordDisplay.innerHTML = `<span class="empty-state">รอคอร์ดแรก...</span>`;
+    setEmptyState(dom.chordDisplay, "รอคอร์ดแรก...", "span");
     dom.currentChordLabel.textContent = "-";
     if (dom.chordDiagram) dom.chordDiagram.hidden = true;
     return;
   }
+  dom.chordDisplay.innerHTML = "";
 
   // Chord badge
   const badge = document.createElement("div");
@@ -2764,14 +2815,14 @@ function syncFullscreenChord(chord) {
 
   dom.lyricsFsChordLabel.textContent = chord || "-";
 
-  dom.lyricsFsChordDisplay.innerHTML = "";
   if (chord) {
+    dom.lyricsFsChordDisplay.innerHTML = "";
     const badge = document.createElement("div");
     badge.className = "chord-badge";
     badge.textContent = chord;
     dom.lyricsFsChordDisplay.appendChild(badge);
   } else {
-    dom.lyricsFsChordDisplay.innerHTML = `<span class="empty-state">รอคอร์ดแรก...</span>`;
+    setEmptyState(dom.lyricsFsChordDisplay, "รอคอร์ดแรก...", "span");
   }
 
   dom.lyricsFsChordDiagram.innerHTML = "";
@@ -2942,11 +2993,15 @@ function initNotePickSheet() {
   if (dom.notePickSheetBackdrop) {
     dom.notePickSheetBackdrop.addEventListener("click", closeNotePickSheet);
   }
-  document.addEventListener("keydown", e => {
-    if (e.key === "Escape" && dom.notePickSheet && !dom.notePickSheet.hidden) {
-      closeNotePickSheet();
-    }
-  });
+  // Store the handler reference so it can be removed later and to avoid
+  // stacking duplicate listeners if initNotePickSheet() is ever called again.
+  if (!initNotePickSheet._escHandler) {
+    initNotePickSheet._escHandler = (e) => {
+      if (e.key === "Escape" && dom.notePickSheet && !dom.notePickSheet.hidden)
+        closeNotePickSheet();
+    };
+    document.addEventListener("keydown", initNotePickSheet._escHandler);
+  }
 }
 
 /** Opens the bottom-sheet string/fingerstyle picker. */
@@ -3037,6 +3092,7 @@ function toggleDiagramOrient() {
 }
 
 function updateCurrentChord(currentSeconds) {
+  if (!state.selectedSong) return;
   const chords    = state.selectedSong.chords;
   const nextIndex = findCurrentTimedIndex(chords, currentSeconds);
 
@@ -3105,10 +3161,10 @@ function _applyStaffHighlight(container, idx) {
   const noteBotRel    = activeRect.bottom - containerRect.top;
 
   // Only scroll when the active note is outside the comfortable viewing band
-  const margin = container.clientHeight * 0.15;
+  const margin = container.clientHeight * STAFF_SCROLL_MARGIN_RATIO;
   if (noteTopRel < margin || noteBotRel > container.clientHeight - margin) {
     const targetTop = activeRect.top - containerRect.top + container.scrollTop
-                    - container.clientHeight * 0.3;
+                    - container.clientHeight * STAFF_SCROLL_CENTER_RATIO;
     container.scrollTop = Math.max(0, targetTop);
   }
 }
@@ -3299,7 +3355,7 @@ function bindEvents() {
   dom.lyricsContainer.addEventListener("scroll", () => {
     state.userScrolling = true;
     clearTimeout(state.userScrollTimer);
-    state.userScrollTimer = setTimeout(() => { state.userScrolling = false; }, 3000);
+    state.userScrollTimer = setTimeout(() => { state.userScrolling = false; }, USER_SCROLL_COOLDOWN_MS);
   }, { passive: true });
 
   // Section label click → Section Loop
@@ -3415,7 +3471,7 @@ function bindEvents() {
     dom.lyricsFullscreenContainer.addEventListener("scroll", () => {
       state.userScrolling = true;
       clearTimeout(state.userScrollTimer);
-      state.userScrollTimer = setTimeout(() => { state.userScrolling = false; }, 3000);
+      state.userScrollTimer = setTimeout(() => { state.userScrolling = false; }, USER_SCROLL_COOLDOWN_MS);
     }, { passive: true });
   }
   // Fullscreen chord controls — delegate to the same toggle functions as main panel
@@ -3468,7 +3524,7 @@ function loadFavorites() {
   try {
     const raw = localStorage.getItem("ukulele-favorites");
     state.favorites = raw ? new Set(JSON.parse(raw)) : new Set();
-  } catch { state.favorites = new Set(); }
+  } catch (e) { console.error("โหลด favorites ไม่สำเร็จ:", e); state.favorites = new Set(); }
 }
 
 /** Saves state.favorites to localStorage. */
@@ -3517,7 +3573,7 @@ function loadPracticeLog() {
   try {
     const raw = localStorage.getItem("ukulele-practice-log");
     state.practiceLog = raw ? JSON.parse(raw) : [];
-  } catch { state.practiceLog = []; }
+  } catch (e) { console.error("โหลด practice log ไม่สำเร็จ:", e); state.practiceLog = []; }
 }
 
 /** Saves practice log to localStorage. */

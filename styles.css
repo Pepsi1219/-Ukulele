@@ -1400,6 +1400,7 @@ button.toggle-pill:hover { transform: translateY(-1px); }
   flex: 1;              /* take remaining space between time and stamp-btn */
 }
 .editor-chname-input::placeholder { color: rgba(56,189,248,0.3); font-weight: 400; font-size: 0.9rem; }
+.editor-chname-unknown { border-bottom-color: #f87171 !important; color: #f87171 !important; }
 .editor-chname-input:focus {
   background: rgba(56,189,248,0.06);
   border-radius: 4px;
