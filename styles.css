@@ -542,8 +542,9 @@ button.toggle-pill:hover { transform: translateY(-1px); }
 .speed-modal {
   position: absolute;
   bottom: calc(100% + 8px);
-  left: 0;
+  right: 0;
   width: 300px;
+  max-width: calc(100vw - 16px);
   background: #0f0f0f;
   border-radius: 16px;
   box-shadow: 0 12px 40px rgba(0,0,0,0.75);
