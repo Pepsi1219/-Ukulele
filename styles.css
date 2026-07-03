@@ -2847,7 +2847,13 @@ select option { font-family: inherit; }
     border-top: 1px solid var(--border);
     border-bottom: none;
   }
-  .lyrics-fs-player { padding: 8px 14px; gap: 4px; }
+  .lyrics-fs-player {
+    padding: 8px 14px;
+    padding-left: max(14px, env(safe-area-inset-left));
+    padding-right: max(14px, env(safe-area-inset-right));
+    padding-bottom: max(8px, env(safe-area-inset-bottom));
+    gap: 4px;
+  }
   .lyrics-fs-player-transport .control-btn { width: 30px; height: 30px; font-size: 0.78rem; }
   .lyrics-fs-player-transport .control-btn.primary { width: 36px; height: 36px; font-size: 0.88rem; }
 }
