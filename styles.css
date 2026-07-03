@@ -2852,6 +2852,8 @@ select option { font-family: inherit; }
 }
 
 @media (max-width: 760px) {
+  .header-brand .dance-char-wrap { display: none; }
+
   /* Override desktop 24px with smaller mobile padding (safe-area still applies via base rule) */
   .app-shell {
     padding-top:    max(14px, env(safe-area-inset-top));
