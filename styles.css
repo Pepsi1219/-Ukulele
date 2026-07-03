@@ -131,7 +131,21 @@ h1, h2, h3, p { margin-top: 0; }
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 24px;
+  margin-bottom: 12px;
+}
+
+.header-brand {
+  position: relative;
+}
+
+.header-brand .dance-char-wrap {
+  position: absolute;
+  top: -10px;
+  left: calc(100% + 8px);
+}
+
+.header-brand .lottie-player {
+  width: 70px;
 }
 
 .header-actions {
@@ -276,7 +290,6 @@ button.toggle-pill:hover { transform: translateY(-1px); }
 }
 
 /* Hide dancing character when toggled off */
-.dance-char-wrap.hidden { display: none !important; }
 
 /* =====================
    Form Elements
@@ -496,8 +509,174 @@ button.toggle-pill:hover { transform: translateY(-1px); }
 /* =====================
    Speed
 ===================== */
-.speed-section { margin-top: 24px; }
-.speed-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+/* Speed gear button + YouTube-style panel */
+.speed-gear-wrap {
+  position: relative;
+  display: inline-block;
+  margin-left: auto;
+}
+
+.speed-gear-btn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--panel-strong);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  padding: 6px 12px;
+  font-size: 0.85rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.speed-gear-btn:hover,
+.speed-gear-btn.open { background: rgba(255,255,255,0.15); border-color: var(--primary); }
+[data-theme="light"] .speed-gear-btn:hover,
+[data-theme="light"] .speed-gear-btn.open { background: rgba(0,0,0,0.08); }
+
+.speed-gear-caret { font-size: 0.65rem; transition: transform 0.2s; }
+.speed-gear-btn.open .speed-gear-caret { transform: rotate(180deg); }
+
+/* Modal panel */
+.speed-modal {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  width: 300px;
+  background: #0f0f0f;
+  border-radius: 16px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.75);
+  border: 1px solid rgba(255,255,255,0.08);
+  z-index: 300;
+  overflow: hidden;
+  padding-bottom: 20px;
+}
+[data-theme="light"] .speed-modal {
+  background: #fff;
+  border-color: rgba(0,0,0,0.08);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+}
+
+/* Header row */
+.speed-modal-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+[data-theme="light"] .speed-modal-header { border-bottom-color: rgba(0,0,0,0.08); }
+
+.speed-modal-back {
+  background: none;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  padding: 4px 6px;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  border-radius: 4px;
+  transition: background 0.1s;
+}
+.speed-modal-back:hover { background: rgba(255,255,255,0.1); }
+[data-theme="light"] .speed-modal-back { color: #111; }
+[data-theme="light"] .speed-modal-back:hover { background: rgba(0,0,0,0.06); }
+
+.speed-modal-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #fff;
+}
+[data-theme="light"] .speed-modal-title { color: #111; }
+
+/* Big value */
+.speed-modal-value {
+  text-align: center;
+  font-size: 2.4rem;
+  font-weight: 700;
+  color: #fff;
+  padding: 18px 0 6px;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+[data-theme="light"] .speed-modal-value { color: #111; }
+
+/* Slider row */
+.speed-modal-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 18px 18px;
+}
+
+.speed-step-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #3a3a3a;
+  border: none;
+  color: #fff;
+  font-size: 1.3rem;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.1s;
+}
+.speed-step-btn:hover { background: #555; }
+[data-theme="light"] .speed-step-btn { background: #e0e0e0; color: #111; }
+[data-theme="light"] .speed-step-btn:hover { background: #ccc; }
+
+.speed-slider {
+  flex: 1;
+  accent-color: #fff;
+  cursor: pointer;
+}
+[data-theme="light"] .speed-slider { accent-color: #111; }
+
+/* Preset chips */
+.speed-modal-presets {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 14px;
+  flex-wrap: wrap;
+}
+
+.speed-preset-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #3a3a3a;
+  border: none;
+  border-radius: 50px;
+  color: #e0e0e0;
+  font-size: 0.82rem;
+  font-family: inherit;
+  font-weight: 500;
+  padding: 7px 10px;
+  min-width: 48px;
+  cursor: pointer;
+  line-height: 1.2;
+  transition: background 0.1s, color 0.1s;
+}
+.speed-preset-btn:hover { background: #555; color: #fff; }
+.speed-preset-btn.active { background: #fff; color: #000; font-weight: 700; }
+[data-theme="light"] .speed-preset-btn { background: #ebebeb; color: #333; }
+[data-theme="light"] .speed-preset-btn:hover { background: #d5d5d5; }
+[data-theme="light"] .speed-preset-btn.active { background: #111; color: #fff; }
+
+.speed-preset-sub {
+  font-size: 0.68rem;
+  opacity: 0.65;
+  font-weight: 400;
+}
+.speed-preset-btn.active .speed-preset-sub { opacity: 0.75; }
 .chip {
   min-height: 38px;
   padding: 0 13px;
@@ -538,13 +717,19 @@ button.toggle-pill:hover { transform: translateY(-1px); }
   box-shadow: 0 0 22px rgba(251, 191, 36, 0.9);
 }
 
-/* Sound selector chips */
-.metro-sound-btns {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
+/* Sound selector dropdown */
+.metro-sound-select {
+  background: var(--input-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 5px 8px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  outline: none;
 }
-.metro-sound-btns .chip { flex: 1; min-width: 0; font-size: 0.78rem; }
+.metro-sound-select:focus { border-color: var(--primary); }
+[data-theme="light"] .metro-sound-select { background: rgba(255,255,255,0.9); }
 
 /* =====================
    Chord Panel
@@ -2060,14 +2245,9 @@ select option { font-family: inherit; }
    Dancing Character (Lottie)
 ===================== */
 .dance-char-wrap {
-  flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 100%;
-  min-height: 220px;
-  padding-bottom: 10px;
-  margin-top: -100px;
   position: relative;
   overflow: visible;
 }
@@ -2686,7 +2866,7 @@ select option { font-family: inherit; }
     flex-wrap: wrap;
     gap: 10px;
   }
-  .app-header > div:first-child { min-width: 0; flex: 1 1 auto; }
+  .header-brand { min-width: 0; flex: 1 1 auto; }
   .header-actions { flex-shrink: 0; margin-left: auto; }
   .main-grid { grid-template-columns: 1fr; }
   .main-grid.panels-swapped { grid-template-columns: 1fr; }

@@ -83,10 +83,14 @@ import { buildNotationConfig,
    Metronome Sound Definitions
 ========================= */
 const METRO_SOUNDS = [
-  { id: "wood",  label: "Wood" },
-  { id: "kick",  label: "Kick" },
-  { id: "hihat", label: "Hi-Hat" },
-  { id: "bell",  label: "Bell" },
+  { id: "wood",    label: "Wood Click" },
+  { id: "kick",    label: "Kick Drum" },
+  { id: "hihat",   label: "Hi-Hat" },
+  { id: "bell",    label: "Bell" },
+  { id: "clap",    label: "Clap" },
+  { id: "rim",     label: "Rim Shot" },
+  { id: "cowbell", label: "Cowbell" },
+  { id: "clave",   label: "Clave" },
 ];
 
 /* =========================
@@ -136,7 +140,6 @@ const state = {
   userScrollTimer: null,
   audioMode: null,        // "song" | "vocal" | null — must be set before audio loads
   autoScrollEnabled: true,// master toggle for lyric auto-scroll
-  dancerEnabled: true,    // master toggle for dancing character visibility
   panelsSwapped: false,   // false: Chord centre, Lyrics right | true: Lyrics centre, Chord right
   lottieIdle: null,       // Lottie instance — idle/relax animation
   lottiePlaying: null,    // Lottie instance — playing/wave-sound animation
@@ -155,7 +158,7 @@ const state = {
   editorBannerLyricIdx: -1,      // cached lyric-row index shown in banner
   chordAutoScroll:      true,    // auto-scroll chord list to active row while playing
   editorActiveChordIdx: -1,      // last chord row index highlighted by auto-scroll
-  chordDiagramRotation: 0,       // 0 | 90 | 180 | 270 — current diagram rotation
+  chordDiagramRotation: 90,      // 0 | 90 | 180 | 270 — current diagram rotation
   chordDiagramMode: "chord",     // "chord" | "note" — full chord shape vs single-note picking view (not persisted)
   notePickMode: "auto",          // "G"|"C"|"E"|"A" | string[] (e.g. ["E","A"]) | "auto" — which string(s) to use in note-picking mode
   notePickPosition: null,        // { stringIdx, fret } — last shown note position (drives "auto" hand-position memory)
@@ -199,12 +202,19 @@ const dom = {
   progressTrack:     document.getElementById("progressTrack"),
   progressFill:      document.getElementById("progressFill"),
   progressThumb:     document.getElementById("progressThumb"),
-  speedButtons:      document.getElementById("speedButtons"),
+  speedGearBtn:      document.getElementById("speedGearBtn"),
+  speedGearLabel:    document.getElementById("speedGearLabel"),
+  speedModal:        document.getElementById("speedModal"),
+  speedModalValue:   document.getElementById("speedModalValue"),
+  speedModalClose:   document.getElementById("speedModalClose"),
+  speedSliderInput:  document.getElementById("speedSliderInput"),
+  speedDecBtn:       document.getElementById("speedDecBtn"),
+  speedIncBtn:       document.getElementById("speedIncBtn"),
   bpmSlider:         document.getElementById("bpmSlider"),
   bpmValue:          document.getElementById("bpmValue"),
   metroToggleBtn:    document.getElementById("metroToggleBtn"),
   metroVisual:       document.getElementById("metroVisual"),
-  metroSoundBtns:    document.getElementById("metroSoundBtns"),
+  metroSoundSelect:  document.getElementById("metroSoundSelect"),
   chordDisplay:      document.getElementById("chordDisplay"),
   chordDiagram:      document.getElementById("chordDiagram"),
   currentChordLabel: document.getElementById("currentChordLabel"),
@@ -219,7 +229,6 @@ const dom = {
 
   // Dance character + its toggle
   danceCharWrap:   document.getElementById("danceCharWrap"),
-  dancerToggleBtn: document.getElementById("dancerToggleBtn"),
   lottieIdleEl:    document.getElementById("lottieIdle"),
   lottiePlayingEl: document.getElementById("lottiePlaying"),
 
@@ -1976,20 +1985,6 @@ function toggleAutoScroll() {
 /* =========================
    Dancing Character Toggle (show/hide)
 ========================= */
-function applyDancer(enabled) {
-  state.dancerEnabled = !!enabled;
-  if (dom.danceCharWrap) {
-    dom.danceCharWrap.classList.toggle("hidden", !state.dancerEnabled);
-  }
-  if (dom.dancerToggleBtn) {
-    dom.dancerToggleBtn.setAttribute("aria-pressed", String(state.dancerEnabled));
-  }
-  localStorage.setItem("ukulele-dancer", state.dancerEnabled ? "on" : "off");
-}
-
-function toggleDancer() {
-  applyDancer(!state.dancerEnabled);
-}
 
 /* =========================
    Panel Layout Swap (Chord ↔ Lyrics)
@@ -2390,10 +2385,28 @@ function seekBy(deltaSeconds) {
 
 function setSpeed(speed) {
   state.speed = Number(speed);
-  document.querySelectorAll(".chip[data-speed]").forEach(btn => {
+  if (dom.speedGearLabel) dom.speedGearLabel.textContent = state.speed === 1 ? "Normal" : `${state.speed}×`;
+  if (dom.speedModalValue) dom.speedModalValue.textContent = `${state.speed.toFixed(2)}x`;
+  if (dom.speedSliderInput) dom.speedSliderInput.value = String(state.speed);
+  document.querySelectorAll(".speed-preset-btn[data-speed]").forEach(btn => {
     btn.classList.toggle("active", Number(btn.dataset.speed) === state.speed);
   });
   if (state.sound) { state.sound.rate(state.speed); applyPreservePitch(); }
+}
+
+function toggleSpeedModal() {
+  if (!dom.speedModal) return;
+  const opening = dom.speedModal.hidden;
+  dom.speedModal.hidden = !opening;
+  dom.speedGearBtn.setAttribute("aria-expanded", String(opening));
+  dom.speedGearBtn.classList.toggle("open", opening);
+}
+
+function closeSpeedModal() {
+  if (!dom.speedModal || dom.speedModal.hidden) return;
+  dom.speedModal.hidden = true;
+  dom.speedGearBtn.setAttribute("aria-expanded", "false");
+  dom.speedGearBtn.classList.remove("open");
 }
 
 function resetProgress() {
@@ -3213,6 +3226,32 @@ function createMetroSynth(soundId) {
         oscillator: { type: "triangle" },
         envelope: { attack: 0.001, decay: 0.35, sustain: 0, release: 0.1 }
       }).toDestination();
+    case "clap":
+      return new Tone.NoiseSynth({
+        noise: { type: "pink" },
+        envelope: { attack: 0.001, decay: 0.08, sustain: 0, release: 0.02 }
+      }).toDestination();
+    case "rim":
+      return new Tone.MembraneSynth({
+        pitchDecay: 0.008, octaves: 2,
+        oscillator: { type: "sine" },
+        envelope: { attack: 0.001, decay: 0.07, sustain: 0, release: 0.03 }
+      }).toDestination();
+    case "cowbell":
+      return new Tone.MetalSynth({
+        frequency: 562,
+        envelope: { attack: 0.001, decay: 0.28, release: 0.08 },
+        harmonicity: 5.1,
+        modulationIndex: 16,
+        resonance: 3500,
+        octaves: 1.5
+      }).toDestination();
+    case "clave":
+      return new Tone.MembraneSynth({
+        pitchDecay: 0.004, octaves: 1,
+        oscillator: { type: "sine" },
+        envelope: { attack: 0.001, decay: 0.04, sustain: 0, release: 0.01 }
+      }).toDestination();
     default: // wood
       return new Tone.MembraneSynth({
         pitchDecay: 0.015, octaves: 3,
@@ -3226,10 +3265,14 @@ function createMetroSynth(soundId) {
 function triggerMetroSound(time) {
   if (!state.metroSynth) return;
   switch (state.metroSoundId) {
-    case "kick":  state.metroSynth.triggerAttackRelease("C1", "16n", time); break;
-    case "hihat": state.metroSynth.triggerAttackRelease("16n", time);       break;
-    case "bell":  state.metroSynth.triggerAttackRelease("A5", "8n",  time); break;
-    default:      state.metroSynth.triggerAttackRelease("C5", "16n", time); break;
+    case "kick":    state.metroSynth.triggerAttackRelease("C1", "16n", time); break;
+    case "hihat":   state.metroSynth.triggerAttackRelease("16n", time);       break;
+    case "bell":    state.metroSynth.triggerAttackRelease("A5", "8n",  time); break;
+    case "clap":    state.metroSynth.triggerAttackRelease("16n", time);       break;
+    case "rim":     state.metroSynth.triggerAttackRelease("D5", "32n", time); break;
+    case "cowbell": state.metroSynth.triggerAttackRelease("16n", time);       break;
+    case "clave":   state.metroSynth.triggerAttackRelease("G6", "32n", time); break;
+    default:        state.metroSynth.triggerAttackRelease("C5", "16n", time); break;
   }
 }
 
@@ -3244,36 +3287,26 @@ function setupMetronome() {
   Tone.Transport.bpm.value = Number(dom.bpmSlider.value);
 }
 
-/** Switches metronome sound. Restarts synth; loop keeps running if metronome is on. */
+/** Switches metronome sound. Recreates synth; loop keeps running if metronome is on. */
 function setMetroSound(soundId) {
   state.metroSoundId = soundId;
-
-  // Update chip highlight
-  if (dom.metroSoundBtns) {
-    dom.metroSoundBtns.querySelectorAll(".chip").forEach(b => {
-      b.classList.toggle("active", b.dataset.soundId === soundId);
-    });
-  }
-
-  // Recreate synth with new sound (dispose old one first)
+  if (dom.metroSoundSelect) dom.metroSoundSelect.value = soundId;
   if (state.metroSynth) { state.metroSynth.dispose(); state.metroSynth = null; }
   state.metroSynth = createMetroSynth(soundId);
 }
 
-/** Initialises the sound-selector chip row. */
-function initMetroSoundBtns() {
-  if (!dom.metroSoundBtns) return;
-  dom.metroSoundBtns.innerHTML = "";
+/** Populates the sound-selector dropdown. */
+function initMetroSoundSelect() {
+  if (!dom.metroSoundSelect) return;
+  dom.metroSoundSelect.innerHTML = "";
   METRO_SOUNDS.forEach(s => {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "chip";
-    btn.dataset.soundId = s.id;
-    btn.textContent = s.label;
-    btn.classList.toggle("active", s.id === state.metroSoundId);
-    btn.addEventListener("click", () => setMetroSound(s.id));
-    dom.metroSoundBtns.appendChild(btn);
+    const opt = document.createElement("option");
+    opt.value = s.id;
+    opt.textContent = s.label;
+    opt.selected = s.id === state.metroSoundId;
+    dom.metroSoundSelect.appendChild(opt);
   });
+  dom.metroSoundSelect.addEventListener("change", e => setMetroSound(e.target.value));
 }
 
 async function toggleMetronome() {
@@ -3340,9 +3373,22 @@ function bindEvents() {
   dom.prevSongBtn.addEventListener("click", () => changeSong(-1));
   dom.nextSongBtn.addEventListener("click", () => changeSong(1));
 
-  dom.speedButtons.addEventListener("click", e => {
-    const btn = e.target.closest("[data-speed]");
+  if (dom.speedGearBtn)    dom.speedGearBtn.addEventListener("click", toggleSpeedModal);
+  if (dom.speedModalClose) dom.speedModalClose.addEventListener("click", closeSpeedModal);
+  if (dom.speedSliderInput) dom.speedSliderInput.addEventListener("input", e => setSpeed(Number(e.target.value)));
+  if (dom.speedDecBtn) dom.speedDecBtn.addEventListener("click", () => {
+    setSpeed(Math.max(0.25, Math.round((state.speed - 0.05) * 100) / 100));
+  });
+  if (dom.speedIncBtn) dom.speedIncBtn.addEventListener("click", () => {
+    setSpeed(Math.min(2, Math.round((state.speed + 0.05) * 100) / 100));
+  });
+  if (dom.speedModal) dom.speedModal.addEventListener("click", e => {
+    const btn = e.target.closest(".speed-preset-btn[data-speed]");
     if (btn) setSpeed(btn.dataset.speed);
+  });
+  document.addEventListener("click", e => {
+    if (!dom.speedModal || dom.speedModal.hidden) return;
+    if (!e.target.closest(".speed-gear-wrap")) closeSpeedModal();
   });
 
   dom.progressTrack.addEventListener("click", e => { seekFromPointer(e.clientX); });
@@ -3436,9 +3482,6 @@ function bindEvents() {
 
   if (dom.autoScrollToggle) {
     dom.autoScrollToggle.addEventListener("click", toggleAutoScroll);
-  }
-  if (dom.dancerToggleBtn) {
-    dom.dancerToggleBtn.addEventListener("click", toggleDancer);
   }
   if (dom.swapPanelsBtn) {
     dom.swapPanelsBtn.addEventListener("click", togglePanelSwap);
@@ -3745,10 +3788,6 @@ async function initApp() {
   const savedAutoScroll = localStorage.getItem("ukulele-autoscroll");
   applyAutoScroll(savedAutoScroll === null ? true : savedAutoScroll === "on");
 
-  // Restore saved Dancer preference (default: on)
-  const savedDancer = localStorage.getItem("ukulele-dancer");
-  applyDancer(savedDancer === null ? true : savedDancer === "on");
-
   // Restore saved Panel-Swap preference (default: off)
   const savedSwap = localStorage.getItem("ukulele-panel-swap");
   applyPanelSwap(savedSwap === "on");
@@ -3760,8 +3799,17 @@ async function initApp() {
   bindEvents();
   initLottieDancer();
   initStrumVisualizer();
-  initMetroSoundBtns();
+  initMetroSoundSelect();
   initNotePickSheet();
+
+  // Apply initial diagram rotation (default 90° = head pointing right)
+  if (state.chordDiagramRotation && dom.chordDiagram) {
+    dom.chordDiagram.classList.add(`rot-${state.chordDiagramRotation}`);
+  }
+  if (dom.diagramOrientBtn) {
+    dom.diagramOrientBtn.setAttribute("aria-pressed", String(state.chordDiagramRotation !== 0));
+    dom.diagramOrientBtn.title = `หมุน Chord Diagram (${state.chordDiagramRotation}°)`;
+  }
   updateBpm(dom.bpmSlider.value);
   await loadSongs();
 

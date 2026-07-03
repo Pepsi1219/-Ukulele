@@ -142,6 +142,21 @@ One `beatWidth` covers the pickup lead-zone plus all full measures — this is w
 
 ---
 
+## Key UI State & Components
+
+Notable `state` fields and their current behaviour — check these before editing related UI:
+
+| Field | Type | Notes |
+|---|---|---|
+| `state.metroSoundId` | `string` | `"wood"` \| `"kick"` \| `"hihat"` \| `"bell"` \| `"clap"` \| `"rim"` \| `"cowbell"` \| `"clave"` (8 options). Sound selector is a `<select>` dropdown (`#metroSoundSelect`) next to the toggle button — not chips. |
+| `state.chordDiagramRotation` | `0\|90\|180\|270` | Default is `90` (head pointing right / horizontal). Applied as `rot-90` class on `#chordDiagram`. Initialised in `initApp()`. |
+| `state.notePickMode` | `"auto"` \| `"G"\|"C"\|"E"\|"A"` \| `string[]` | Array mode enables multi-string selection. `resolveStrings(mode)` in `chordDiagram.js` normalises all formats to `string[]`. |
+| `state.speed` | `number` | Controlled by a gear button (`#speedGearBtn`) in the A/B loop row (right side). Opens a YouTube-style modal (`#speedModal`) with a range slider, −/+ buttons, and preset chips (1.0–2.0). |
+
+**Dancing character (Lottie):** Lives in `.header-brand` inside `<header>`, absolutely positioned to the right of the h1 so it doesn't affect header height. No toggle button — always visible. Controlled by `initLottieDancer()` / `swapLottie()` in `script.js`.
+
+---
+
 ## Adding a Song
 
 1. Add an entry to `manifest.json` with a unique `id` (slug format, e.g. `artist-song-title`).
