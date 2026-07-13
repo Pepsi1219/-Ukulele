@@ -2624,6 +2624,29 @@ select option { font-family: inherit; }
   font-size: 1.1rem;
 }
 
+.lyrics-fs-font-size-ctrl {
+  display: flex;
+  gap: 2px;
+}
+.lyrics-fs-font-size-ctrl .icon-btn {
+  min-width: 36px;
+  font-family: var(--lyric-font);
+  font-weight: 700;
+  font-size: 0.85rem;
+  letter-spacing: -0.02em;
+}
+
+/* Scale lyrics text in fullscreen via CSS variable */
+#lyricsFullscreenContainer .inline-chord {
+  font-size: calc(0.82rem * var(--lyrics-fs-scale, 1));
+}
+#lyricsFullscreenContainer .inline-lyric {
+  font-size: calc(0.92rem * var(--lyrics-fs-scale, 1));
+}
+#lyricsFullscreenContainer .lyric-section-label {
+  font-size: calc(0.78rem * var(--lyrics-fs-scale, 1));
+}
+
 /* Two-column main area: chord + lyrics */
 .lyrics-fs-main {
   flex: 1;

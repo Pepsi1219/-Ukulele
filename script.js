@@ -164,6 +164,7 @@ const state = {
   notePickPosition: null,        // { stringIdx, fret } — last shown note position (drives "auto" hand-position memory)
   lyricsFullscreen: false,       // true when lyrics are displayed in fullscreen overlay
   lyricsFsSwapped: false,        // true = chord column on right side in fullscreen
+  lyricsFsFontScale: 1.0,        // multiplier for fullscreen lyrics font size (0.75–3.0)
   activeStaffNoteIdx: -1,        // data-idx of the highlighted note in the SVG staff (-1 = none)
   staffNoteTimes: [],            // [{time, idx}] for the current staff — drives highlight sync
   notationMode: "interactive",   // "interactive" | "image" — toggle in renderLyricsEmptyState
@@ -292,6 +293,8 @@ const dom = {
   lyricsFullscreen:          document.getElementById("lyricsFullscreen"),
   lyricsFullscreenContainer: document.getElementById("lyricsFullscreenContainer"),
   lyricsCollapseBtn:         document.getElementById("lyricsCollapseBtn"),
+  lyricsFsFontDown:          document.getElementById("lyricsFsFontDown"),
+  lyricsFsFontUp:            document.getElementById("lyricsFsFontUp"),
   lyricsFullscreenAutoScroll:document.getElementById("lyricsFullscreenAutoScroll"),
   lyricsFsMain:              document.getElementById("lyricsFsMain"),
   lyricsFsSwapBtn:           document.getElementById("lyricsFsSwapBtn"),
@@ -2902,6 +2905,17 @@ function toggleFsSwap() {
   if (dom.lyricsFsSwapBtn) dom.lyricsFsSwapBtn.setAttribute("aria-pressed", String(state.lyricsFsSwapped));
 }
 
+function adjustFsFontScale(delta) {
+  const STEPS = [0.75, 0.85, 1.0, 1.2, 1.5, 1.8, 2.2, 2.7, 3.0];
+  const cur = state.lyricsFsFontScale;
+  const idx = STEPS.reduce((best, v, i) => Math.abs(v - cur) < Math.abs(STEPS[best] - cur) ? i : best, 0);
+  const next = STEPS[Math.max(0, Math.min(STEPS.length - 1, idx + delta))];
+  state.lyricsFsFontScale = next;
+  if (dom.lyricsFullscreenContainer) {
+    dom.lyricsFullscreenContainer.style.setProperty("--lyrics-fs-scale", next);
+  }
+}
+
 /**
  * Re-derives the currently displayed chord's name from state and re-runs
  * setChordDisplay — used after switching diagram mode / note-pick mode so
@@ -3517,6 +3531,10 @@ function bindEvents() {
       state.userScrollTimer = setTimeout(() => { state.userScrolling = false; }, USER_SCROLL_COOLDOWN_MS);
     }, { passive: true });
   }
+  // Fullscreen font size
+  if (dom.lyricsFsFontDown) dom.lyricsFsFontDown.addEventListener("click", () => adjustFsFontScale(-1));
+  if (dom.lyricsFsFontUp)   dom.lyricsFsFontUp.addEventListener("click",   () => adjustFsFontScale(+1));
+
   // Fullscreen chord controls — delegate to the same toggle functions as main panel
   if (dom.lyricsFsSwapBtn) dom.lyricsFsSwapBtn.addEventListener("click", toggleFsSwap);
   if (dom.lyricsFsDiagramModeBtn) dom.lyricsFsDiagramModeBtn.addEventListener("click", toggleDiagramMode);

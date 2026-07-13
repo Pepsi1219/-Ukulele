@@ -2,6 +2,11 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Workflow Rules
+
+- **Never run preview servers or browser tests.** The user verifies all changes themselves in real-time — it is faster for them. After finishing code edits, summarize what changed and stop. Do NOT call `preview_start`, `preview_screenshot`, `preview_snapshot`, or any `preview_*` tool.
+- **Never git commit or push without explicit user approval.**
+
 ## Commands
 
 ```bash
