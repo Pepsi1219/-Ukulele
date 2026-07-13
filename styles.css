@@ -1855,6 +1855,20 @@ button.toggle-pill:hover { transform: translateY(-1px); }
 [data-theme="dark"]  .editor-chord-row.playing .editor-time-badge.stamped { background: rgba(56, 189, 248, 0.25); }
 [data-theme="light"] .editor-chord-row.playing .editor-time-badge.stamped { background: rgba(56, 189, 248, 0.15); }
 
+/* Playback-position highlight for lyrics editor rows */
+.editor-row-line.playing {
+  border-left: 3px solid var(--primary);
+  padding-left: calc(12px - 3px);
+}
+[data-theme="dark"]  .editor-row-line.playing { background: rgba(56, 189, 248, 0.13); }
+[data-theme="light"] .editor-row-line.playing { background: rgba(56, 189, 248, 0.09); }
+
+.editor-row-line.playing .editor-time-badge.stamped {
+  color: var(--primary);
+}
+[data-theme="dark"]  .editor-row-line.playing .editor-time-badge.stamped { background: rgba(56, 189, 248, 0.25); }
+[data-theme="light"] .editor-row-line.playing .editor-time-badge.stamped { background: rgba(56, 189, 248, 0.15); }
+
 /* ── Live lyric banner (chords tab) ── */
 .editor-lyric-banner {
   display: flex;

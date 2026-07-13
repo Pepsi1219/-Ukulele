@@ -156,6 +156,7 @@ const state = {
   notationPlayheadIdx:  -1,      // playback-highlighted notation row index (-1 = none)
   notationTimeline:     [],      // sorted playback times for the active notation rows
   editorBannerLyricIdx: -1,      // cached lyric-row index shown in banner
+  editorActiveLyricIdx: -1,      // last lyrics editor row index highlighted by playback
   chordAutoScroll:      true,    // auto-scroll chord list to active row while playing
   editorActiveChordIdx: -1,      // last chord row index highlighted by auto-scroll
   chordDiagramRotation: 90,      // 0 | 90 | 180 | 270 — current diagram rotation
@@ -453,7 +454,8 @@ function autoResizeInput(input) {
 
 /** Re-renders the editor lines list and resets focus (used after structural changes). */
 function reRenderEditorLines() {
-  state.editorFocusIdx = -1;
+  state.editorFocusIdx      = -1;
+  state.editorActiveLyricIdx = -1;  // force highlight re-apply after render
   renderEditorLines();
   updateEditorStampCount();
 }
@@ -784,6 +786,39 @@ function handleEditorImport() {
  *
  * @param {number} currentSeconds  current playback position
  */
+/**
+ * Highlights the currently-playing lyrics editor row, mirroring updateChordAutoScroll.
+ * Driven by the RAF tick; skips when editor is closed or another tab is active.
+ */
+function updateLyricsEditorAutoScroll(currentSeconds) {
+  if (!state.editorOpen || state.editorTab !== "lyrics") return;
+  if (!dom.editorLinesList) return;
+
+  // Find the last line-type row with a stamped time ≤ currentSeconds
+  let activeRowIdx = -1;
+  for (let i = 0; i < state.editorRows.length; i++) {
+    const r = state.editorRows[i];
+    if (r.type === "line" && r.time !== null && r.time <= currentSeconds) activeRowIdx = i;
+  }
+
+  if (activeRowIdx === state.editorActiveLyricIdx) return;
+
+  const prev = dom.editorLinesList.querySelector(".editor-row-line.playing");
+  if (prev) prev.classList.remove("playing");
+
+  state.editorActiveLyricIdx = activeRowIdx;
+
+  if (activeRowIdx >= 0) {
+    const el = dom.editorLinesList.querySelector(
+      `.editor-row-line[data-row-index="${activeRowIdx}"]`
+    );
+    if (el) {
+      el.classList.add("playing");
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }
+}
+
 function updateEditorLyricBanner(currentSeconds) {
   if (!dom.editorLyricBanner || dom.editorLyricBanner.hidden) return;
 
@@ -1545,6 +1580,7 @@ function updateEditorProgress(currentSeconds) {
   if (dom.editorCurrentTime)  dom.editorCurrentTime.textContent  = formatTime(currentSeconds);
   if (dom.editorProgressFill) dom.editorProgressFill.style.width = `${percent}%`;
   updateEditorLyricBanner(currentSeconds);
+  updateLyricsEditorAutoScroll(currentSeconds);
   updateChordAutoScroll(currentSeconds);
   if (state.editorTab === "notation") {
     syncNotationPlaybackHighlight(currentSeconds);
