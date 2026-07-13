@@ -30,7 +30,7 @@
     ]
   },
   {
-    "time": 5.5,
+    "time": 12.093,
     "line": [
       {
         "lyric": "Happy "
@@ -49,7 +49,7 @@
     ]
   },
   {
-    "time": 8,
+    "time": 16.253,
     "line": [
       {
         "lyric": "Happy "
@@ -68,7 +68,7 @@
     "section": "Chorus"
   },
   {
-    "time": 11.5,
+    "time": 20.961,
     "line": [
       {
         "lyric": "Happy "
@@ -95,7 +95,7 @@
     ]
   },
   {
-    "time": 16.5,
+    "time": 29.291,
     "line": [
       {
         "lyric": "Happy "
@@ -114,14 +114,21 @@
     ]
   },
   {
-    "time": 19,
+    "time": 33.678,
     "line": [
       {
         "lyric": "Happy "
       },
       {
-        "chord": "(C     G7)",
-        "lyric": "Birthday To "
+        "chord": "C",
+        "lyric": "Birth"
+      },
+      {
+        "chord": "G7",
+        "lyric": "day "
+      },
+      {
+        "lyric": "To "
       },
       {
         "chord": "C",
