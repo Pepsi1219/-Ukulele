@@ -1,3 +1,7 @@
 node_modules/
 coverage/
 .DS_Store
+
+# Firebase service account keys — never commit
+serviceAccount*.json
+*-service-account*.json

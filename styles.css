@@ -116,7 +116,7 @@ h1, h2, h3, p { margin-top: 0; }
    Layout
 ===================== */
 .app-shell {
-  width: min(1440px, 100%);
+  width: min(1800px, 100%);
   margin: 0 auto;
   padding: 24px;
   /* Safe-area — respects iPhone notch / Dynamic Island / Android cutouts on all screen sizes */
@@ -132,6 +132,10 @@ h1, h2, h3, p { margin-top: 0; }
   justify-content: space-between;
   gap: 16px;
   margin-bottom: 12px;
+}
+/* Extra breathing room only on the desktop 3-column layout — small screens keep the original tight spacing */
+@media (min-width: 1181px) {
+  .app-header { margin-bottom: 36px; }
 }
 
 .header-brand {
@@ -188,7 +192,9 @@ h1 i { color: var(--accent); }
    Panel
 ===================== */
 .panel {
-  min-height: 720px;
+  /* Fixed (not min-) height so every song's panel is the same size — long
+     lyrics/notation scroll inside .lyrics-container instead of growing the box. */
+  height: 720px;
   padding: 20px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -1191,6 +1197,23 @@ button.toggle-pill:hover { transform: translateY(-1px); }
   font-weight: 800;
 }
 
+/* Save-to-Firestore button — teacher only */
+.editor-save-btn {
+  font-size: 0.82rem;
+  padding: 0 14px;
+  min-height: 34px;
+  background: var(--primary);
+  color: #020617;
+  font-weight: 800;
+}
+.editor-save-btn:disabled { opacity: 0.6; cursor: wait; }
+
+/* Teacher login button — green tint when signed in with teacher rights */
+.teacher-login-btn.is-teacher {
+  color: var(--success);
+  border-color: var(--success);
+}
+
 /* ── Tab bar ── */
 .editor-tab-bar {
   display: flex;
@@ -2091,6 +2114,12 @@ select option { font-family: inherit; }
   gap: 24px;
 }
 
+.history-retention-note {
+  margin: 0 0 12px;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
 /* Summary stat cards */
 .history-summary {
   display: grid;
@@ -2638,11 +2667,11 @@ select option { font-family: inherit; }
   font-size: 1.1rem;
 }
 
-.lyrics-fs-font-size-ctrl {
+.font-size-ctrl {
   display: flex;
   gap: 2px;
 }
-.lyrics-fs-font-size-ctrl .icon-btn {
+.font-size-ctrl .icon-btn {
   min-width: 36px;
   font-family: var(--lyric-font);
   font-weight: 700;
@@ -2650,15 +2679,19 @@ select option { font-family: inherit; }
   letter-spacing: -0.02em;
 }
 
-/* Scale lyrics text in fullscreen via CSS variable */
+/* Scale lyrics text (shared by the normal panel and the fullscreen overlay)
+   via a CSS variable set on the document root */
+#lyricsContainer .inline-chord,
 #lyricsFullscreenContainer .inline-chord {
-  font-size: calc(0.82rem * var(--lyrics-fs-scale, 1));
+  font-size: calc(0.82rem * var(--lyrics-font-scale, 1));
 }
+#lyricsContainer .inline-lyric,
 #lyricsFullscreenContainer .inline-lyric {
-  font-size: calc(0.92rem * var(--lyrics-fs-scale, 1));
+  font-size: calc(0.92rem * var(--lyrics-font-scale, 1));
 }
+#lyricsContainer .lyric-section-label,
 #lyricsFullscreenContainer .lyric-section-label {
-  font-size: calc(0.78rem * var(--lyrics-fs-scale, 1));
+  font-size: calc(0.78rem * var(--lyrics-font-scale, 1));
 }
 
 /* Two-column main area: chord + lyrics */
@@ -2856,7 +2889,7 @@ select option { font-family: inherit; }
   .main-grid { grid-template-columns: 1fr 1fr; }
   .main-grid.panels-swapped { grid-template-columns: 1fr 1fr; }
   /* Swap still works: chord-panel order:3 from base rule reorders it after lyrics */
-  .player-panel { grid-column: 1 / -1; min-height: auto; }
+  .player-panel { grid-column: 1 / -1; height: auto; min-height: auto; }
   .lyrics-container { min-height: 520px; }
 }
 
@@ -2917,10 +2950,13 @@ select option { font-family: inherit; }
   .main-grid { grid-template-columns: 1fr; }
   .main-grid.panels-swapped { grid-template-columns: 1fr; }
 
-  .panel { min-height: auto; padding: 16px; border-radius: 20px; }
+  .panel { height: auto; min-height: auto; padding: 16px; border-radius: 20px; }
 
   .chord-stage { min-height: 420px; }
-  .lyrics-container { min-height: 420px; }
+  /* Cap (not just floor) the mobile lyrics box too — otherwise long lyrics
+     inherit the desktop 760px max-height, which is basically no cap at all
+     on a phone screen, and the whole page grows instead of scrolling inside. */
+  .lyrics-container { min-height: 420px; max-height: 480px; }
 
   /* Allow lyric rows to wrap nicely on narrow screens */
   .lyric-row { padding: 6px 8px; }

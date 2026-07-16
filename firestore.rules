@@ -1,0 +1,46 @@
+rules_version = '2';
+
+// นักเรียนอ่านได้ทุกคน — เขียนได้เฉพาะครูที่อยู่ใน admins collection
+// Deploy: คัดลอกไปวางใน Firebase console → Firestore Database → Rules → Publish
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isTeacher() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    // Editable song payloads (lyrics/chords/notation). Song identity/metadata
+    // and audio/image files stay local (manifest.json + static folders) —
+    // no top-level songs/{songId} doc is ever created.
+    match /songs/{songId}/data/{kind} {
+      allow read: if true;
+      allow write: if isTeacher();
+    }
+
+    // Practice log — a single shared, class-wide log (no per-student
+    // identity; students never sign in). Any visitor can log their own
+    // session; only teachers can read or prune/clear it. `create` is
+    // shape-checked since it's open to unauthenticated writers.
+    function isValidPracticeSession(data) {
+      return data.keys().hasOnly(['songId', 'songTitle', 'date', 'durationSec', 'createdAt'])
+        && data.songId is string && data.songId.size() > 0 && data.songId.size() < 200
+        && data.songTitle is string && data.songTitle.size() < 300
+        && data.date is string && data.date.size() == 10
+        && data.durationSec is number && data.durationSec > 0 && data.durationSec <= 7200
+        && data.createdAt == request.time;
+    }
+    match /practiceLog/{sessionId} {
+      allow create: if isValidPracticeSession(request.resource.data);
+      allow read, delete: if isTeacher();
+      allow update: if false;
+    }
+
+    // Teacher allowlist — readable only by the signed-in user checking
+    // their own entry; managed by hand in the Firebase console.
+    match /admins/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+    }
+  }
+}

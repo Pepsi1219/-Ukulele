@@ -44,6 +44,11 @@
       </div>
 
       <div class="header-actions">
+        <button id="teacherLoginBtn" class="icon-btn secondary teacher-login-btn" type="button"
+                aria-label="ล็อกอินสำหรับครู" title="ล็อกอินสำหรับครู">
+          <i class="fa-solid fa-user" id="teacherLoginIcon"></i>
+        </button>
+
         <button id="swapPanelsBtn" class="icon-btn secondary" type="button" aria-label="สลับตำแหน่ง Chord และ Lyrics" title="สลับ Chord ↔ Lyrics" aria-pressed="false">
           <i class="fa-solid fa-arrow-right-arrow-left"></i>
         </button>
@@ -71,7 +76,7 @@
               <i class="fa-solid fa-filter"></i>
             </button>
             <button id="historyBtn" class="icon-btn secondary" type="button"
-                    aria-label="ดูประวัติการฝึก" title="Practice History">
+                    aria-label="ดูประวัติการฝึก" title="Practice History (ครูเท่านั้น)" hidden>
               <i class="fa-solid fa-chart-simple"></i>
             </button>
             <button id="strumBtn" class="icon-btn secondary" type="button"
@@ -79,7 +84,7 @@
               <i class="fa-solid fa-music"></i>
             </button>
             <button id="editorToggleBtn" class="icon-btn secondary" type="button"
-                    aria-label="เปิด Timestamp Editor" title="Timestamp Editor" disabled>
+                    aria-label="เปิด Timestamp Editor" title="Timestamp Editor" disabled hidden>
               <i class="fa-solid fa-pen-to-square"></i>
             </button>
             <span id="loadStatus" class="load-light load-light--loading" role="status" aria-live="polite" title="กำลังโหลดข้อมูล..." aria-label="กำลังโหลดข้อมูล..."></span>
@@ -254,6 +259,10 @@
               <i class="fa-solid fa-arrows-up-down"></i>
               <span>Auto Scroll</span>
             </button>
+            <div class="font-size-ctrl">
+              <button id="lyricsFontDown" class="icon-btn secondary" type="button" aria-label="ลดขนาดตัวอักษร" title="ลดขนาดตัวอักษร">A<span style="font-size:0.65em">−</span></button>
+              <button id="lyricsFontUp"   class="icon-btn secondary" type="button" aria-label="เพิ่มขนาดตัวอักษร" title="เพิ่มขนาดตัวอักษร">A<span style="font-size:1.2em">+</span></button>
+            </div>
             <button id="lyricsExpandBtn" class="icon-btn secondary" type="button"
                     aria-label="ขยายเนื้อเพลงเต็มจอ" title="ขยายเนื้อเพลงเต็มจอ">
               <i class="fa-solid fa-expand"></i>
@@ -292,7 +301,7 @@
             <i class="fa-solid fa-arrows-up-down"></i>
             <span>Auto Scroll</span>
           </button>
-          <div class="lyrics-fs-font-size-ctrl">
+          <div class="font-size-ctrl">
             <button id="lyricsFsFontDown" class="icon-btn secondary" type="button" aria-label="ลดขนาดตัวอักษร" title="ลดขนาดตัวอักษร">A<span style="font-size:0.65em">−</span></button>
             <button id="lyricsFsFontUp"   class="icon-btn secondary" type="button" aria-label="เพิ่มขนาดตัวอักษร" title="เพิ่มขนาดตัวอักษร">A<span style="font-size:1.2em">+</span></button>
           </div>
@@ -398,6 +407,10 @@
           <i class="fa-solid fa-file-import"></i> นำเข้าจากเนื้อร้อง
         </button>
         <span id="editorStampCount" class="editor-stamp-count"></span>
+        <button id="editorSaveBtn" class="chip editor-save-btn" type="button" hidden
+                title="บันทึกแท็บปัจจุบันขึ้น Firestore">
+          <i class="fa-solid fa-cloud-arrow-up"></i> บันทึกขึ้น Cloud
+        </button>
         <button id="editorExportBtn" class="chip editor-export-btn" type="button">
           <i class="fa-solid fa-copy"></i> Copy JSON
         </button>

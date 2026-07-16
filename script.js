@@ -19,6 +19,12 @@ import { buildChordsFromLyrics,
 import { buildSong }                from "./src/utils/songBuilder.js";
 import { getMp3PathFor as _getMp3 } from "./src/utils/playerUtils.js";
 import { getNotationImagePath }     from "./src/utils/notationImage.js";
+import { fetchSongData, saveSongData }
+                                    from "./src/firebase/songStore.js";
+import { observeAuth, signInTeacher, signOutTeacher }
+                                    from "./src/firebase/authStore.js";
+import { logSession, fetchAllSessions, prunePracticeLog, clearAllSessions, RETENTION_DAYS }
+                                    from "./src/firebase/practiceLogStore.js";
 import { parseNotation,
          chordsToNotation }         from "./src/utils/notationModel.js";
 import { renderStaff }              from "./src/utils/staffRenderer.js";
@@ -48,7 +54,6 @@ import { buildEditorRows,
          updateSectionName }       from "./src/utils/timestampEditor.js";
 import { toggleFavoriteId,
          filterFavorites,
-         addSession,
          aggregateBySong,
          recentSessions,
          totalSecInDays,
@@ -96,11 +101,6 @@ const METRO_SOUNDS = [
 /* =========================
    State
 ========================= */
-const MANIFEST_JSON_PATH = "manifest.json";
-const LYRICS_DIR   = "Lyrics";
-const CHORDS_DIR   = "Chords";
-const NOTATION_DIR = "Notation";
-
 // UI timing / layout constants
 const USER_SCROLL_COOLDOWN_MS   = 3000;  // ms before userScrolling flag resets after last scroll
 const STAFF_SCROLL_MARGIN_RATIO = 0.15;  // fraction of container height kept as comfortable margin
@@ -144,6 +144,8 @@ const state = {
   lottieIdle: null,       // Lottie instance — idle/relax animation
   lottiePlaying: null,    // Lottie instance — playing/wave-sound animation
   strumPatternId: "island", // currently selected strumming pattern id
+  authUser:        null,    // Firebase user object (null = signed out)
+  isTeacher:       false,   // true when signed-in user is on the admins allowlist
   editorOpen:      false,   // true when Timestamp Editor is visible
   editorTab:            "lyrics",// "lyrics" | "chords" | "notation"
   editorRows:           [],      // current lyrics editor row objects
@@ -165,7 +167,7 @@ const state = {
   notePickPosition: null,        // { stringIdx, fret } — last shown note position (drives "auto" hand-position memory)
   lyricsFullscreen: false,       // true when lyrics are displayed in fullscreen overlay
   lyricsFsSwapped: false,        // true = chord column on right side in fullscreen
-  lyricsFsFontScale: 1.0,        // multiplier for fullscreen lyrics font size (0.75–3.0)
+  lyricsFontScale: 1.0,          // multiplier for lyrics text size (0.75–3.0) — shared by normal panel + fullscreen
   activeStaffNoteIdx: -1,        // data-idx of the highlighted note in the SVG staff (-1 = none)
   staffNoteTimes: [],            // [{time, idx}] for the current staff — drives highlight sync
   notationMode: "interactive",   // "interactive" | "image" — toggle in renderLyricsEmptyState
@@ -271,6 +273,9 @@ const dom = {
   historyContent: document.getElementById("historyContent"),
   historyCloseBtn:document.getElementById("historyCloseBtn"),
   historyClearBtn:document.getElementById("historyClearBtn"),
+  teacherLoginBtn:    document.getElementById("teacherLoginBtn"),
+  teacherLoginIcon:   document.getElementById("teacherLoginIcon"),
+  editorSaveBtn:      document.getElementById("editorSaveBtn"),
   editorToggleBtn:    document.getElementById("editorToggleBtn"),
   editorPanel:        document.getElementById("editorPanel"),
   editorCloseBtn:     document.getElementById("editorCloseBtn"),
@@ -294,6 +299,8 @@ const dom = {
   lyricsFullscreen:          document.getElementById("lyricsFullscreen"),
   lyricsFullscreenContainer: document.getElementById("lyricsFullscreenContainer"),
   lyricsCollapseBtn:         document.getElementById("lyricsCollapseBtn"),
+  lyricsFontDown:            document.getElementById("lyricsFontDown"),
+  lyricsFontUp:              document.getElementById("lyricsFontUp"),
   lyricsFsFontDown:          document.getElementById("lyricsFsFontDown"),
   lyricsFsFontUp:            document.getElementById("lyricsFsFontUp"),
   lyricsFullscreenAutoScroll:document.getElementById("lyricsFullscreenAutoScroll"),
@@ -2092,6 +2099,8 @@ function setCharPlaying(playing) {
 /* =========================
    Load Songs
 ========================= */
+const MANIFEST_JSON_PATH = "manifest.json";
+
 async function fetchJson(path) {
   const res = await fetch(path, { cache: "no-store" });
   if (!res.ok) throw new Error(`โหลด ${path} ไม่สำเร็จ: ${res.status}`);
@@ -2120,27 +2129,20 @@ function setEmptyState(container, msg, tag = "p") {
 async function loadSongs() {
   if (dom.songSelect) dom.songSelect.disabled = true; // prevent selection mid-load
   try {
+    // Song list (id, title, mp3 path, bpm) stays local — served as a static
+    // file alongside songs/ and vocal/ audio. Only the editable payloads
+    // (lyrics/chords/notation) live in Firestore, keyed by song id.
     const manifest = await fetchJson(MANIFEST_JSON_PATH);
     if (!manifest || !Array.isArray(manifest.songs)) {
       throw new Error("manifest.json ต้องมี key ชื่อ songs และเป็น Array");
     }
 
-    // For each song in manifest, fetch its lyrics + chords + notation files in
-    // parallel. Missing files are tolerated — that song just gets empty data.
     const songs = await Promise.all(manifest.songs.map(async meta => {
-      const id = meta.id;
-      const [lyricsArr, chordsArr, notationObj] = await Promise.all([
-        fetchJson(`${LYRICS_DIR}/${id}.json`).catch(err => {
-          console.warn(`Lyrics/${id}.json not loaded:`, err.message);
-          return [];
-        }),
-        fetchJson(`${CHORDS_DIR}/${id}.json`).catch(err => {
-          console.warn(`Chords/${id}.json not loaded:`, err.message);
-          return null;
-        }),
-        fetchJson(`${NOTATION_DIR}/${id}.json`).catch(() => null) // optional, no warning
-      ]);
-      return buildSong(meta, lyricsArr, chordsArr, notationObj);
+      const { lyrics, chords, notation } = await fetchSongData(meta.id).catch(err => {
+        console.warn(`โหลดข้อมูลเพลง ${meta.id} ไม่สำเร็จ:`, err.message);
+        return { lyrics: [], chords: null, notation: null };
+      });
+      return buildSong(meta, lyrics, chords, notation);
     }));
 
     state.songs = songs;
@@ -2941,15 +2943,14 @@ function toggleFsSwap() {
   if (dom.lyricsFsSwapBtn) dom.lyricsFsSwapBtn.setAttribute("aria-pressed", String(state.lyricsFsSwapped));
 }
 
-function adjustFsFontScale(delta) {
+/** Steps the shared lyrics font-size scale up/down — applies to both the normal panel and fullscreen. */
+function adjustLyricsFontScale(delta) {
   const STEPS = [0.75, 0.85, 1.0, 1.2, 1.5, 1.8, 2.2, 2.7, 3.0];
-  const cur = state.lyricsFsFontScale;
+  const cur = state.lyricsFontScale;
   const idx = STEPS.reduce((best, v, i) => Math.abs(v - cur) < Math.abs(STEPS[best] - cur) ? i : best, 0);
   const next = STEPS[Math.max(0, Math.min(STEPS.length - 1, idx + delta))];
-  state.lyricsFsFontScale = next;
-  if (dom.lyricsFullscreenContainer) {
-    dom.lyricsFullscreenContainer.style.setProperty("--lyrics-fs-scale", next);
-  }
+  state.lyricsFontScale = next;
+  document.documentElement.style.setProperty("--lyrics-font-scale", next);
 }
 
 /**
@@ -3469,6 +3470,8 @@ function bindEvents() {
   if (dom.editorToggleBtn) dom.editorToggleBtn.addEventListener("click", openEditor);
   if (dom.editorCloseBtn)  dom.editorCloseBtn.addEventListener("click",  closeEditor);
   if (dom.editorExportBtn) dom.editorExportBtn.addEventListener("click",  handleEditorExport);
+  if (dom.editorSaveBtn)   dom.editorSaveBtn.addEventListener("click",    handleEditorSave);
+  if (dom.teacherLoginBtn) dom.teacherLoginBtn.addEventListener("click",  handleTeacherLoginClick);
   if (dom.editorTabLyrics) dom.editorTabLyrics.addEventListener("click", () => switchEditorTab("lyrics"));
   if (dom.editorTabChords) dom.editorTabChords.addEventListener("click", () => switchEditorTab("chords"));
   if (dom.editorTabNotation) dom.editorTabNotation.addEventListener("click", () => switchEditorTab("notation"));
@@ -3518,11 +3521,17 @@ function bindEvents() {
   if (dom.historyCloseBtn) dom.historyCloseBtn.addEventListener("click", closeHistoryPanel);
   if (dom.strumBtn)        dom.strumBtn.addEventListener("click", openStrumPanel);
   if (dom.strumCloseBtn)   dom.strumCloseBtn.addEventListener("click", closeStrumPanel);
-  if (dom.historyClearBtn) dom.historyClearBtn.addEventListener("click", () => {
+  if (dom.historyClearBtn) dom.historyClearBtn.addEventListener("click", async () => {
+    if (!state.isTeacher) return;
     if (!confirm("ล้างประวัติการฝึกทั้งหมด?")) return;
-    state.practiceLog = [];
-    savePracticeLog();
-    renderHistoryPanel();
+    try {
+      await clearAllSessions(state.practiceLog);
+      state.practiceLog = [];
+      renderHistoryPanel();
+    } catch (err) {
+      console.error("ล้างประวัติการฝึกไม่สำเร็จ:", err);
+      alert(`ล้างประวัติไม่สำเร็จ: ${err.message || err}`);
+    }
   });
 
   dom.bpmSlider.addEventListener("input", e => { updateBpm(e.target.value); });
@@ -3567,9 +3576,11 @@ function bindEvents() {
       state.userScrollTimer = setTimeout(() => { state.userScrolling = false; }, USER_SCROLL_COOLDOWN_MS);
     }, { passive: true });
   }
-  // Fullscreen font size
-  if (dom.lyricsFsFontDown) dom.lyricsFsFontDown.addEventListener("click", () => adjustFsFontScale(-1));
-  if (dom.lyricsFsFontUp)   dom.lyricsFsFontUp.addEventListener("click",   () => adjustFsFontScale(+1));
+  // Lyrics font size — shared control in both the normal panel and fullscreen
+  if (dom.lyricsFontDown)   dom.lyricsFontDown.addEventListener("click",   () => adjustLyricsFontScale(-1));
+  if (dom.lyricsFontUp)     dom.lyricsFontUp.addEventListener("click",     () => adjustLyricsFontScale(+1));
+  if (dom.lyricsFsFontDown) dom.lyricsFsFontDown.addEventListener("click", () => adjustLyricsFontScale(-1));
+  if (dom.lyricsFsFontUp)   dom.lyricsFsFontUp.addEventListener("click",   () => adjustLyricsFontScale(+1));
 
   // Fullscreen chord controls — delegate to the same toggle functions as main panel
   if (dom.lyricsFsSwapBtn) dom.lyricsFsSwapBtn.addEventListener("click", toggleFsSwap);
@@ -3582,6 +3593,14 @@ function bindEvents() {
     if (e.key === "Escape" && state.lyricsFullscreen) {
       e.preventDefault();
       closeLyricsFullscreen();
+    }
+  });
+
+  // Escape key closes the Practice History panel
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape" && dom.historyPanel && !dom.historyPanel.hidden) {
+      e.preventDefault();
+      closeHistoryPanel();
     }
   });
 
@@ -3664,19 +3683,9 @@ function toggleFavFilter() {
 /* =========================
    Practice Log
 ========================= */
-
-/** Loads practice log from localStorage. */
-function loadPracticeLog() {
-  try {
-    const raw = localStorage.getItem("ukulele-practice-log");
-    state.practiceLog = raw ? JSON.parse(raw) : [];
-  } catch (e) { console.error("โหลด practice log ไม่สำเร็จ:", e); state.practiceLog = []; }
-}
-
-/** Saves practice log to localStorage. */
-function savePracticeLog() {
-  localStorage.setItem("ukulele-practice-log", JSON.stringify(state.practiceLog));
-}
+// A single shared, class-wide log in Firestore (no per-student identity —
+// students never sign in). Any visitor can log a session; only the
+// teacher-only History panel reads/prunes it. See src/firebase/practiceLogStore.js.
 
 /** Called when playback starts — records the wall-clock start time. */
 function startPracticeTimer() {
@@ -3693,20 +3702,19 @@ function pausePracticeTimer() {
   }
 }
 
-/** Saves the current session if it exceeds 10 s, then resets the timer. */
+/** Logs the current session to Firestore if it exceeds 10 s, then resets the timer. */
 function commitPracticeSession() {
   pausePracticeTimer();
   const MIN_SEC = 10;
   if (state.practiceSessionSec >= MIN_SEC && state.selectedSong) {
-    const today = new Date().toISOString().slice(0, 10);
     const session = {
       songId:      state.selectedSong.id,
       songTitle:   state.selectedSong.title,
-      date:        today,
+      date:        new Date().toISOString().slice(0, 10),
       durationSec: Math.round(state.practiceSessionSec),
     };
-    state.practiceLog = addSession(state.practiceLog, session);
-    savePracticeLog();
+    // Fire-and-forget — a logging hiccup shouldn't disrupt playback.
+    logSession(session).catch(err => console.warn("บันทึกประวัติการฝึกไม่สำเร็จ:", err));
   }
   state.practiceSessionStart = null;
   state.practiceSessionSec   = 0;
@@ -3716,10 +3724,35 @@ function commitPracticeSession() {
    Practice History Panel
 ========================= */
 
-function openHistoryPanel() {
-  renderHistoryPanel();
+/** Opens the (teacher-only) Practice History panel and loads the shared log from Firestore. */
+async function openHistoryPanel() {
+  if (!state.isTeacher) return; // defensive — the button is hidden for non-teachers
   if (dom.historyPanel) dom.historyPanel.hidden = false;
   if (dom.mainGrid)     dom.mainGrid.hidden     = true;
+  if (dom.historyContent) {
+    dom.historyContent.innerHTML = "";
+    const loading = document.createElement("p");
+    loading.className = "empty-state";
+    loading.textContent = "กำลังโหลด...";
+    dom.historyContent.appendChild(loading);
+  }
+  try {
+    state.practiceLog = await fetchAllSessions();
+    renderHistoryPanel();
+    // Retention runs opportunistically each time the teacher opens the panel —
+    // no server/Cloud Function needed. Best-effort; a failure here shouldn't
+    // block viewing the log.
+    prunePracticeLog(state.practiceLog).catch(err => console.warn("Prune practice log ไม่สำเร็จ:", err));
+  } catch (err) {
+    console.error("โหลดประวัติการฝึกไม่สำเร็จ:", err);
+    if (dom.historyContent) {
+      dom.historyContent.innerHTML = "";
+      const errEl = document.createElement("p");
+      errEl.className = "empty-state";
+      errEl.textContent = "โหลดประวัติการฝึกไม่สำเร็จ";
+      dom.historyContent.appendChild(errEl);
+    }
+  }
 }
 
 function closeHistoryPanel() {
@@ -3747,6 +3780,13 @@ function renderHistoryPanel() {
   const weekSec = totalSecInDays(state.practiceLog, today, 7);
   const totalSec = state.practiceLog.reduce((s, r) => s + (r.durationSec || 0), 0);
   const songCount = new Set(state.practiceLog.map(r => r.songId)).size;
+
+  // ── Retention notice ──────────────────────────────────────────────────────
+  const retentionNote = document.createElement("p");
+  retentionNote.className = "history-retention-note";
+  retentionNote.textContent =
+    `ระบบเก็บข้อมูลย้อนหลัง ${Math.round(RETENTION_DAYS / 30)} เดือน แล้วลบข้อมูลเก่าให้อัตโนมัติ`;
+  dom.historyContent.appendChild(retentionNote);
 
   // ── Summary cards ─────────────────────────────────────────────────────────
   const summary = document.createElement("div");
@@ -3831,6 +3871,109 @@ function makeHistorySection(title) {
 }
 
 /* =========================
+   Teacher Auth
+========================= */
+/**
+ * Reflects the current auth state in the UI:
+ * — login button icon/tooltip
+ * — Editor button + Save-to-Cloud button visibility (teachers only)
+ */
+function applyAuthState({ user, isTeacher }) {
+  state.authUser  = user;
+  state.isTeacher = isTeacher;
+
+  if (dom.teacherLoginBtn && dom.teacherLoginIcon) {
+    dom.teacherLoginBtn.classList.toggle("is-teacher", isTeacher);
+    if (!user) {
+      dom.teacherLoginIcon.className = "fa-solid fa-user";
+      dom.teacherLoginBtn.title = "ล็อกอินสำหรับครู";
+    } else if (isTeacher) {
+      dom.teacherLoginIcon.className = "fa-solid fa-user-check";
+      dom.teacherLoginBtn.title = `ครู: ${user.email} (กดเพื่อออกจากระบบ)`;
+    } else {
+      dom.teacherLoginIcon.className = "fa-solid fa-user-xmark";
+      dom.teacherLoginBtn.title =
+        `${user.email} ยังไม่ได้รับสิทธิ์ครู — เพิ่ม UID ใน collection admins (กดเพื่อออกจากระบบ)`;
+    }
+  }
+
+  // Editor is teacher-only
+  if (dom.editorToggleBtn) dom.editorToggleBtn.hidden = !isTeacher;
+  if (dom.editorSaveBtn)   dom.editorSaveBtn.hidden   = !isTeacher;
+  if (!isTeacher && state.editorOpen) closeEditor();
+
+  // Practice History is teacher-only (shared class-wide log; students never see it)
+  if (dom.historyBtn) dom.historyBtn.hidden = !isTeacher;
+  if (!isTeacher && dom.historyPanel && !dom.historyPanel.hidden) closeHistoryPanel();
+}
+
+/** Login-button click: popup sign-in when signed out, sign-out otherwise. */
+async function handleTeacherLoginClick() {
+  try {
+    if (state.authUser) {
+      await signOutTeacher();
+    } else {
+      await signInTeacher();
+    }
+  } catch (err) {
+    if (err && err.code !== "auth/popup-closed-by-user") {
+      console.error("Sign-in failed:", err);
+      alert(`ล็อกอินไม่สำเร็จ: ${err.message || err}`);
+    }
+  }
+}
+
+/** Saves the active editor tab's data to Firestore. */
+async function handleEditorSave() {
+  if (!state.selectedSong || !state.isTeacher || !dom.editorSaveBtn) return;
+
+  let kind, json, rows;
+  if (state.editorTab === "chords") {
+    kind = "chords";
+    rows = state.chordRows;
+    json = exportToChordJson(state.chordRows);
+  } else if (state.editorTab === "notation") {
+    kind = "notation";
+    rows = state.notationRows;
+    json = exportToNotationJson(state.notationConfig, state.notationRows);
+  } else {
+    kind = "lyrics";
+    rows = state.editorRows;
+    json = exportToLyricsJson(state.editorRows);
+  }
+  if (!rows.length) return;
+
+  const btn = dom.editorSaveBtn;
+  btn.disabled = true;
+  btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> กำลังบันทึก...`;
+  try {
+    await saveSongData(state.selectedSong.id, kind, json);
+
+    // Apply to the in-memory song so playback reflects the save immediately
+    const parsed = JSON.parse(json);
+    if (kind === "lyrics") {
+      state.selectedSong.lyrics = parsed;
+      renderLyrics(state.selectedSong.lyrics, state.selectedSong);
+    } else if (kind === "chords") {
+      state.selectedSong.chords = parsed;
+    } else {
+      state.selectedSong.notation = parsed;
+    }
+
+    btn.innerHTML = `<i class="fa-solid fa-check"></i> บันทึกแล้ว`;
+  } catch (err) {
+    console.error("Save failed:", err);
+    btn.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> บันทึกไม่สำเร็จ`;
+    alert(`บันทึกไม่สำเร็จ: ${err.message || err}`);
+  } finally {
+    btn.disabled = false;
+    setTimeout(() => {
+      btn.innerHTML = `<i class="fa-solid fa-cloud-arrow-up"></i> บันทึกขึ้น Cloud`;
+    }, 3000);
+  }
+}
+
+/* =========================
    Init
 ========================= */
 async function initApp() {
@@ -3846,9 +3989,9 @@ async function initApp() {
   const savedSwap = localStorage.getItem("ukulele-panel-swap");
   applyPanelSwap(savedSwap === "on");
 
-  // Restore Favorites + Practice Log
+  // Restore Favorites (per-device). Practice Log is fetched on-demand from
+  // Firestore when a teacher opens the History panel — see openHistoryPanel().
   loadFavorites();
-  loadPracticeLog();
 
   bindEvents();
   initLottieDancer();
@@ -3865,6 +4008,10 @@ async function initApp() {
     dom.diagramOrientBtn.title = `หมุน Chord Diagram (${state.chordDiagramRotation}°)`;
   }
   updateBpm(dom.bpmSlider.value);
+
+  // Watch teacher sign-in state (async — UI updates whenever it changes)
+  observeAuth(applyAuthState);
+
   await loadSongs();
 
   // Commit any unsaved session when user closes/reloads the page

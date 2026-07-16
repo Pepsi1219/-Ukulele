@@ -26,7 +26,25 @@ npx vitest run tests/unit/chordEngine.test.js
 
 **Entry point:** `index.html` + `script.js` + `styles.css`. All three are flat files at the repo root — no framework, no bundler.
 
-**`script.js`** is the entire application controller (~2500+ lines). It owns all DOM wiring, event handlers, and a single `state` object that holds all runtime state (selected song, playback position, metronome, editor state, etc.). It imports exclusively from `src/utils/`.
+**`script.js`** is the entire application controller (~4000+ lines). It owns all DOM wiring, event handlers, and a single `state` object that holds all runtime state (selected song, playback position, metronome, editor state, etc.). It imports from `src/utils/` and `src/firebase/`.
+
+**`src/firebase/`** — Firebase backend layer (Web SDK v10 via gstatic CDN ESM imports, matching the no-bundler setup). Firestore only — no Storage bucket (avoids requiring the Blaze billing plan):
+
+| File | Purpose |
+|---|---|
+| `firebase-config.js` | Project config (user fills from Firebase console) |
+| `firebase.js` | App bootstrap — exports `db`, `auth` singletons |
+| `songStore.js` | `fetchSongData(id)`, `saveSongData(id, kind, json)` |
+| `authStore.js` | Google Sign-In + teacher allowlist check (`admins/{uid}` doc) |
+| `practiceLogStore.js` | `logSession()`, `fetchAllSessions()`, `prunePracticeLog()`, `clearAllSessions()` |
+
+**Firestore data model:** only the editable payloads live in Firestore, at `songs/{id}/data/{lyrics|chords|notation}` as `{ json: "<stringified>" }` — JSON strings keep byte-exact fidelity with the original file format and sidestep Firestore nested-array limits. Song identity/metadata (`id`, `title`, `mp3`, `bpm`) stays in the local `manifest.json`, and audio/images stay in the local `songs/`, `vocal/`, `Letter Note Notation/` folders, served as static files exactly as before — `loadSongs()` fetches `manifest.json` locally, then fetches each song's lyrics/chords/notation from Firestore by id.
+
+**Auth:** students read without signing in; editing requires Google Sign-In plus an `admins/{uid}` allowlist doc (see `firestore.rules`, deployed by hand via console). The Editor button, the editor's "บันทึกขึ้น Cloud" save button, and the Practice History button are all visible only to teachers.
+
+**Practice Log:** a single shared, class-wide log at `practiceLog/{autoId}` — not per-student (students never sign in). Any visitor can log a session (`allow create` is open but shape-validated in `firestore.rules`); only teachers can read, prune, or clear it. Retention runs client-side, opportunistically, each time a teacher opens the History panel (no Cloud Function — this project intentionally stays off the Blaze plan): sessions older than `RETENTION_DAYS` (90) are deleted, and if the collection ever exceeds `MAX_DOCS` (2000) it's wiped entirely rather than trimmed incrementally. See `src/firebase/practiceLogStore.js`.
+
+**Setup / migration:** see `FIREBASE_SETUP.md`. The one-time migration script is `scripts/migrate-to-firebase.mjs` (firebase-admin + service account key; key files are git-ignored) — it uploads `Lyrics/`, `Chords/`, `Notation/` content to Firestore only; it never touches audio/image files.
 
 **`src/utils/`** — pure, side-effect-free utility modules. Every function here is unit-testable in Node/vitest without a DOM. Modules:
 
@@ -110,14 +128,16 @@ One `beatWidth` covers the pickup lead-zone plus all full measures — this is w
 
 ## Song Data Format
 
-- `manifest.json` — song index; each entry has `id`, `title`, `mp3`, `bpm`
-- `Lyrics/<id>.json` — array of timed entries, each either `{ section: "name" }` or `{ time: number, line: [{ chord?, lyric }] }`
-- `Chords/<id>.json` — optional explicit chord timeline `[{ time, chord }]`; when absent, chords are derived from the first chord-bearing segment of each lyrics line
-- `Notation/<id>.json` — optional melody staff notation (see format below)
-- `Letter Note Notation/<id>.png` — static reference image of a lesson's melody (used when no `Notation/` file exists)
-- `songs/<id>.mp3` — full-mix audio
-- `vocal/<id>.mp3` — vocal-only audio (mirrors `songs/` filenames)
-- `animation/` — Lottie JSON files for the dancing character
+- `manifest.json` — song index (local, unchanged); each entry has `id`, `title`, `mp3`, `bpm`
+- **Lyrics** (`songs/{id}/data/lyrics` in Firestore) — array of timed entries, each either `{ section: "name" }` or `{ time: number, line: [{ chord?, lyric }] }`
+- **Chords** (`songs/{id}/data/chords` in Firestore) — optional explicit chord timeline `[{ time, chord }]`; when absent, chords are derived from the first chord-bearing segment of each lyrics line
+- **Notation** (`songs/{id}/data/notation` in Firestore) — optional melody staff notation (see format below)
+- `Letter Note Notation/<id>.png` — static reference image of a lesson's melody (used when no notation data exists), local
+- `songs/<id>.mp3` — full-mix audio, local
+- `vocal/<id>.mp3` — vocal-only audio (mirrors `songs/` filenames), local
+- `animation/` — Lottie JSON files for the dancing character, local
+
+The local `Lyrics/`, `Chords/`, `Notation/` folders remain in the repo only as the migration source for `scripts/migrate-to-firebase.mjs` — the app itself reads lyrics/chords/notation from Firestore, not these folders.
 
 ### Notation/<id>.json Format
 
@@ -143,7 +163,7 @@ One `beatWidth` covers the pickup lead-zone plus all full measures — this is w
 - `time` — seconds into the audio; optional — only needed for playback highlight sync
 - Note order = melody order (NOT sorted by time; `parseNotation` reads them as-is)
 
-**Easiest authoring path:** Editor → **โน้ต** tab → configure + add notes (live staff preview) → **Copy JSON** → paste into `Notation/<id>.json`.
+**Easiest authoring path:** Editor → **โน้ต** tab → configure + add notes (live staff preview) → **บันทึกขึ้น Cloud** (writes straight to Firestore; teacher login required). Copy JSON remains available as a manual export.
 
 ---
 
@@ -157,29 +177,31 @@ Notable `state` fields and their current behaviour — check these before editin
 | `state.chordDiagramRotation` | `0\|90\|180\|270` | Default is `90` (head pointing right / horizontal). Applied as `rot-90` class on `#chordDiagram`. Initialised in `initApp()`. |
 | `state.notePickMode` | `"auto"` \| `"G"\|"C"\|"E"\|"A"` \| `string[]` | Array mode enables multi-string selection. `resolveStrings(mode)` in `chordDiagram.js` normalises all formats to `string[]`. |
 | `state.speed` | `number` | Controlled by a gear button (`#speedGearBtn`) in the A/B loop row (right side). Opens a YouTube-style modal (`#speedModal`) with a range slider, −/+ buttons, and preset chips (1.0–2.0). |
+| `state.lyricsFontScale` | `number` | Multiplier (0.75–3.0, 9-step ladder) for lyrics text size — shared by the normal panel and the fullscreen overlay. **A−**/**A+** buttons appear in both headers; either one calls `adjustLyricsFontScale()`, which sets the `--lyrics-font-scale` CSS variable on `document.documentElement` so both `#lyricsContainer` and `#lyricsFullscreenContainer` pick it up. |
+| `state.editorActiveLyricIdx` | `number` | Playback-position highlight for the Lyrics tab of the timestamp editor (`.editor-row-line.playing`) — mirrors the existing chord-tab highlight (`state.editorActiveChordIdx`). Driven by `updateLyricsEditorAutoScroll()` each RAF tick. |
 
 **Dancing character (Lottie):** Lives in `.header-brand` inside `<header>`, absolutely positioned to the right of the h1 so it doesn't affect header height. No toggle button — always visible. Controlled by `initLottieDancer()` / `swapLottie()` in `script.js`.
+
+**Layout:** `.panel` (the 3 main cards) uses a **fixed** `height: 720px` on desktop (not `min-height`) so every song's panel is the same size regardless of lyrics/notation length — long content scrolls inside `.lyrics-container` (`overflow-y: auto`) instead of growing the card. Both mobile breakpoints reset this to `height: auto` for natural single-column stacking, and the mobile `.lyrics-container` gets its own smaller `max-height: 480px` cap (the desktop 760px cap is too tall to matter on a phone viewport). `.app-shell` caps overall page width at `min(1800px, 100%)`.
 
 ---
 
 ## Adding a Song
 
 1. Add an entry to `manifest.json` with a unique `id` (slug format, e.g. `artist-song-title`).
-2. Create `Lyrics/<id>.json` with the timed lyrics array.
-3. Optionally create `Chords/<id>.json` for a separate, more granular chord timeline.
-4. Place `songs/<id>.mp3` (and `vocal/<id>.mp3` if available) in the matching folders.
-5. Optionally create `Notation/<id>.json` for an interactive staff (use the in-app editor).
+2. Place `songs/<id>.mp3` (and `vocal/<id>.mp3` if available) in the matching local folders; for lesson songs also place `Letter Note Notation/<id>.png`.
+3. In the app (teacher login) open the Editor to author lyrics/chords/notation and press **บันทึกขึ้น Cloud** — or write `songs/{id}/data/{kind}` docs (`{ json: "<stringified payload>" }`) directly in the Firestore console.
 
 ---
 
 ## Adding / Editing Notation for a Lesson
 
-1. Open the app and select the lesson song.
+1. Open the app, log in as a teacher, and select the lesson song.
 2. Click the **Editor** button → switch to the **โน้ต** tab.
 3. Set clef, key, time signature, measures per row, pickup beats.
 4. Add notes one by one (pitch + duration). The staff preview updates live.
 5. To sync highlights with audio: play the song and press **Stamp** on each note at the right moment.
-6. Click **Copy JSON** and paste into `Notation/<id>.json`.
+6. Click **บันทึกขึ้น Cloud** to save straight to Firestore.
 
 ---
 
