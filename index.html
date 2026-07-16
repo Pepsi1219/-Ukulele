@@ -28,7 +28,45 @@
 </head>
 
 <body>
-  <div class="app-shell">
+  <!-- ===== Entry Gate — shown before the main app ===== -->
+  <div id="entryGate" class="entry-gate">
+    <!-- Ambient soundhole rings -->
+    <div class="gate-rings" aria-hidden="true">
+      <div class="gate-ring"></div>
+      <div class="gate-ring"></div>
+      <div class="gate-ring"></div>
+      <div class="gate-ring"></div>
+    </div>
+
+    <div class="gate-content">
+      <div class="gate-brand">
+        <i class="fa-solid fa-guitar" aria-hidden="true"></i>
+        <div class="gate-wordmark">
+          <span class="gate-wordmark-main">UKULELE</span>
+          <span class="gate-wordmark-sub">STUDIO</span>
+        </div>
+      </div>
+
+      <div class="gate-ctas">
+        <button id="entryStudentBtn" class="gate-cta gate-cta-primary" type="button">
+          เข้าใช้งาน
+        </button>
+        <button id="entryTeacherBtn" class="gate-cta gate-cta-secondary" type="button">
+          <i class="fa-brands fa-google" aria-hidden="true"></i>
+          ล็อกอินครู
+        </button>
+      </div>
+
+      <p id="entryGateStatus" class="gate-status" role="status" aria-live="polite" hidden></p>
+
+      <button id="entrySignOutBtn" class="gate-signout" type="button" hidden>
+        <i class="fa-solid fa-arrow-right-from-bracket" aria-hidden="true"></i>
+        ออกจากระบบ — <span id="entrySignOutEmail"></span>
+      </button>
+    </div>
+  </div>
+
+  <div class="app-shell" id="appShell" hidden>
 
     <!-- Header -->
     <header class="app-header">
@@ -44,9 +82,9 @@
       </div>
 
       <div class="header-actions">
-        <button id="teacherLoginBtn" class="icon-btn secondary teacher-login-btn" type="button"
-                aria-label="ล็อกอินสำหรับครู" title="ล็อกอินสำหรับครู">
-          <i class="fa-solid fa-user" id="teacherLoginIcon"></i>
+        <button id="backToGateBtn" class="icon-btn secondary" type="button"
+                aria-label="กลับไปหน้าแรก" title="กลับไปหน้าแรก">
+          <i class="fa-solid fa-house"></i>
         </button>
 
         <button id="swapPanelsBtn" class="icon-btn secondary" type="button" aria-label="สลับตำแหน่ง Chord และ Lyrics" title="สลับ Chord ↔ Lyrics" aria-pressed="false">
@@ -291,7 +329,7 @@
   <div id="lyricsFullscreen" class="lyrics-fs" hidden>
     <div class="lyrics-fs-body">
       <div class="lyrics-fs-header">
-        <h2>เนื้อเพลง</h2>
+        <span id="lyricsFsHeaderTitle" class="lyrics-fs-header-song">—</span>
         <div class="lyrics-title-actions">
           <button id="lyricsFsSwapBtn" class="icon-btn secondary" type="button"
                   aria-pressed="false" aria-label="สลับตำแหน่ง Chord ↔ Lyrics" title="สลับตำแหน่ง Chord ↔ Lyrics">

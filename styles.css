@@ -113,6 +113,206 @@ button { cursor: pointer; }
 h1, h2, h3, p { margin-top: 0; }
 
 /* =====================
+   Entry Gate — full-screen pre-app landing
+===================== */
+.entry-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #080c14;
+  overflow: hidden;
+  padding: max(24px, env(safe-area-inset-top))
+           max(24px, env(safe-area-inset-right))
+           max(24px, env(safe-area-inset-bottom))
+           max(24px, env(safe-area-inset-left));
+}
+.entry-gate[hidden] { display: none !important; }
+
+/* Ambient soundhole rings */
+.gate-rings {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.gate-ring {
+  position: absolute;
+  top: 50%; left: 50%;
+  border-radius: 50%;
+  border: 1px solid;
+  transform: translate(-50%, -50%);
+}
+.gate-ring:nth-child(1) { width: 190px;  height: 190px;  border-color: rgba(245, 166, 35, 0.22); }
+.gate-ring:nth-child(2) { width: 370px;  height: 370px;  border-color: rgba(245, 166, 35, 0.12); }
+.gate-ring:nth-child(3) { width: 590px;  height: 590px;  border-color: rgba(245, 166, 35, 0.06); }
+.gate-ring:nth-child(4) { width: 840px;  height: 840px;  border-color: rgba(245, 166, 35, 0.03); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .gate-ring:nth-child(1) { animation: ringPulse 6s 0.0s ease-in-out infinite; }
+  .gate-ring:nth-child(2) { animation: ringPulse 6s 1.0s ease-in-out infinite; }
+  .gate-ring:nth-child(3) { animation: ringPulse 6s 2.0s ease-in-out infinite; }
+  .gate-ring:nth-child(4) { animation: ringPulse 6s 3.0s ease-in-out infinite; }
+}
+@keyframes ringPulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.3; }
+}
+
+/* Content column */
+.gate-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+/* Brand block */
+.gate-brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 22px;
+  margin-bottom: 56px;
+  animation: gateIn 0.8s 0.05s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.gate-brand > i {
+  font-size: 2.8rem;
+  background: linear-gradient(145deg, #e09820 0%, #ffcf72 55%, #e09820 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  filter: drop-shadow(0 0 26px rgba(245, 166, 35, 0.42));
+}
+.gate-wordmark {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.gate-wordmark-main {
+  display: block;
+  font-size: clamp(2.4rem, 9vw, 5.4rem);
+  font-weight: 800;
+  letter-spacing: 0.24em;
+  margin-left: 0.24em;
+  color: #f2f0eb;
+  line-height: 1;
+}
+.gate-wordmark-sub {
+  display: block;
+  font-size: clamp(0.62rem, 1.6vw, 0.78rem);
+  font-weight: 400;
+  letter-spacing: 0.52em;
+  margin-left: 0.52em;
+  color: #3a3f55;
+  text-transform: uppercase;
+}
+
+/* CTA buttons */
+.gate-ctas {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-bottom: 20px;
+  animation: gateIn 0.8s 0.20s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.gate-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 13px 26px;
+  border-radius: 100px;
+  font-family: inherit;
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: transform 140ms ease, box-shadow 140ms ease,
+              background 140ms ease, border-color 140ms ease, opacity 140ms ease;
+}
+.gate-cta:active { transform: scale(0.97); }
+.gate-cta i { font-size: 0.88em; }
+
+.gate-cta-primary {
+  background: #f2f0eb;
+  color: #0d1117;
+  border: 1px solid transparent;
+}
+.gate-cta-primary:hover {
+  box-shadow: 0 6px 24px rgba(242, 240, 235, 0.16);
+}
+
+.gate-cta-secondary {
+  background: transparent;
+  color: #7a80a0;
+  border: 1px solid rgba(122, 128, 160, 0.28);
+}
+.gate-cta-secondary:hover {
+  color: #c8ccdc;
+  border-color: rgba(200, 204, 220, 0.40);
+  background: rgba(242, 240, 235, 0.04);
+}
+.gate-cta-secondary.is-loading { opacity: 0.40; pointer-events: none; }
+
+/* Status message */
+.gate-status {
+  margin: 0 0 12px;
+  font-size: 0.79rem;
+  color: #505570;
+  max-width: 300px;
+  line-height: 1.55;
+}
+.gate-status.is-err { color: #ef4444; }
+.gate-status[hidden] { display: none !important; }
+
+/* Sign-out link */
+.gate-signout {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  background: none;
+  border: none;
+  font-family: inherit;
+  font-size: 0.74rem;
+  color: #252838;
+  cursor: pointer;
+  transition: color 140ms ease;
+}
+.gate-signout:hover { color: #505570; }
+.gate-signout[hidden] { display: none !important; }
+
+/* Entry animation */
+@keyframes gateIn {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Light theme */
+[data-theme="light"] .entry-gate        { background: #fdfcf8; }
+[data-theme="light"] .gate-ring:nth-child(1) { border-color: rgba(180, 100, 20, 0.20); }
+[data-theme="light"] .gate-ring:nth-child(2) { border-color: rgba(180, 100, 20, 0.11); }
+[data-theme="light"] .gate-ring:nth-child(3) { border-color: rgba(180, 100, 20, 0.06); }
+[data-theme="light"] .gate-ring:nth-child(4) { border-color: rgba(180, 100, 20, 0.03); }
+[data-theme="light"] .gate-wordmark-main     { color: #0d1117; }
+[data-theme="light"] .gate-wordmark-sub      { color: #c4c8d8; }
+[data-theme="light"] .gate-cta-primary       { background: #0d1117; color: #fdfcf8; }
+[data-theme="light"] .gate-cta-primary:hover { box-shadow: 0 6px 24px rgba(13, 17, 23, 0.18); }
+[data-theme="light"] .gate-cta-secondary     { color: #909ab8; border-color: rgba(144, 154, 184, 0.30); }
+[data-theme="light"] .gate-cta-secondary:hover { color: #0d1117; border-color: rgba(13,17,23,0.35); background: rgba(13,17,23,0.04); }
+[data-theme="light"] .gate-status            { color: #a8afc8; }
+[data-theme="light"] .gate-status.is-err     { color: #dc2626; }
+[data-theme="light"] .gate-signout           { color: #dde0ea; }
+[data-theme="light"] .gate-signout:hover     { color: #a8afc8; }
+
+/* =====================
    Layout
 ===================== */
 .app-shell {
@@ -403,6 +603,10 @@ button.toggle-pill:hover { transform: translateY(-1px); }
   border-radius: 999px;
 }
 .icon-btn.secondary { background: rgba(128, 128, 128, 0.12); }
+/* Without this, the class rule's `display: inline-flex` (author CSS) beats
+   the browser's default `[hidden] { display: none }` (UA CSS) — buttons
+   like Timestamp Editor / Practice History would stay visible even when hidden. */
+.icon-btn[hidden] { display: none !important; }
 
 /* =====================
    Timeline
@@ -1207,12 +1411,6 @@ button.toggle-pill:hover { transform: translateY(-1px); }
   font-weight: 800;
 }
 .editor-save-btn:disabled { opacity: 0.6; cursor: wait; }
-
-/* Teacher login button — green tint when signed in with teacher rights */
-.teacher-login-btn.is-teacher {
-  color: var(--success);
-  border-color: var(--success);
-}
 
 /* ── Tab bar ── */
 .editor-tab-bar {
@@ -2656,15 +2854,23 @@ select option { font-family: inherit; }
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 14px 20px;
-  padding-top: max(14px, env(safe-area-inset-top));
-  background: var(--panel);
+  padding: 11px 24px;
+  padding-top: max(11px, env(safe-area-inset-top));
+  background: var(--panel-strong);
+  backdrop-filter: blur(24px);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
-.lyrics-fs-header h2 {
+.lyrics-fs-header-song {
   margin: 0;
-  font-size: 1.1rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
 }
 
 .font-size-ctrl {
@@ -2703,14 +2909,14 @@ select option { font-family: inherit; }
 
 /* ── Chord column ── */
 .lyrics-fs-chord-col {
-  width: 260px;
+  width: clamp(280px, 28vw, 420px);
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
-  padding: 16px 12px;
-  background: var(--panel);
+  gap: 12px;
+  padding: 20px 16px;
+  background: var(--bg-soft);
   border-right: 1px solid var(--border);
   overflow-y: auto;
 }
@@ -2724,13 +2930,14 @@ select option { font-family: inherit; }
   justify-content: center;
   min-height: 140px;
   width: 100%;
+  margin-top: 56px;
 }
 .lyrics-fs-chord-display .chord-badge {
   position: relative;
-  width: clamp(120px, 16vw, 160px);
-  height: clamp(120px, 16vw, 160px);
-  font-size: clamp(3.5rem, 8vw, 5.5rem);
-  border-radius: 28px;
+  width: clamp(160px, 20vw, 260px);
+  height: clamp(160px, 20vw, 260px);
+  font-size: clamp(5rem, 12vw, 8.5rem);
+  border-radius: 32px;
 }
 .lyrics-fs-chord-diagram {
   display: flex;
@@ -2739,7 +2946,7 @@ select option { font-family: inherit; }
   width: 100%;
 }
 .lyrics-fs-chord-diagram .chord-diagram-svg {
-  width: 140px;
+  width: clamp(160px, 18vw, 240px);
 }
 
 /* Chord column header (title + action buttons) */
@@ -2753,7 +2960,9 @@ select option { font-family: inherit; }
 }
 .lyrics-fs-chord-header h3 {
   margin: 0;
-  font-size: 0.95rem;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--muted);
   white-space: nowrap;
 }
 .lyrics-fs-chord-actions {
@@ -2772,9 +2981,9 @@ select option { font-family: inherit; }
 
 /* Swap button highlight when active */
 #lyricsFsSwapBtn[aria-pressed="true"] {
-  color: var(--primary);
-  background: rgba(56, 189, 248, 0.18);
-  box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.45);
+  color: var(--accent);
+  background: rgba(251, 191, 36, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(251, 191, 36, 0.38);
 }
 #lyricsFsSwapBtn[aria-pressed="true"] i {
   transform: rotate(180deg);
@@ -2789,14 +2998,14 @@ select option { font-family: inherit; }
 
 /* Mirror orientation button highlight in fullscreen */
 #lyricsFsDiagramOrientBtn[aria-pressed="true"] {
-  color: var(--primary);
-  background: rgba(56, 189, 248, 0.12);
-  border-color: rgba(56, 189, 248, 0.3);
+  color: var(--accent);
+  background: rgba(251, 191, 36, 0.12);
+  border-color: rgba(251, 191, 36, 0.3);
 }
 #lyricsFsDiagramModeBtn[aria-pressed="true"] {
-  color: var(--primary);
-  background: rgba(56, 189, 248, 0.12);
-  border-color: rgba(56, 189, 248, 0.3);
+  color: var(--accent);
+  background: rgba(251, 191, 36, 0.12);
+  border-color: rgba(251, 191, 36, 0.3);
 }
 
 .lyrics-fs-container {
@@ -2811,16 +3020,16 @@ select option { font-family: inherit; }
 /* ── Fullscreen Player Bar ── */
 .lyrics-fs-player {
   flex-shrink: 0;
-  background: var(--panel);
+  background: var(--panel-strong);
+  backdrop-filter: blur(24px);
   border-top: 1px solid var(--border);
-  backdrop-filter: blur(16px);
-  padding: 6px 20px;
-  padding-left: max(20px, env(safe-area-inset-left));
-  padding-right: max(20px, env(safe-area-inset-right));
-  padding-bottom: max(6px, env(safe-area-inset-bottom));
+  padding: 8px 24px 12px;
+  padding-left: max(24px, env(safe-area-inset-left));
+  padding-right: max(24px, env(safe-area-inset-right));
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
 }
 
 .lyrics-fs-player-top {
@@ -2839,12 +3048,12 @@ select option { font-family: inherit; }
 .lyrics-fs-player-art {
   display: grid;
   place-items: center;
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   flex-shrink: 0;
-  border-radius: 6px;
-  background: linear-gradient(135deg, var(--primary), var(--accent));
-  color: #020617;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #0d1117;
   font-size: 0.72rem;
 }
 .lyrics-fs-player-title {
@@ -2860,26 +3069,38 @@ select option { font-family: inherit; }
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 5px;
+  gap: 8px;
 }
 .lyrics-fs-player-transport .control-btn {
-  width: 30px;
-  height: 30px;
-  font-size: 0.78rem;
-}
-.lyrics-fs-player-transport .control-btn.primary {
   width: 36px;
   height: 36px;
-  font-size: 0.9rem;
+  font-size: 0.82rem;
+}
+.lyrics-fs-player-transport .control-btn.primary {
+  width: 46px;
+  height: 46px;
+  font-size: 1rem;
 }
 
 .lyrics-fs-player-timeline {
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 2px;
 }
 .lyrics-fs-player-timeline .time-row {
   font-size: 0.7rem;
+}
+.lyrics-fs-player-timeline .progress-track {
+  height: 3px;
+  border-radius: 2px;
+}
+.lyrics-fs-player-timeline .progress-fill {
+  background: var(--accent);
+}
+.lyrics-fs-player-timeline .progress-thumb {
+  width: 12px;
+  height: 12px;
+  border-width: 2px;
 }
 
 /* =====================

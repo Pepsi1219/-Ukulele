@@ -165,6 +165,9 @@ const state = {
   chordDiagramMode: "chord",     // "chord" | "note" — full chord shape vs single-note picking view (not persisted)
   notePickMode: "auto",          // "G"|"C"|"E"|"A" | string[] (e.g. ["E","A"]) | "auto" — which string(s) to use in note-picking mode
   notePickPosition: null,        // { stringIdx, fret } — last shown note position (drives "auto" hand-position memory)
+  studentModeOverride: false,    // true after explicitly choosing "เข้าใช้งาน" on the Entry Gate —
+                                  // hides teacher-only controls even if a teacher session is still
+                                  // persisted, until the user explicitly chooses teacher mode again
   lyricsFullscreen: false,       // true when lyrics are displayed in fullscreen overlay
   lyricsFsSwapped: false,        // true = chord column on right side in fullscreen
   lyricsFontScale: 1.0,          // multiplier for lyrics text size (0.75–3.0) — shared by normal panel + fullscreen
@@ -191,6 +194,16 @@ const state = {
    DOM References
 ========================= */
 const dom = {
+  // Entry Gate
+  entryGate:         document.getElementById("entryGate"),
+  appShell:          document.getElementById("appShell"),
+  entryStudentBtn:   document.getElementById("entryStudentBtn"),
+  entryTeacherBtn:   document.getElementById("entryTeacherBtn"),
+  entryGateStatus:   document.getElementById("entryGateStatus"),
+  entrySignOutBtn:   document.getElementById("entrySignOutBtn"),
+  entrySignOutEmail: document.getElementById("entrySignOutEmail"),
+  backToGateBtn:     document.getElementById("backToGateBtn"),
+
   loadStatus:        document.getElementById("loadStatus"),
   songSelect:        document.getElementById("songSelect"),
   currentSongTitle:  document.getElementById("currentSongTitle"),
@@ -273,8 +286,6 @@ const dom = {
   historyContent: document.getElementById("historyContent"),
   historyCloseBtn:document.getElementById("historyCloseBtn"),
   historyClearBtn:document.getElementById("historyClearBtn"),
-  teacherLoginBtn:    document.getElementById("teacherLoginBtn"),
-  teacherLoginIcon:   document.getElementById("teacherLoginIcon"),
   editorSaveBtn:      document.getElementById("editorSaveBtn"),
   editorToggleBtn:    document.getElementById("editorToggleBtn"),
   editorPanel:        document.getElementById("editorPanel"),
@@ -314,6 +325,7 @@ const dom = {
   lyricsFsNotePickTrigger:   document.getElementById("lyricsFsNotePickTrigger"),
   lyricsFsNotePickLabel:     document.getElementById("lyricsFsNotePickLabel"),
   lyricsFsPlayerTitle:       document.getElementById("lyricsFsPlayerTitle"),
+  lyricsFsHeaderTitle:       document.getElementById("lyricsFsHeaderTitle"),
   lyricsFsPlayPause:         document.getElementById("lyricsFsPlayPause"),
   lyricsFsPrev:              document.getElementById("lyricsFsPrev"),
   lyricsFsNext:              document.getElementById("lyricsFsNext"),
@@ -2776,6 +2788,7 @@ function syncFullscreenLyrics() {
 function syncFsPlayer() {
   const title = state.selectedSong ? state.selectedSong.title : "—";
   dom.lyricsFsPlayerTitle.textContent = title;
+  if (dom.lyricsFsHeaderTitle) dom.lyricsFsHeaderTitle.textContent = title;
   syncFsPlayPauseIcon();
   syncFsProgress();
 
@@ -3471,7 +3484,18 @@ function bindEvents() {
   if (dom.editorCloseBtn)  dom.editorCloseBtn.addEventListener("click",  closeEditor);
   if (dom.editorExportBtn) dom.editorExportBtn.addEventListener("click",  handleEditorExport);
   if (dom.editorSaveBtn)   dom.editorSaveBtn.addEventListener("click",    handleEditorSave);
-  if (dom.teacherLoginBtn) dom.teacherLoginBtn.addEventListener("click",  handleTeacherLoginClick);
+
+  // Entry Gate
+  if (dom.entryStudentBtn) dom.entryStudentBtn.addEventListener("click", handleGateStudentEntry);
+  if (dom.entryTeacherBtn) dom.entryTeacherBtn.addEventListener("click", handleGateTeacherLogin);
+  if (dom.entrySignOutBtn) dom.entrySignOutBtn.addEventListener("click", handleGateSignOut);
+  if (dom.backToGateBtn)   dom.backToGateBtn.addEventListener("click",   showEntryGate);
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape" && dom.entryGate && !dom.entryGate.hidden) {
+      e.preventDefault();
+      dismissEntryGate();
+    }
+  });
   if (dom.editorTabLyrics) dom.editorTabLyrics.addEventListener("click", () => switchEditorTab("lyrics"));
   if (dom.editorTabChords) dom.editorTabChords.addEventListener("click", () => switchEditorTab("chords"));
   if (dom.editorTabNotation) dom.editorTabNotation.addEventListener("click", () => switchEditorTab("notation"));
@@ -3871,55 +3895,112 @@ function makeHistorySection(title) {
 }
 
 /* =========================
+   Entry Gate
+========================= */
+/** Dismisses the entry gate and reveals the main app (student path, or after a successful teacher login). */
+function dismissEntryGate() {
+  if (dom.entryGate) dom.entryGate.hidden = true;
+  if (dom.appShell)  dom.appShell.hidden  = false;
+}
+
+/** Re-shows the entry gate from the main app (the header's "กลับไปหน้าแรก" button). */
+function showEntryGate() {
+  if (dom.appShell)  dom.appShell.hidden  = true;
+  if (dom.entryGate) dom.entryGate.hidden = false;
+  if (dom.entryGateStatus) { dom.entryGateStatus.hidden = true; dom.entryGateStatus.textContent = ""; dom.entryGateStatus.classList.remove("is-err"); }
+}
+
+/** Gate's "เข้าใช้งาน" button — explicit student path; overrides any stale/persisted teacher session. */
+function handleGateStudentEntry() {
+  state.studentModeOverride = true;
+  dismissEntryGate();
+  updateTeacherOnlyVisibility();
+}
+
+/** Gate's "ล็อกอินสำหรับครู" button — signs in; applyAuthState() dismisses the gate once the result is known. */
+async function handleGateTeacherLogin() {
+  // Explicitly choosing teacher mode always wins over an earlier student-mode override.
+  state.studentModeOverride = false;
+  updateTeacherOnlyVisibility();
+  if (state.isTeacher) { dismissEntryGate(); return; } // already an authenticated teacher — no popup needed
+
+  if (dom.entryTeacherBtn) dom.entryTeacherBtn.classList.add("is-loading");
+  if (dom.entryGateStatus) { dom.entryGateStatus.hidden = true; dom.entryGateStatus.textContent = ""; dom.entryGateStatus.classList.remove("is-err"); }
+  try {
+    await signInTeacher();
+  } catch (err) {
+    if (dom.entryTeacherBtn) dom.entryTeacherBtn.classList.remove("is-loading");
+    if (err && err.code !== "auth/popup-closed-by-user" && dom.entryGateStatus) {
+      dom.entryGateStatus.hidden = false;
+      dom.entryGateStatus.classList.add("is-err");
+      dom.entryGateStatus.textContent = `ล็อกอินไม่สำเร็จ: ${err.message || err}`;
+    }
+  }
+}
+
+/* =========================
    Teacher Auth
 ========================= */
 /**
  * Reflects the current auth state in the UI:
- * — login button icon/tooltip
  * — Editor button + Save-to-Cloud button visibility (teachers only)
+ * — Entry Gate: auto-dismisses on a successful teacher login (or an
+ *   already-persisted teacher session from a previous visit); shows an
+ *   inline error on the gate if the signed-in account isn't an allowlisted teacher.
+ * — Entry Gate's sign-out link (only auth control now — no header button)
  */
 function applyAuthState({ user, isTeacher }) {
   state.authUser  = user;
   state.isTeacher = isTeacher;
 
-  if (dom.teacherLoginBtn && dom.teacherLoginIcon) {
-    dom.teacherLoginBtn.classList.toggle("is-teacher", isTeacher);
-    if (!user) {
-      dom.teacherLoginIcon.className = "fa-solid fa-user";
-      dom.teacherLoginBtn.title = "ล็อกอินสำหรับครู";
-    } else if (isTeacher) {
-      dom.teacherLoginIcon.className = "fa-solid fa-user-check";
-      dom.teacherLoginBtn.title = `ครู: ${user.email} (กดเพื่อออกจากระบบ)`;
-    } else {
-      dom.teacherLoginIcon.className = "fa-solid fa-user-xmark";
-      dom.teacherLoginBtn.title =
-        `${user.email} ยังไม่ได้รับสิทธิ์ครู — เพิ่ม UID ใน collection admins (กดเพื่อออกจากระบบ)`;
-    }
+  if (dom.entrySignOutBtn) {
+    dom.entrySignOutBtn.hidden = !user;
+    if (user && dom.entrySignOutEmail) dom.entrySignOutEmail.textContent = user.email;
   }
 
-  // Editor is teacher-only
-  if (dom.editorToggleBtn) dom.editorToggleBtn.hidden = !isTeacher;
-  if (dom.editorSaveBtn)   dom.editorSaveBtn.hidden   = !isTeacher;
-  if (!isTeacher && state.editorOpen) closeEditor();
+  updateTeacherOnlyVisibility();
 
-  // Practice History is teacher-only (shared class-wide log; students never see it)
-  if (dom.historyBtn) dom.historyBtn.hidden = !isTeacher;
-  if (!isTeacher && dom.historyPanel && !dom.historyPanel.hidden) closeHistoryPanel();
+  if (dom.entryTeacherBtn) dom.entryTeacherBtn.classList.remove("is-loading");
+  if (dom.entryGate && !dom.entryGate.hidden) {
+    if (isTeacher && !state.studentModeOverride) {
+      dismissEntryGate();
+    } else if (user && !isTeacher && dom.entryGateStatus) {
+      dom.entryGateStatus.hidden = false;
+      dom.entryGateStatus.classList.add("is-err");
+      dom.entryGateStatus.textContent =
+        `บัญชี ${user.email} ยังไม่ได้รับสิทธิ์ครู — ลองบัญชีอื่น หรือกด "เข้าใช้งาน" เพื่อเข้าแบบนักเรียน`;
+    } else if (!user && dom.entryGateStatus) {
+      dom.entryGateStatus.hidden = false;
+      dom.entryGateStatus.classList.remove("is-err");
+      dom.entryGateStatus.textContent = "ออกจากระบบแล้ว";
+    }
+  }
 }
 
-/** Login-button click: popup sign-in when signed out, sign-out otherwise. */
-async function handleTeacherLoginClick() {
+/**
+ * Shows/hides teacher-only controls (Editor, Save-to-Cloud, Practice History).
+ * Takes `state.studentModeOverride` into account — a persisted teacher
+ * session still hides these once the user has explicitly chosen "เข้าใช้งาน"
+ * on the Entry Gate, until they choose teacher mode again.
+ */
+function updateTeacherOnlyVisibility() {
+  const showTeacherUI = state.isTeacher && !state.studentModeOverride;
+
+  if (dom.editorToggleBtn) dom.editorToggleBtn.hidden = !showTeacherUI;
+  if (dom.editorSaveBtn)   dom.editorSaveBtn.hidden   = !showTeacherUI;
+  if (!showTeacherUI && state.editorOpen) closeEditor();
+
+  if (dom.historyBtn) dom.historyBtn.hidden = !showTeacherUI;
+  if (!showTeacherUI && dom.historyPanel && !dom.historyPanel.hidden) closeHistoryPanel();
+}
+
+/** Entry Gate's "ออกจากระบบครู" link — the only sign-out control in the app. */
+async function handleGateSignOut() {
   try {
-    if (state.authUser) {
-      await signOutTeacher();
-    } else {
-      await signInTeacher();
-    }
+    await signOutTeacher();
   } catch (err) {
-    if (err && err.code !== "auth/popup-closed-by-user") {
-      console.error("Sign-in failed:", err);
-      alert(`ล็อกอินไม่สำเร็จ: ${err.message || err}`);
-    }
+    console.error("Sign-out failed:", err);
+    alert(`ออกจากระบบไม่สำเร็จ: ${err.message || err}`);
   }
 }
 

@@ -42,6 +42,12 @@ npx vitest run tests/unit/chordEngine.test.js
 
 **Auth:** students read without signing in; editing requires Google Sign-In plus an `admins/{uid}` allowlist doc (see `firestore.rules`, deployed by hand via console). The Editor button, the editor's "บันทึกขึ้น Cloud" save button, and the Practice History button are all visible only to teachers.
 
+**Entry Gate:** `#entryGate` is a full-screen overlay shown before `#appShell` (which starts `hidden`) on every page load. Design: dark `#080c14` background with concentric amber ring animations (`.gate-rings` > `.gate-ring` ×4), a guitar icon + tracked wordmark (`.gate-brand`), and two CTA buttons (`.gate-ctas`): **เข้าใช้งาน** (`#entryStudentBtn`, `.gate-cta-primary` — `handleGateStudentEntry()`, no auth) and **ล็อกอินครู** (`#entryTeacherBtn`, `.gate-cta-secondary` + Google icon — `handleGateTeacherLogin()`). The gate does not gate reading; it's just a landing/choice screen. `applyAuthState()` auto-dismisses it whenever `isTeacher` resolves true — this also covers a returning teacher with a persisted Firebase session (no re-login needed), since `observeAuth()` fires on every page load regardless of the gate. Status messages use `#entryGateStatus` (`.gate-status`) — default color is muted, `.is-err` class makes it red for errors; the element uses `[hidden]` with `display: none !important` override to prevent author-CSS conflicts. The student button is always available as a fallback. Escape key also dismisses it (same as every other overlay in the app). A **กลับไปหน้าแรก** (house icon) button in the main app header (`#backToGateBtn` → `showEntryGate()`) reopens it from within the app — the inverse of `dismissEntryGate()`.
+
+**Sign-out:** the gate is the *only* auth control in the app — there is no login/logout button in the main app header anymore (removed; login already happens on the gate). `#entrySignOutBtn` (`.gate-signout`) on the gate shows whenever `state.authUser` is set (via `applyAuthState()`) — it displays "ออกจากระบบ — `<email>`" where the email lives in `#entrySignOutEmail`. Clicking calls `handleGateSignOut()` → `signOutTeacher()`. To sign out, a teacher must go back to the gate first (`#backToGateBtn`). Note: `.gate-signout[hidden]` requires `display: none !important` to prevent author CSS from overriding the `[hidden]` UA rule.
+
+**`state.studentModeOverride`:** set `true` by `handleGateStudentEntry()`. Firebase auth sessions persist across reloads, so a teacher who previously logged in would otherwise still see teacher-only controls (Editor, Save-to-Cloud, Practice History) even after explicitly choosing "เข้าใช้งาน". `updateTeacherOnlyVisibility()` computes `showTeacherUI = state.isTeacher && !state.studentModeOverride` and is the single place that toggles those controls — called from `applyAuthState()` and directly from the gate handlers so the override takes effect immediately without waiting for an auth event. Cleared back to `false` only by an explicit teacher-mode choice: `handleGateTeacherLogin()`.
+
 **Practice Log:** a single shared, class-wide log at `practiceLog/{autoId}` — not per-student (students never sign in). Any visitor can log a session (`allow create` is open but shape-validated in `firestore.rules`); only teachers can read, prune, or clear it. Retention runs client-side, opportunistically, each time a teacher opens the History panel (no Cloud Function — this project intentionally stays off the Blaze plan): sessions older than `RETENTION_DAYS` (90) are deleted, and if the collection ever exceeds `MAX_DOCS` (2000) it's wiped entirely rather than trimmed incrementally. See `src/firebase/practiceLogStore.js`.
 
 **Setup / migration:** see `FIREBASE_SETUP.md`. The one-time migration script is `scripts/migrate-to-firebase.mjs` (firebase-admin + service account key; key files are git-ignored) — it uploads `Lyrics/`, `Chords/`, `Notation/` content to Firestore only; it never touches audio/image files.
@@ -180,9 +186,23 @@ Notable `state` fields and their current behaviour — check these before editin
 | `state.lyricsFontScale` | `number` | Multiplier (0.75–3.0, 9-step ladder) for lyrics text size — shared by the normal panel and the fullscreen overlay. **A−**/**A+** buttons appear in both headers; either one calls `adjustLyricsFontScale()`, which sets the `--lyrics-font-scale` CSS variable on `document.documentElement` so both `#lyricsContainer` and `#lyricsFullscreenContainer` pick it up. |
 | `state.editorActiveLyricIdx` | `number` | Playback-position highlight for the Lyrics tab of the timestamp editor (`.editor-row-line.playing`) — mirrors the existing chord-tab highlight (`state.editorActiveChordIdx`). Driven by `updateLyricsEditorAutoScroll()` each RAF tick. |
 
+**Fullscreen lyrics overlay (`#lyricsFullscreen` / `.lyrics-fs`):** Fixed overlay, `z-index: 300`, background `#090d18`. Structure: `.lyrics-fs-body` (flex column, fills space) → `.lyrics-fs-header` (glassmorphism, shows `#lyricsFsHeaderTitle` song title + action buttons) → `.lyrics-fs-main` (flex row: chord column + lyrics container) → `.lyrics-fs-player` (glassmorphism player bar at bottom). Chord column (`.lyrics-fs-chord-col`) is `clamp(280px, 28vw, 420px)` — responsive, scales with viewport. Chord badge inside is `clamp(160px, 20vw, 260px)`. Diagram SVG is `clamp(160px, 18vw, 240px)`. Player transport buttons: 36px/46px (secondary/primary). Progress bar in `.lyrics-fs-player-timeline` is overridden to 3px height with amber fill. Active-state button highlights use `var(--accent)` amber (not blue). `syncFsPlayer()` populates both `dom.lyricsFsPlayerTitle` (in player bar) and `dom.lyricsFsHeaderTitle` (in header) with the current song title.
+
 **Dancing character (Lottie):** Lives in `.header-brand` inside `<header>`, absolutely positioned to the right of the h1 so it doesn't affect header height. No toggle button — always visible. Controlled by `initLottieDancer()` / `swapLottie()` in `script.js`.
 
 **Layout:** `.panel` (the 3 main cards) uses a **fixed** `height: 720px` on desktop (not `min-height`) so every song's panel is the same size regardless of lyrics/notation length — long content scrolls inside `.lyrics-container` (`overflow-y: auto`) instead of growing the card. Both mobile breakpoints reset this to `height: auto` for natural single-column stacking, and the mobile `.lyrics-container` gets its own smaller `max-height: 480px` cap (the desktop 760px cap is too tall to matter on a phone viewport). `.app-shell` caps overall page width at `min(1800px, 100%)`.
+
+---
+
+## Common CSS Pitfall — `[hidden]` Override
+
+Any author CSS that sets `display` on an element will silently override the browser UA rule `[hidden] { display: none }`, making the element always visible and un-hideable via the `hidden` attribute. Pattern seen on: `.icon-btn`, `.gate-signout`, `.gate-status`.
+
+**Fix:** wherever an element uses both a CSS class with an explicit `display` value AND the `hidden` attribute, add:
+```css
+.my-class[hidden] { display: none !important; }
+```
+Do this proactively whenever writing CSS that sets `display: block/flex/inline-flex` on elements that may also receive `hidden`.
 
 ---
 
