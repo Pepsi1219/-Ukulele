@@ -188,11 +188,26 @@ Notable `state` fields and their current behaviour — check these before editin
 
 **Notation config modal (`#ntConfigModal` / `.ntcfg-modal-overlay`):** Fixed overlay, `z-index: 450`. Opened by `#ntConfigOpenBtn` (⚙ ตั้งค่า) in the notation tab header. Contains clef, key, time signature, measures-per-row, and pickup-beats fields — changes apply live (preview updates on each `change` event). Save (`#ntConfigSaveBtn`) just closes; Cancel (`#ntConfigCancelBtn`) / Escape / backdrop click reverts `state.notationConfig` to the snapshot taken at open. `wireNotationConfigControls()` wires everything. On mobile (≤ 760px): bottom sheet; on desktop (≥ 761px): centered dialog.
 
-**Fullscreen lyrics overlay (`#lyricsFullscreen` / `.lyrics-fs`):** Fixed overlay, `z-index: 300`, background `#090d18`. Structure: `.lyrics-fs-body` (flex column, fills space) → `.lyrics-fs-header` (glassmorphism, shows `#lyricsFsHeaderTitle` song title + action buttons) → `.lyrics-fs-main` (flex row: chord column + lyrics container) → `.lyrics-fs-player` (glassmorphism player bar at bottom). Chord column (`.lyrics-fs-chord-col`) is `clamp(280px, 28vw, 420px)` — responsive, scales with viewport. Chord badge inside is `clamp(160px, 20vw, 260px)`. Diagram SVG is `clamp(160px, 18vw, 240px)`. Player transport buttons: 36px/46px (secondary/primary). Progress bar in `.lyrics-fs-player-timeline` is overridden to 3px height with amber fill. Active-state button highlights use `var(--accent)` amber (not blue). `syncFsPlayer()` populates both `dom.lyricsFsPlayerTitle` (in player bar) and `dom.lyricsFsHeaderTitle` (in header) with the current song title.
+**Fullscreen lyrics overlay (`#lyricsFullscreen` / `.lyrics-fs`):** Fixed overlay, `z-index: 300`, background `#090d18`. Structure: `.lyrics-fs-body` (flex column, fills space) → `.lyrics-fs-header` (glassmorphism, shows `#lyricsFsHeaderTitle` song title + action buttons) → `.lyrics-fs-main` (flex row: chord column + lyrics container) → `.lyrics-fs-player` (glassmorphism player bar at bottom). Chord column (`.lyrics-fs-chord-col`) is `clamp(280px, 28vw, 420px)` — responsive, scales with viewport. Chord badge inside is `clamp(160px, 20vw, 260px)`. Diagram SVG is `clamp(160px, 18vw, 240px)`. Player transport buttons: 36px/46px (secondary/primary). Progress bar in `.lyrics-fs-player-timeline` is overridden to 3px height with amber fill. Active-state button highlights use `var(--accent)` amber (not blue). `syncFsPlayer()` populates both `dom.lyricsFsPlayerTitle` (in player bar) and `dom.lyricsFsHeaderTitle` (in header) with the current song title. A-B loop markers (`dom.lyricsFsLoopMarkerA`, `dom.lyricsFsLoopMarkerB`, `dom.lyricsFsLoopRegion`) mirror the main timeline markers — both sets are updated together by `updateLoopMarkers()`.
 
 **Dancing character (Lottie):** Lives in `.header-brand` inside `<header>`, absolutely positioned to the right of the h1 so it doesn't affect header height. No toggle button — always visible. Controlled by `initLottieDancer()` / `swapLottie()` in `script.js`.
 
 **Layout:** `.panel` (the 3 main cards) uses a **fixed** `height: 720px` on desktop (not `min-height`) so every song's panel is the same size regardless of lyrics/notation length — long content scrolls inside `.lyrics-container` (`overflow-y: auto`) instead of growing the card. Both mobile breakpoints reset this to `height: auto` for natural single-column stacking, and the mobile `.lyrics-container` gets its own smaller `max-height: 480px` cap (the desktop 760px cap is too tall to matter on a phone viewport). `.app-shell` caps overall page width at `min(1800px, 100%)`.
+
+---
+
+## XSS / innerHTML Safety
+
+`script.js` contains an `escHtml(str)` helper (defined just before `renderHistoryPanel()`). Use it whenever inserting Firestore-sourced strings into `innerHTML`. Do **not** interpolate raw Firestore values directly into HTML template literals — song titles and section names are user-controlled.
+
+```js
+// Safe
+el.innerHTML = `<span>${escHtml(entry.songTitle)}</span>`;
+// Unsafe — XSS vector
+el.innerHTML = `<span>${entry.songTitle}</span>`;
+```
+
+Prefer `textContent` or DOM creation (`document.createElement` + `.textContent`) over `innerHTML` when the content is plain text with no markup — `makeChordSectionDivider()` uses this pattern for section names.
 
 ---
 

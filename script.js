@@ -354,9 +354,12 @@ const dom = {
   loopBBtn:        document.getElementById("loopBBtn"),
   loopClearBtn:    document.getElementById("loopClearBtn"),
   loopStatusText:  document.getElementById("loopStatusText"),
-  loopMarkerA:     document.getElementById("loopMarkerA"),
-  loopMarkerB:     document.getElementById("loopMarkerB"),
-  loopRegion:      document.getElementById("loopRegion"),
+  loopMarkerA:         document.getElementById("loopMarkerA"),
+  loopMarkerB:         document.getElementById("loopMarkerB"),
+  loopRegion:          document.getElementById("loopRegion"),
+  lyricsFsLoopMarkerA: document.getElementById("lyricsFsLoopMarkerA"),
+  lyricsFsLoopMarkerB: document.getElementById("lyricsFsLoopMarkerB"),
+  lyricsFsLoopRegion:  document.getElementById("lyricsFsLoopRegion"),
 };
 
 /* =========================
@@ -1007,11 +1010,12 @@ function makeChordInsertDivider(afterIdx) {
 function makeChordSectionDivider(name) {
   const el = document.createElement("div");
   el.className = "editor-chord-section";
-  el.innerHTML =
-    `<span class="chord-sec-line"></span>` +
-    `<i class="fa-solid fa-music"></i>` +
-    `<span class="chord-sec-name">${name || "(section)"}</span>` +
-    `<span class="chord-sec-line"></span>`;
+  const line1 = document.createElement("span"); line1.className = "chord-sec-line";
+  const icon  = document.createElement("i");    icon.className  = "fa-solid fa-music";
+  const label = document.createElement("span"); label.className = "chord-sec-name";
+  label.textContent = name || "(section)";
+  const line2 = document.createElement("span"); line2.className = "chord-sec-line";
+  el.append(line1, icon, label, line2);
   return el;
 }
 
@@ -1598,9 +1602,11 @@ function wireNotationConfigControls() {
     });
   }
 
-  // Escape key closes the modal (document-level, same pattern as other modals)
+  // Escape key closes the modal — stopImmediatePropagation prevents the editor's
+  // own Escape handler (closeEditor) from firing on the same event.
   document.addEventListener("keydown", e => {
     if (e.key === "Escape" && dom.ntConfigModal && !dom.ntConfigModal.hidden) {
+      e.stopImmediatePropagation();
       closeNtConfigModal(true);
     }
   });
@@ -1947,13 +1953,14 @@ function updateLoopMarkers() {
   const resolvedEnd = (endTime !== null ? endTime : duration) || 0;
 
   // A marker
+  const aLeft = showA ? `${Math.min((startTime / duration) * 100, 100)}%` : null;
   if (dom.loopMarkerA) {
-    if (showA) {
-      dom.loopMarkerA.style.left = `${Math.min((startTime / duration) * 100, 100)}%`;
-      dom.loopMarkerA.hidden = false;
-    } else {
-      dom.loopMarkerA.hidden = true;
-    }
+    if (aLeft) { dom.loopMarkerA.style.left = aLeft; dom.loopMarkerA.hidden = false; }
+    else        { dom.loopMarkerA.hidden = true; }
+  }
+  if (dom.lyricsFsLoopMarkerA) {
+    if (aLeft) { dom.lyricsFsLoopMarkerA.style.left = aLeft; dom.lyricsFsLoopMarkerA.hidden = false; }
+    else        { dom.lyricsFsLoopMarkerA.hidden = true; }
   }
 
   // B marker + region overlay
@@ -1961,18 +1968,15 @@ function updateLoopMarkers() {
     const { aPercent, bPercent, regionWidth } =
       calcLoopMarkerPercents(duration, startTime, resolvedEnd);
 
-    if (dom.loopMarkerB) {
-      dom.loopMarkerB.style.left = `${bPercent}%`;
-      dom.loopMarkerB.hidden = false;
-    }
-    if (dom.loopRegion) {
-      dom.loopRegion.style.left  = `${aPercent}%`;
-      dom.loopRegion.style.width = `${regionWidth}%`;
-      dom.loopRegion.hidden = false;
-    }
+    if (dom.loopMarkerB) { dom.loopMarkerB.style.left = `${bPercent}%`; dom.loopMarkerB.hidden = false; }
+    if (dom.loopRegion)  { dom.loopRegion.style.left = `${aPercent}%`; dom.loopRegion.style.width = `${regionWidth}%`; dom.loopRegion.hidden = false; }
+    if (dom.lyricsFsLoopMarkerB) { dom.lyricsFsLoopMarkerB.style.left = `${bPercent}%`; dom.lyricsFsLoopMarkerB.hidden = false; }
+    if (dom.lyricsFsLoopRegion)  { dom.lyricsFsLoopRegion.style.left = `${aPercent}%`; dom.lyricsFsLoopRegion.style.width = `${regionWidth}%`; dom.lyricsFsLoopRegion.hidden = false; }
   } else {
-    if (dom.loopMarkerB) dom.loopMarkerB.hidden = true;
-    if (dom.loopRegion)  dom.loopRegion.hidden  = true;
+    if (dom.loopMarkerB)         dom.loopMarkerB.hidden         = true;
+    if (dom.loopRegion)          dom.loopRegion.hidden          = true;
+    if (dom.lyricsFsLoopMarkerB) dom.lyricsFsLoopMarkerB.hidden = true;
+    if (dom.lyricsFsLoopRegion)  dom.lyricsFsLoopRegion.hidden  = true;
   }
 }
 
@@ -2428,6 +2432,7 @@ function changeSong(delta) {
 }
 
 function applyPreservePitch() {
+  // Uses Howler private API (_sounds, _node) — may break on Howler major version bumps.
   if (!state.sound || !state.sound._sounds) return;
   state.sound._sounds.forEach(s => {
     const node = s && s._node;
@@ -2444,7 +2449,7 @@ function unloadSound() {
   if (state.sound) { state.sound.unload(); state.sound = null; }
 }
 
-async function togglePlayPause() {
+function togglePlayPause() {
   if (!state.sound) return;
   if (state.isPlaying) { state.sound.pause(); return; }
   state.sound.rate(state.speed);
@@ -3220,6 +3225,8 @@ function updateCurrentChord(currentSeconds) {
 
   if (nextIndex >= 0 && chords[nextIndex]) {
     setChordDisplay(chords[nextIndex].chord);
+  } else if (nextIndex === -1) {
+    setChordDisplay(null);
   }
 
   state.currentChordIndex = nextIndex;
@@ -3571,9 +3578,11 @@ function bindEvents() {
   if (dom.editorPanel) {
     dom.editorPanel.addEventListener("keydown", handleEditorKeydown);
   }
-  // Also catch Space/Esc globally when editor is open
+  // Also catch Space/Esc globally when editor is open, but only when the
+  // focused element is NOT inside the panel (panel listener already handles that path).
   document.addEventListener("keydown", e => {
     if (!state.editorOpen) return;
+    if (dom.editorPanel && dom.editorPanel.contains(e.target)) return;
     handleEditorKeydown(e);
   });
 
@@ -3839,6 +3848,15 @@ function closeStrumPanel() {
   if (dom.mainGrid)   dom.mainGrid.hidden   = false;
 }
 
+/** Escapes HTML special chars — used to safely embed Firestore strings in innerHTML. */
+function escHtml(str) {
+  return String(str ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
 function renderHistoryPanel() {
   if (!dom.historyContent) return;
   dom.historyContent.innerHTML = "";
@@ -3895,7 +3913,7 @@ function renderHistoryPanel() {
     const pct = Math.round((entry.totalSec / maxSec) * 100);
     const isFav = state.favorites.has(entry.songId);
     row.innerHTML =
-      `<span class="history-song-name">${isFav ? "★ " : ""}${entry.songTitle}</span>` +
+      `<span class="history-song-name">${isFav ? "★ " : ""}${escHtml(entry.songTitle)}</span>` +
       `<div class="history-bar-wrap">` +
         `<div class="history-bar" style="width:${pct}%"></div>` +
       `</div>` +
@@ -3915,8 +3933,8 @@ function renderHistoryPanel() {
       ? new Intl.DateTimeFormat("th-TH", { day: "numeric", month: "short", year: "numeric" }).format(new Date(d))
       : "—";
     row.innerHTML =
-      `<span class="session-date">${displayDate}</span>` +
-      `<span class="session-title">${s.songTitle}</span>` +
+      `<span class="session-date">${escHtml(displayDate)}</span>` +
+      `<span class="session-title">${escHtml(s.songTitle)}</span>` +
       `<span class="session-dur">${formatLogDuration(s.durationSec)}</span>`;
     recentSection.list.appendChild(row);
   });

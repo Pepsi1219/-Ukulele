@@ -3278,6 +3278,25 @@ select option { font-family: inherit; }
      on a phone screen, and the whole page grows instead of scrolling inside. */
   .lyrics-container { min-height: 420px; max-height: 480px; }
 
+  /* ── Editor topbar: icon-only on mobile ──────────────────────────────── */
+  .editor-topbar { gap: 6px; padding: 8px 12px; padding-top: max(8px, env(safe-area-inset-top)); }
+  /* Hide "กลับ" text and button labels — keep icons only */
+  .editor-back-btn > span { display: none; }
+  .editor-back-btn { gap: 0; }
+  .editor-topbar .btn-label { display: none; }
+  /* Hide the "Now playing" pill — saves ~120px */
+  .editor-now-playing { display: none; }
+  /* Icon-only chip buttons: square, centered */
+  .editor-topbar-end { gap: 6px; }
+  .editor-topbar .editor-import-btn,
+  .editor-topbar .editor-save-btn,
+  .editor-topbar .editor-export-btn {
+    padding: 0;
+    width: 36px;
+    min-height: 36px;
+    justify-content: center;
+  }
+
   /* Allow lyric rows to wrap nicely on narrow screens */
   .lyric-row { padding: 6px 8px; }
   .inline-lyric { font-size: 0.86rem; }
