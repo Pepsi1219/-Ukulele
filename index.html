@@ -474,9 +474,6 @@
         <button id="ntConfigOpenBtn" class="chip ntcfg-open-btn" type="button">
           <i class="fa-solid fa-sliders"></i> ตั้งค่า
         </button>
-        <button id="ntAddNoteBtn" class="chip" type="button">
-          <i class="fa-solid fa-plus"></i> เพิ่มโน้ต
-        </button>
       </div>
       <div class="ntcfg-summary" aria-live="polite">
         <span id="ntSummaryMeasure">Measure —</span>
@@ -640,6 +637,34 @@
     </div>
   </div>
   <!-- ===== /Notation Config Modal ===== -->
+
+  <!-- ===== Pitch Picker Modal ===== -->
+  <div id="ntPitchModal" class="ntpitch-overlay" hidden role="dialog" aria-modal="true" aria-label="เลือกโน้ต">
+    <div class="ntpitch-panel">
+      <div class="ntpitch-header-bar">
+        <span class="ntpitch-title"><i class="fa-solid fa-music"></i> เลือกโน้ต</span>
+        <button id="ntPitchCancelBtn" class="icon-btn" type="button" aria-label="ปิด">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div id="ntPitchGrid" class="ntpitch-grid"></div>
+    </div>
+  </div>
+  <!-- ===== /Pitch Picker Modal ===== -->
+
+  <!-- ===== Chord Picker Modal ===== -->
+  <div id="chordPickModal" class="chpick-overlay" hidden role="dialog" aria-modal="true" aria-label="เลือกคอร์ด">
+    <div class="chpick-panel">
+      <div class="chpick-header-bar">
+        <span class="chpick-title"><i class="fa-solid fa-guitar"></i> เลือกคอร์ด</span>
+        <button id="chordPickCancelBtn" class="icon-btn" type="button" aria-label="ปิด">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div id="chordPickGrid" class="chpick-grid"></div>
+    </div>
+  </div>
+  <!-- ===== /Chord Picker Modal ===== -->
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/howler/2.2.4/howler.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>

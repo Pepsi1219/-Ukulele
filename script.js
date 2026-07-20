@@ -263,9 +263,14 @@ const dom = {
   ntTimeSig:          document.getElementById("ntTimeSig"),
   ntMeasPerRow:       document.getElementById("ntMeasPerRow"),
   ntPickup:           document.getElementById("ntPickup"),
-  ntAddNoteBtn:       document.getElementById("ntAddNoteBtn"),
   ntConfigOpenBtn:    document.getElementById("ntConfigOpenBtn"),
   ntConfigModal:      document.getElementById("ntConfigModal"),
+  ntPitchModal:       document.getElementById("ntPitchModal"),
+  ntPitchCancelBtn:   document.getElementById("ntPitchCancelBtn"),
+  ntPitchGrid:        document.getElementById("ntPitchGrid"),
+  chordPickModal:     document.getElementById("chordPickModal"),
+  chordPickCancelBtn: document.getElementById("chordPickCancelBtn"),
+  chordPickGrid:      document.getElementById("chordPickGrid"),
   ntConfigSaveBtn:    document.getElementById("ntConfigSaveBtn"),
   ntConfigCancelBtn:  document.getElementById("ntConfigCancelBtn"),
   ntPreview:          document.getElementById("ntPreview"),
@@ -994,13 +999,7 @@ function makeChordInsertDivider(afterIdx) {
     e.stopPropagation();
     state.chordRows = insertChordRow(state.chordRows, afterIdx);
     reRenderChordRows();
-    setTimeout(() => {
-      const newIdx = afterIdx + 1;
-      const newEl  = dom.editorLinesList.querySelector(
-        `[data-chord-index="${newIdx}"] .editor-chname-input`
-      );
-      if (newEl) newEl.focus();
-    }, 30);
+    openChordPickModal(afterIdx + 1);
   });
   div.appendChild(addBtn);
   return div;
@@ -1083,27 +1082,17 @@ function renderChordRows() {
     timeDiv.appendChild(fineBtns);
     el.appendChild(timeDiv);
 
-    // Chord name input (prominent — this IS the main content)
-    const chordInput       = document.createElement("input");
-    chordInput.type        = "text";
-    chordInput.className   = "editor-chname-input";
-    chordInput.value       = row.chord;
-    chordInput.placeholder = "คอร์ด…";
-    chordInput.title       = "ชื่อคอร์ด เช่น Am, G7, Cmaj7/E";
-    chordInput.addEventListener("input", () => {
-      state.chordRows = updateChordName(state.chordRows, i, chordInput.value);
-      autoResizeInput(chordInput);
-      // Visual feedback: mark unrecognised chord names so the user notices typos.
-      // Empty string is allowed (means "no chord at this timestamp").
-      const val = chordInput.value.trim();
-      const unknown = val !== "" && !getChordData(val);
-      chordInput.classList.toggle("editor-chname-unknown", unknown);
-      chordInput.title = unknown
-        ? `"${val}" ไม่อยู่ในฐานข้อมูลคอร์ด — diagram จะไม่แสดง`
-        : "ชื่อคอร์ด เช่น Am, G7, Cmaj7/E";
+    // Chord name button (opens chord picker modal)
+    const chordBtn = document.createElement("button");
+    chordBtn.type = "button";
+    chordBtn.className = "editor-chname-btn" + (row.chord ? "" : " empty");
+    chordBtn.textContent = row.chord || "—";
+    chordBtn.title = "กดเพื่อเลือกคอร์ด";
+    chordBtn.addEventListener("click", e => {
+      e.stopPropagation();
+      openChordPickModal(i);
     });
-    autoResizeInput(chordInput);
-    el.appendChild(chordInput);
+    el.appendChild(chordBtn);
 
     // Stamp button
     const stampBtn       = document.createElement("button");
@@ -1352,12 +1341,7 @@ function makeNotationInsertDivider(afterIdx) {
     e.stopPropagation();
     state.notationRows = insertNoteRow(state.notationRows, afterIdx);
     reRenderNotationRows();
-    setTimeout(() => {
-      const newEl = dom.editorLinesList.querySelector(
-        `[data-notation-index="${afterIdx + 1}"] .editor-pitch-input`
-      );
-      if (newEl) newEl.focus();
-    }, 30);
+    openNtPitchModal(afterIdx + 1);
   });
   div.appendChild(addBtn);
   return div;
@@ -1418,18 +1402,17 @@ function renderNotationRows() {
     timeDiv.appendChild(fineBtns);
     el.appendChild(timeDiv);
 
-    // Pitch input (e.g. A4, F#4, rest)
-    const pitchInput       = document.createElement("input");
-    pitchInput.type        = "text";
-    pitchInput.className    = "editor-pitch-input";
-    pitchInput.value        = row.pitch;
-    pitchInput.placeholder  = "A4";
-    pitchInput.title        = "ระดับเสียง เช่น A4, F#4, Bb3 หรือ rest";
-    pitchInput.addEventListener("input", () => {
-      state.notationRows = updateNoteField(state.notationRows, i, { pitch: pitchInput.value });
-      renderNotationPreview();
+    // Pitch picker button
+    const pitchBtn = document.createElement("button");
+    pitchBtn.type = "button";
+    pitchBtn.className = "editor-pitch-btn" + (row.pitch ? "" : " empty");
+    pitchBtn.textContent = row.pitch || "—";
+    pitchBtn.title = "กดเพื่อเลือกโน้ต";
+    pitchBtn.addEventListener("click", e => {
+      e.stopPropagation();
+      openNtPitchModal(i);
     });
-    el.appendChild(pitchInput);
+    el.appendChild(pitchBtn);
 
     // Duration dropdown
     const durSelect      = document.createElement("select");
@@ -1556,6 +1539,157 @@ function applyNotationConfig(patch) {
   updateNotationSummary(getCurrentPlaybackSeconds());
 }
 
+// ─── Chord picker modal ───────────────────────────────────────────────────────
+
+const CHORD_GROUPS = [
+  { label: "Major",     chords: ["C","D","E","F","G","A","Bb","B"] },
+  { label: "Minor",     chords: ["Am","Bm","Cm","Dm","Em","Fm","Gm"] },
+  { label: "Dom 7",     chords: ["C7","D7","E7","F7","G7","A7","B7"] },
+  { label: "Minor 7",   chords: ["Am7","Bm7","Cm7","Dm7","Em7","Gm7"] },
+  { label: "Major 7",   chords: ["Cmaj7","Dmaj7","Fmaj7","Gmaj7","Amaj7"] },
+  { label: "Suspended", chords: ["Csus2","Csus4","Dsus2","Dsus4","Gsus2","Gsus4"] },
+];
+let _chordPickTargetIdx = -1;
+
+function buildChordPickGrid() {
+  const grid = dom.chordPickGrid;
+  if (!grid) return;
+
+  // "ว่าง" option (empty chord)
+  const emptyRow = document.createElement("div");
+  emptyRow.className = "chpick-group";
+  const emptyBtn = document.createElement("button");
+  emptyBtn.type = "button";
+  emptyBtn.className = "chpick-opt is-empty";
+  emptyBtn.dataset.chord = "";
+  emptyBtn.textContent = "ว่าง (ไม่มีคอร์ด)";
+  emptyBtn.addEventListener("click", () => selectChordPick(""));
+  emptyRow.appendChild(emptyBtn);
+  grid.appendChild(emptyRow);
+
+  CHORD_GROUPS.forEach(group => {
+    const section = document.createElement("div");
+    section.className = "chpick-section";
+
+    const lbl = document.createElement("span");
+    lbl.className = "chpick-group-label";
+    lbl.textContent = group.label;
+    section.appendChild(lbl);
+
+    const row = document.createElement("div");
+    row.className = "chpick-group";
+    group.chords.forEach(chord => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "chpick-opt";
+      btn.dataset.chord = chord;
+      btn.textContent = chord;
+      btn.addEventListener("click", () => selectChordPick(chord));
+      row.appendChild(btn);
+    });
+    section.appendChild(row);
+    grid.appendChild(section);
+  });
+}
+
+function openChordPickModal(rowIdx) {
+  _chordPickTargetIdx = rowIdx;
+  const currentChord = (state.chordRows[rowIdx] || {}).chord || "";
+  if (dom.chordPickGrid) {
+    dom.chordPickGrid.querySelectorAll(".chpick-opt").forEach(btn =>
+      btn.classList.toggle("is-selected", btn.dataset.chord === currentChord)
+    );
+  }
+  if (dom.chordPickModal) dom.chordPickModal.hidden = false;
+}
+
+function closeChordPickModal() {
+  if (dom.chordPickModal) dom.chordPickModal.hidden = true;
+  _chordPickTargetIdx = -1;
+}
+
+function selectChordPick(chord) {
+  if (_chordPickTargetIdx < 0) return;
+  state.chordRows = updateChordName(state.chordRows, _chordPickTargetIdx, chord);
+  reRenderChordRows();
+  closeChordPickModal();
+}
+
+// ─── Pitch picker modal ───────────────────────────────────────────────────────
+
+const NT_PITCH_NOTES   = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+const NT_PITCH_OCTAVES = [3, 4, 5];
+let _ntPitchTargetIdx  = -1;
+
+function buildNtPitchGrid() {
+  const grid = dom.ntPitchGrid;
+  if (!grid) return;
+
+  const hdr = document.createElement("div");
+  hdr.className = "ntpitch-row ntpitch-octave-hdr";
+  const blank = document.createElement("span"); blank.className = "ntpitch-note-label";
+  hdr.appendChild(blank);
+  NT_PITCH_OCTAVES.forEach(oct => {
+    const s = document.createElement("span"); s.className = "ntpitch-oct-label"; s.textContent = oct;
+    hdr.appendChild(s);
+  });
+  grid.appendChild(hdr);
+
+  NT_PITCH_NOTES.forEach(note => {
+    const row = document.createElement("div");
+    row.className = "ntpitch-row" + (note.includes("#") ? " ntpitch-sharp-row" : "");
+    const label = document.createElement("span"); label.className = "ntpitch-note-label"; label.textContent = note;
+    row.appendChild(label);
+    NT_PITCH_OCTAVES.forEach(oct => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "ntpitch-opt" + (note.includes("#") ? " is-sharp" : "");
+      btn.dataset.pitch = `${note}${oct}`;
+      btn.textContent   = `${note}${oct}`;
+      btn.addEventListener("click", () => selectNtPitch(btn.dataset.pitch));
+      row.appendChild(btn);
+    });
+    grid.appendChild(row);
+  });
+
+  const restRow = document.createElement("div");
+  restRow.className = "ntpitch-row ntpitch-rest-row";
+  const restBtn = document.createElement("button");
+  restBtn.type = "button";
+  restBtn.className = "ntpitch-opt is-rest";
+  restBtn.dataset.pitch = "rest";
+  const restIcon = document.createElement("i"); restIcon.className = "fa-solid fa-minus";
+  restBtn.appendChild(restIcon);
+  restBtn.appendChild(document.createTextNode(" rest (หยุด)"));
+  restBtn.addEventListener("click", () => selectNtPitch("rest"));
+  restRow.appendChild(restBtn);
+  grid.appendChild(restRow);
+}
+
+function openNtPitchModal(rowIdx) {
+  _ntPitchTargetIdx = rowIdx;
+  const currentPitch = (state.notationRows[rowIdx] || {}).pitch || "";
+  if (dom.ntPitchGrid) {
+    dom.ntPitchGrid.querySelectorAll(".ntpitch-opt").forEach(btn =>
+      btn.classList.toggle("is-selected", btn.dataset.pitch === currentPitch)
+    );
+  }
+  if (dom.ntPitchModal) dom.ntPitchModal.hidden = false;
+}
+
+function closeNtPitchModal() {
+  if (dom.ntPitchModal) dom.ntPitchModal.hidden = true;
+  _ntPitchTargetIdx = -1;
+}
+
+function selectNtPitch(pitch) {
+  if (_ntPitchTargetIdx < 0) return;
+  state.notationRows = updateNoteField(state.notationRows, _ntPitchTargetIdx, { pitch });
+  reRenderNotationRows();
+  renderNotationPreview();
+  closeNtPitchModal();
+}
+
 /** Wires the notation config controls + add-note button (once, at init). */
 function wireNotationConfigControls() {
   // Config fields (now inside the modal) — live-update preview as user changes values
@@ -1611,15 +1745,36 @@ function wireNotationConfigControls() {
     }
   });
 
-  if (dom.ntAddNoteBtn) dom.ntAddNoteBtn.addEventListener("click", () => {
-    state.notationRows = insertNoteRow(state.notationRows, state.notationRows.length - 1);
-    reRenderNotationRows();
-    setTimeout(() => {
-      const rows = dom.editorLinesList.querySelectorAll(".editor-pitch-input");
-      const last = rows[rows.length - 1];
-      if (last) last.focus();
-    }, 30);
+  // Wire chord picker modal
+  buildChordPickGrid();
+  if (dom.chordPickCancelBtn) dom.chordPickCancelBtn.addEventListener("click", closeChordPickModal);
+  if (dom.chordPickModal) {
+    dom.chordPickModal.addEventListener("click", e => {
+      if (e.target === dom.chordPickModal) closeChordPickModal();
+    });
+  }
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape" && dom.chordPickModal && !dom.chordPickModal.hidden) {
+      e.stopImmediatePropagation();
+      closeChordPickModal();
+    }
   });
+
+  // Wire pitch picker modal
+  buildNtPitchGrid();
+  if (dom.ntPitchCancelBtn) dom.ntPitchCancelBtn.addEventListener("click", closeNtPitchModal);
+  if (dom.ntPitchModal) {
+    dom.ntPitchModal.addEventListener("click", e => {
+      if (e.target === dom.ntPitchModal) closeNtPitchModal();
+    });
+  }
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape" && dom.ntPitchModal && !dom.ntPitchModal.hidden) {
+      e.stopImmediatePropagation();
+      closeNtPitchModal();
+    }
+  });
+
 }
 
 /** Updates the stamp-count badge in the topbar (tab-aware). */
@@ -1708,6 +1863,9 @@ function handleEditorExport() {
  * Routes to chord handler when chords tab is active.
  */
 function handleEditorKeydown(e) {
+  if (dom.ntConfigModal   && !dom.ntConfigModal.hidden)   return;
+  if (dom.ntPitchModal    && !dom.ntPitchModal.hidden)    return;
+  if (dom.chordPickModal  && !dom.chordPickModal.hidden)  return;
   if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
 
   if (state.editorTab === "notation") {
