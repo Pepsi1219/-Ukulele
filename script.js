@@ -264,6 +264,10 @@ const dom = {
   ntMeasPerRow:       document.getElementById("ntMeasPerRow"),
   ntPickup:           document.getElementById("ntPickup"),
   ntAddNoteBtn:       document.getElementById("ntAddNoteBtn"),
+  ntConfigOpenBtn:    document.getElementById("ntConfigOpenBtn"),
+  ntConfigModal:      document.getElementById("ntConfigModal"),
+  ntConfigSaveBtn:    document.getElementById("ntConfigSaveBtn"),
+  ntConfigCancelBtn:  document.getElementById("ntConfigCancelBtn"),
   ntPreview:          document.getElementById("ntPreview"),
   ntSummaryMeasure:   document.getElementById("ntSummaryMeasure"),
   ntSummaryRemaining: document.getElementById("ntSummaryRemaining"),
@@ -1550,17 +1554,56 @@ function applyNotationConfig(patch) {
 
 /** Wires the notation config controls + add-note button (once, at init). */
 function wireNotationConfigControls() {
+  // Config fields (now inside the modal) — live-update preview as user changes values
   if (dom.ntClef)    dom.ntClef.addEventListener("change", () => applyNotationConfig({ clef: dom.ntClef.value }));
   if (dom.ntKey)     dom.ntKey.addEventListener("change", () => applyNotationConfig({ key: dom.ntKey.value }));
   if (dom.ntTimeSig) dom.ntTimeSig.addEventListener("change", () => {
     const [n, d] = dom.ntTimeSig.value.split("/").map(Number);
     state.notationConfig = updateConfigField(state.notationConfig, { timeSignature: [n, d] });
-    reRenderNotationRows();   // measure dividers depend on the time signature
+    reRenderNotationRows();
   });
   if (dom.ntMeasPerRow) dom.ntMeasPerRow.addEventListener("change", () =>
     applyNotationConfig({ measuresPerRow: Number(dom.ntMeasPerRow.value) }));
   if (dom.ntPickup) dom.ntPickup.addEventListener("change", () =>
     applyNotationConfig({ pickupBeats: Number(dom.ntPickup.value) }));
+
+  // Modal open / close
+  let _prevNotationConfig = null;
+
+  function openNtConfigModal() {
+    _prevNotationConfig = JSON.parse(JSON.stringify(state.notationConfig));
+    syncNotationConfigControls();
+    if (dom.ntConfigModal) dom.ntConfigModal.hidden = false;
+  }
+
+  function closeNtConfigModal(revert) {
+    if (revert && _prevNotationConfig) {
+      state.notationConfig = _prevNotationConfig;
+      syncNotationConfigControls();
+      renderNotationPreview();
+      reRenderNotationRows();
+    }
+    _prevNotationConfig = null;
+    if (dom.ntConfigModal) dom.ntConfigModal.hidden = true;
+  }
+
+  if (dom.ntConfigOpenBtn) dom.ntConfigOpenBtn.addEventListener("click", openNtConfigModal);
+  if (dom.ntConfigSaveBtn) dom.ntConfigSaveBtn.addEventListener("click", () => closeNtConfigModal(false));
+  if (dom.ntConfigCancelBtn) dom.ntConfigCancelBtn.addEventListener("click", () => closeNtConfigModal(true));
+
+  // Close on backdrop click
+  if (dom.ntConfigModal) {
+    dom.ntConfigModal.addEventListener("click", e => {
+      if (e.target === dom.ntConfigModal) closeNtConfigModal(true);
+    });
+  }
+
+  // Escape key closes the modal (document-level, same pattern as other modals)
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape" && dom.ntConfigModal && !dom.ntConfigModal.hidden) {
+      closeNtConfigModal(true);
+    }
+  });
 
   if (dom.ntAddNoteBtn) dom.ntAddNoteBtn.addEventListener("click", () => {
     state.notationRows = insertNoteRow(state.notationRows, state.notationRows.length - 1);

@@ -1827,35 +1827,134 @@ button.toggle-pill:hover { transform: translateY(-1px); }
 }
 /* class+attr beats the plain class rule, so this correctly hides when toggled */
 .editor-notation-config[hidden] { display: none; }
-.ntcfg-controls {
+/* Header row: settings button + add-note button */
+.ntcfg-header-row {
   display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: 10px 14px;
+  gap: 8px;
+  align-items: center;
+  padding: 4px 0 6px;
 }
-.ntcfg-field {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  font-size: 0.72rem;
-  color: var(--text-muted, var(--text));
+.ntcfg-open-btn {
+  background: rgba(56,189,248,0.1);
+  border-color: rgba(56,189,248,0.35);
+  color: var(--primary);
   font-weight: 600;
 }
-.ntcfg-field select,
-.ntcfg-field input {
+.ntcfg-open-btn:hover {
+  background: rgba(56,189,248,0.2);
+  border-color: var(--primary);
+}
+
+/* ── Notation Config Modal ── */
+.ntcfg-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 450;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: flex-end;       /* bottom sheet on mobile */
+  justify-content: center;
+  padding: 0;
+}
+.ntcfg-modal-overlay[hidden] { display: none !important; }
+
+.ntcfg-modal-panel {
+  width: 100%;
+  max-width: 480px;
+  background: var(--panel-bg, #0e1829);
+  border-radius: 20px 20px 0 0;
+  box-shadow: 0 -8px 40px rgba(0,0,0,0.55);
+  border: 1px solid var(--border);
+  border-bottom: none;
+  overflow: hidden;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+[data-theme="light"] .ntcfg-modal-panel {
+  background: #f8fafc;
+}
+
+/* Drag handle pill */
+.ntcfg-modal-panel::before {
+  content: '';
+  display: block;
+  width: 36px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border);
+  margin: 10px auto 0;
+}
+
+.ntcfg-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px 10px;
+  border-bottom: 1px solid var(--border);
+}
+.ntcfg-modal-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.ntcfg-modal-title i { color: var(--primary); }
+
+.ntcfg-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 8px 0;
+}
+.ntcfg-modal-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 20px;
+  font-size: 0.9rem;
+  color: var(--text);
+  font-weight: 500;
+  border-bottom: 1px solid var(--border);
+  cursor: default;
+}
+.ntcfg-modal-field:last-child { border-bottom: none; }
+.ntcfg-modal-field span { flex-shrink: 0; }
+.ntcfg-modal-field select,
+.ntcfg-modal-field input {
   background: var(--panel-strong);
   border: 1.5px solid var(--border);
-  border-radius: 8px;
+  border-radius: 10px;
   color: var(--text);
   font-size: 0.9rem;
   font-family: inherit;
-  padding: 5px 8px;
+  padding: 7px 10px;
   outline: none;
+  min-width: 0;
+  flex-shrink: 1;
 }
-.ntcfg-field input { width: 84px; }
-.ntcfg-field select:focus,
-.ntcfg-field input:focus { border-color: var(--primary); }
-.ntcfg-controls .chip { align-self: flex-end; }
+.ntcfg-modal-field select { min-width: 140px; }
+.ntcfg-modal-field input  { width: 80px; text-align: center; }
+.ntcfg-modal-field select:focus,
+.ntcfg-modal-field input:focus { border-color: var(--primary); }
+
+.ntcfg-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding: 12px 20px 16px;
+  border-top: 1px solid var(--border);
+}
+.ntcfg-save-btn {
+  background: var(--primary);
+  color: #020617;
+  font-weight: 700;
+  font-size: 0.9rem;
+  padding: 0 28px;
+  min-height: 40px;
+  border-color: var(--primary);
+}
+.ntcfg-save-btn:hover { filter: brightness(1.1); }
 
 .ntcfg-summary {
   display: flex;
@@ -3201,11 +3300,82 @@ select option { font-family: inherit; }
     height: 0;
     order: 4;
   }
-  .editor-row-time    { order: 1; }
+  .editor-notation-row .editor-row-time { order: 1; }
   .editor-pitch-input { order: 2; flex: 1 1 auto; min-width: 0; width: auto; }
   .editor-del-btn     { order: 3; }
   .editor-dur-select  { order: 5; flex: 1 1 auto; min-width: 0; }
-  .editor-stamp-btn   { order: 6; }
+  .editor-notation-row .editor-stamp-btn { order: 6; }
+
+  /* ── Lyrics editor rows: 2-line layout on mobile ───────────────────────
+     Row 1: [lyric segments · flex:1]  [🗑 delete]
+     Row 2: [time badge + −/+ btns]    [🕐 Stamp → right]                  */
+  .editor-row-line {
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+  .editor-row-line::before {
+    content: '';
+    flex-basis: 100%;
+    height: 0;
+    order: 3;
+  }
+  .editor-row-line .editor-row-content { order: 1; flex: 1 1 0; min-width: 0; }
+  .editor-row-line .editor-del-row-btn { order: 2; }
+  .editor-row-line .editor-row-time {
+    order: 4;
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+  }
+  .editor-row-line .editor-stamp-btn { order: 5; margin-left: auto; }
+
+  /* ── Chord editor rows: same 2-line layout ─────────────────────────────
+     Row 1: [chord input · flex:1]  [🗑 delete]
+     Row 2: [time badge + −/+ btns] [🕐 Stamp → right]                     */
+  .editor-chord-row {
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+  .editor-chord-row::before {
+    content: '';
+    flex-basis: 100%;
+    height: 0;
+    order: 3;
+  }
+  .editor-chord-row .editor-chname-input { order: 1; flex: 1 1 0; min-width: 0; }
+  .editor-chord-row .editor-del-row-btn  { order: 2; }
+  .editor-chord-row .editor-row-time {
+    order: 4;
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+  }
+  .editor-chord-row .editor-stamp-btn { order: 5; margin-left: auto; }
+
+  /* Bigger touch targets for fine-tune −/+ buttons */
+  .editor-fine-btn { width: 30px; height: 28px; }
+
+  /* Always-visible on mobile — hover/opacity-0 patterns don't work on touch */
+  .editor-row-line .editor-del-row-btn,
+  .editor-row-section .editor-del-row-btn,
+  .editor-chord-row .editor-del-row-btn { opacity: 0.7 !important; }
+  .editor-row-line .editor-add-seg-btn,
+  .editor-row-line .editor-rm-seg-btn   { opacity: 1 !important; }
+
+  /* Insert-row dividers: always visible on mobile */
+  .editor-row-divider { opacity: 0.6; }
+
+  /* ── Notation editor: mobile tweaks ───────────────────────────────────── */
+  /* Del btn: bigger touch target, always at readable opacity */
+  .editor-del-btn { padding: 8px 12px; opacity: 0.7; }
+
+  /* Stamp & Next: bigger tap area */
+  .editor-notation-row .editor-stamp-btn { min-height: 38px; padding: 0 16px; }
+
+  /* Staff preview: fill full width so the score is easier to read */
+  .ntcfg-preview .note-staff-svg { width: 95%; max-width: 95%; }
+
 }
 
 /* Very narrow phones (≤ 360px) */
@@ -3213,4 +3383,18 @@ select option { font-family: inherit; }
   .control-btn { width: 36px; height: 36px; }
   .control-btn.primary { width: 46px; height: 46px; }
   .controls { gap: 4px; }
+}
+
+/* Notation config modal: centered dialog on wider screens */
+@media (min-width: 761px) {
+  .ntcfg-modal-overlay {
+    align-items: center;
+    padding: 20px;
+  }
+  .ntcfg-modal-panel {
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    max-width: 440px;
+  }
+  .ntcfg-modal-panel::before { display: none; }
 }

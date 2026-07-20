@@ -186,6 +186,8 @@ Notable `state` fields and their current behaviour — check these before editin
 | `state.lyricsFontScale` | `number` | Multiplier (0.75–3.0, 9-step ladder) for lyrics text size — shared by the normal panel and the fullscreen overlay. **A−**/**A+** buttons appear in both headers; either one calls `adjustLyricsFontScale()`, which sets the `--lyrics-font-scale` CSS variable on `document.documentElement` so both `#lyricsContainer` and `#lyricsFullscreenContainer` pick it up. |
 | `state.editorActiveLyricIdx` | `number` | Playback-position highlight for the Lyrics tab of the timestamp editor (`.editor-row-line.playing`) — mirrors the existing chord-tab highlight (`state.editorActiveChordIdx`). Driven by `updateLyricsEditorAutoScroll()` each RAF tick. |
 
+**Notation config modal (`#ntConfigModal` / `.ntcfg-modal-overlay`):** Fixed overlay, `z-index: 450`. Opened by `#ntConfigOpenBtn` (⚙ ตั้งค่า) in the notation tab header. Contains clef, key, time signature, measures-per-row, and pickup-beats fields — changes apply live (preview updates on each `change` event). Save (`#ntConfigSaveBtn`) just closes; Cancel (`#ntConfigCancelBtn`) / Escape / backdrop click reverts `state.notationConfig` to the snapshot taken at open. `wireNotationConfigControls()` wires everything. On mobile (≤ 760px): bottom sheet; on desktop (≥ 761px): centered dialog.
+
 **Fullscreen lyrics overlay (`#lyricsFullscreen` / `.lyrics-fs`):** Fixed overlay, `z-index: 300`, background `#090d18`. Structure: `.lyrics-fs-body` (flex column, fills space) → `.lyrics-fs-header` (glassmorphism, shows `#lyricsFsHeaderTitle` song title + action buttons) → `.lyrics-fs-main` (flex row: chord column + lyrics container) → `.lyrics-fs-player` (glassmorphism player bar at bottom). Chord column (`.lyrics-fs-chord-col`) is `clamp(280px, 28vw, 420px)` — responsive, scales with viewport. Chord badge inside is `clamp(160px, 20vw, 260px)`. Diagram SVG is `clamp(160px, 18vw, 240px)`. Player transport buttons: 36px/46px (secondary/primary). Progress bar in `.lyrics-fs-player-timeline` is overridden to 3px height with amber fill. Active-state button highlights use `var(--accent)` amber (not blue). `syncFsPlayer()` populates both `dom.lyricsFsPlayerTitle` (in player bar) and `dom.lyricsFsHeaderTitle` (in header) with the current song title.
 
 **Dancing character (Lottie):** Lives in `.header-brand` inside `<header>`, absolutely positioned to the right of the h1 so it doesn't affect header height. No toggle button — always visible. Controlled by `initLottieDancer()` / `swapLottie()` in `script.js`.
@@ -218,9 +220,9 @@ Do this proactively whenever writing CSS that sets `display: block/flex/inline-f
 
 1. Open the app, log in as a teacher, and select the lesson song.
 2. Click the **Editor** button → switch to the **โน้ต** tab.
-3. Set clef, key, time signature, measures per row, pickup beats.
-4. Add notes one by one (pitch + duration). The staff preview updates live.
-5. To sync highlights with audio: play the song and press **Stamp** on each note at the right moment.
+3. Press **⚙ ตั้งค่า** to open the config modal — set clef, key, time signature, measures per row, pickup beats. Preview updates live as you change values. Press **บันทึก** to confirm or ✕/Escape to revert.
+4. Press **+ เพิ่มโน้ต** to add notes one by one (pitch + duration). The staff preview updates live.
+5. To sync highlights with audio: play the song and press **Stamp & Next** on each note at the right moment.
 6. Click **บันทึกขึ้น Cloud** to save straight to Firestore.
 
 ---

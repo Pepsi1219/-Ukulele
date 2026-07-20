@@ -470,45 +470,10 @@
 
     <!-- Notation config + live preview — only visible on the notation tab -->
     <div id="editorNotationConfig" class="editor-notation-config" hidden>
-      <div class="ntcfg-controls">
-        <label class="ntcfg-field">กุญแจ
-          <select id="ntClef">
-            <option value="treble">กุญแจซอล (Treble)</option>
-            <option value="bass">กุญแจฟา (Bass)</option>
-          </select>
-        </label>
-        <label class="ntcfg-field">คีย์
-          <select id="ntKey">
-            <option value="C">C</option>
-            <option value="G">G (1♯)</option>
-            <option value="D">D (2♯)</option>
-            <option value="A">A (3♯)</option>
-            <option value="E">E (4♯)</option>
-            <option value="B">B (5♯)</option>
-            <option value="F#">F♯ (6♯)</option>
-            <option value="F">F (1♭)</option>
-            <option value="Bb">B♭ (2♭)</option>
-            <option value="Eb">E♭ (3♭)</option>
-            <option value="Ab">A♭ (4♭)</option>
-            <option value="Db">D♭ (5♭)</option>
-            <option value="Gb">G♭ (6♭)</option>
-          </select>
-        </label>
-        <label class="ntcfg-field">จังหวะ
-          <select id="ntTimeSig">
-            <option value="4/4">4/4</option>
-            <option value="3/4">3/4</option>
-            <option value="2/4">2/4</option>
-            <option value="6/8">6/8</option>
-            <option value="2/2">2/2</option>
-          </select>
-        </label>
-        <label class="ntcfg-field">ห้อง/แถว
-          <input id="ntMeasPerRow" type="number" min="1" max="8" step="1">
-        </label>
-        <label class="ntcfg-field">ห้องนำ (beat)
-          <input id="ntPickup" type="number" min="0" max="16" step="0.5">
-        </label>
+      <div class="ntcfg-header-row">
+        <button id="ntConfigOpenBtn" class="chip ntcfg-open-btn" type="button">
+          <i class="fa-solid fa-sliders"></i> ตั้งค่า
+        </button>
         <button id="ntAddNoteBtn" class="chip" type="button">
           <i class="fa-solid fa-plus"></i> เพิ่มโน้ต
         </button>
@@ -563,16 +528,6 @@
     <!-- Lyric lines list -->
     <div id="editorLinesList" class="editor-lines-list"></div>
 
-    <!-- Keyboard hint footer -->
-    <div class="editor-footer">
-      <span class="editor-hint">
-        คลิกช่อง <strong>คอร์ด</strong> หรือ <strong>เนื้อเพลง</strong> เพื่อแก้ไขโดยตรง &nbsp;·&nbsp;
-        วางเมาส์ที่บรรทัดเพื่อเพิ่ม/ลบ segment &nbsp;·&nbsp;
-        กด <kbd>Space</kbd> หรือ <strong>Stamp</strong> เพื่อตั้งเวลา &nbsp;·&nbsp;
-        <kbd>↑</kbd><kbd>↓</kbd> เลื่อนบรรทัด &nbsp;·&nbsp; <kbd>Esc</kbd> กลับ
-      </span>
-    </div>
-
   </div>
   <!-- ===== /Timestamp Editor ===== -->
 
@@ -620,6 +575,71 @@
 
   </div>
   <!-- ===== /Strumming Pattern Panel ===== -->
+
+  <!-- ===== Notation Config Modal ===== -->
+  <div id="ntConfigModal" class="ntcfg-modal-overlay" hidden role="dialog" aria-modal="true" aria-label="ตั้งค่าโน้ต">
+    <div class="ntcfg-modal-panel">
+      <div class="ntcfg-modal-header">
+        <span class="ntcfg-modal-title">
+          <i class="fa-solid fa-sliders"></i> ตั้งค่าโน้ต
+        </span>
+        <button id="ntConfigCancelBtn" class="icon-btn" type="button" aria-label="ปิด">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div class="ntcfg-modal-body">
+        <label class="ntcfg-modal-field">
+          <span>กุญแจ</span>
+          <select id="ntClef">
+            <option value="treble">กุญแจซอล (Treble)</option>
+            <option value="bass">กุญแจฟา (Bass)</option>
+          </select>
+        </label>
+        <label class="ntcfg-modal-field">
+          <span>คีย์</span>
+          <select id="ntKey">
+            <option value="C">C</option>
+            <option value="G">G (1♯)</option>
+            <option value="D">D (2♯)</option>
+            <option value="A">A (3♯)</option>
+            <option value="E">E (4♯)</option>
+            <option value="B">B (5♯)</option>
+            <option value="F#">F♯ (6♯)</option>
+            <option value="F">F (1♭)</option>
+            <option value="Bb">B♭ (2♭)</option>
+            <option value="Eb">E♭ (3♭)</option>
+            <option value="Ab">A♭ (4♭)</option>
+            <option value="Db">D♭ (5♭)</option>
+            <option value="Gb">G♭ (6♭)</option>
+          </select>
+        </label>
+        <label class="ntcfg-modal-field">
+          <span>จังหวะ</span>
+          <select id="ntTimeSig">
+            <option value="4/4">4/4</option>
+            <option value="3/4">3/4</option>
+            <option value="2/4">2/4</option>
+            <option value="6/8">6/8</option>
+            <option value="2/2">2/2</option>
+          </select>
+        </label>
+        <label class="ntcfg-modal-field">
+          <span>ห้อง/แถว</span>
+          <input id="ntMeasPerRow" type="number" min="1" max="8" step="1">
+        </label>
+        <label class="ntcfg-modal-field">
+          <span>ห้องนำ (beat)</span>
+          <input id="ntPickup" type="number" min="0" max="16" step="0.5">
+        </label>
+      </div>
+      <div class="ntcfg-modal-footer">
+        <button id="ntConfigSaveBtn" class="chip ntcfg-save-btn" type="button">
+          <i class="fa-solid fa-check"></i> บันทึก
+        </button>
+      </div>
+    </div>
+  </div>
+  <!-- ===== /Notation Config Modal ===== -->
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/howler/2.2.4/howler.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
