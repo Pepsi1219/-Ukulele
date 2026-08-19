@@ -335,7 +335,7 @@ h1, h2, h3, p { margin-top: 0; }
 }
 /* Extra breathing room only on the desktop 3-column layout — small screens keep the original tight spacing */
 @media (min-width: 1181px) {
-  .app-header { margin-bottom: 36px; }
+  .app-header { margin-bottom: 16px; }
 }
 
 .header-brand {
