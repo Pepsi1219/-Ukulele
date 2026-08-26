@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo 'REMINDER (whole-system impact rule): Before editing, map every place the change touches — data model, Firestore rules, editor tabs, playback sync, main panel + fullscreen overlay, tests, migration script, related state. If low risk: fix the whole system in the same pass (never patch only the exact spot while leaving mirrors stale). If high risk / cross-cutting: STOP, list impact + risk, and let the user decide before touching code. If unsure, treat as high risk and ask.'"
+          }
+        ]
+      }
+    ]
+  }
+}

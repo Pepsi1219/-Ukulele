@@ -46,14 +46,27 @@ describe("buildNoteRows", () => {
   it("maps notes to rows with string fields and null time when absent", () => {
     const rows = buildNoteRows(sample);
     expect(rows).toEqual([
-      { pitch: "A4", dur: "quarter", time: 1.0 },
-      { pitch: "B4", dur: "half", time: null },
+      { pitch: "A4", dur: "quarter", time: 1.0, tabString: null, tabFret: null },
+      { pitch: "B4", dur: "half", time: null,  tabString: null, tabFret: null },
     ]);
   });
 
   it("returns [] for missing notes", () => {
     expect(buildNoteRows(null)).toEqual([]);
     expect(buildNoteRows({})).toEqual([]);
+  });
+
+  it("preserves tabString / tabFret when the raw note carries them", () => {
+    const rows = buildNoteRows({
+      notes: [
+        { pitch: "A4", dur: "quarter", tabString: 3, tabFret: 0 },
+        { pitch: "C5", dur: "quarter", tabString: 3, tabFret: 3 },
+      ],
+    });
+    expect(rows[0].tabString).toBe(3);
+    expect(rows[0].tabFret).toBe(0);
+    expect(rows[1].tabString).toBe(3);
+    expect(rows[1].tabFret).toBe(3);
   });
 });
 
@@ -198,6 +211,23 @@ describe("exportToNotationJson", () => {
     const json = JSON.parse(exportToNotationJson({}, rows));
     expect(json.notes).toHaveLength(1);
     expect(json.notes[0].pitch).toBe("A4");
+  });
+
+  it("emits tabString + tabFret only when BOTH are set and in range", () => {
+    const rows = [
+      { pitch: "A4", dur: "quarter", time: null, tabString: 3, tabFret: 0 }, // full override → keep
+      { pitch: "C5", dur: "quarter", time: null, tabString: 3, tabFret: null }, // partial → drop
+      { pitch: "E5", dur: "quarter", time: null, tabString: 9, tabFret: 3 }, // out-of-range string → drop
+      { pitch: "G5", dur: "quarter", time: null, tabString: 0, tabFret: 20 }, // out-of-range fret → drop
+      { pitch: "B4", dur: "quarter", time: null, tabString: null, tabFret: null }, // no override → drop
+    ];
+    const json = JSON.parse(exportToNotationJson({}, rows));
+    expect(json.notes[0]).toEqual({ pitch: "A4", dur: "quarter", tabString: 3, tabFret: 0 });
+    expect(json.notes[1].tabString).toBeUndefined();
+    expect(json.notes[1].tabFret).toBeUndefined();
+    expect(json.notes[2].tabString).toBeUndefined();
+    expect(json.notes[3].tabFret).toBeUndefined();
+    expect(json.notes[4].tabString).toBeUndefined();
   });
 
   it("does not reorder notes by time", () => {

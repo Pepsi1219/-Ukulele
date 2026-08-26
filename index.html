@@ -246,10 +246,14 @@
       </section>
 
       <!-- Center Panel: Chord + Character -->
-      <section class="panel chord-panel">
+      <section class="panel chord-panel" id="chordPanel">
         <div class="section-title">
           <h2>คอร์ดอูคูเลเล่</h2>
           <div class="chord-panel-actions">
+            <button id="chordPanelCollapseBtn" class="icon-btn secondary panel-collapse-btn"
+                    type="button" aria-label="ย่อพาเนลคอร์ด" title="ย่อพาเนลคอร์ด">
+              <i class="fa-solid fa-angles-right"></i>
+            </button>
             <button id="diagramModeBtn" class="icon-btn secondary" type="button"
                     aria-pressed="false" aria-label="สลับโหมดคอร์ด/โน้ต" title="สลับโหมดคอร์ด/โน้ต (สำหรับฝึกดีดโน้ต)">
               <i class="fa-solid fa-circle-dot"></i>
@@ -282,20 +286,34 @@
 
         </div>
 
+        <!-- Collapsed-state rail (shown only when .is-collapsed on desktop).
+             Mobile hides this rail via the responsive CSS since the accordion
+             pattern reuses the section-title's collapse button as the toggle. -->
+        <button id="chordPanelExpandBtn" class="panel-rail" type="button"
+                aria-label="ขยายพาเนลคอร์ด" title="ขยายพาเนลคอร์ด">
+          <i class="fa-solid fa-angles-left panel-rail-chevron" aria-hidden="true"></i>
+          <span class="panel-rail-title">คอร์ด</span>
+          <i class="fa-solid fa-guitar panel-rail-icon" aria-hidden="true"></i>
+        </button>
+
       </section>
 
       <!-- Right Panel: Lyrics -->
-      <section class="panel lyrics-panel">
+      <section class="panel lyrics-panel" id="lyricsPanel">
         <div class="section-title">
           <h2>เนื้อเพลง</h2>
           <div class="lyrics-title-actions">
+            <button id="lyricsPanelCollapseBtn" class="icon-btn secondary panel-collapse-btn"
+                    type="button" aria-label="ย่อพาเนลเนื้อเพลง" title="ย่อพาเนลเนื้อเพลง">
+              <i class="fa-solid fa-angles-right"></i>
+            </button>
             <button id="notationToggleBtn" class="icon-btn secondary" type="button" hidden
-                    aria-pressed="false" title="สลับโหมด Letter Note Notation">
+                    aria-haspopup="dialog" aria-expanded="false"
+                    title="เปลี่ยนโหมดการแสดงโน้ต">
               <i class="fa-solid fa-music"></i>
             </button>
-            <button id="autoScrollToggle" class="status-pill toggle-pill is-on" type="button" aria-pressed="true" title="เปิด/ปิด Auto Scroll">
+            <button id="autoScrollToggle" class="status-pill toggle-pill is-on icon-only" type="button" aria-pressed="true" aria-label="เปิด/ปิด Auto Scroll" title="เปิด/ปิด Auto Scroll">
               <i class="fa-solid fa-arrows-up-down"></i>
-              <span>Auto Scroll</span>
             </button>
             <div class="font-size-ctrl">
               <button id="lyricsFontDown" class="icon-btn secondary" type="button" aria-label="ลดขนาดตัวอักษร" title="ลดขนาดตัวอักษร">A<span style="font-size:0.65em">−</span></button>
@@ -310,10 +328,57 @@
         <div id="lyricsContainer" class="lyrics-container">
           <p class="empty-state">ยังไม่มีเนื้อเพลง</p>
         </div>
+
+        <!-- Collapsed-state rail (desktop). Mobile uses accordion via the
+             section-title collapse button; see .panel-rail responsive rule. -->
+        <button id="lyricsPanelExpandBtn" class="panel-rail" type="button"
+                aria-label="ขยายพาเนลเนื้อเพลง" title="ขยายพาเนลเนื้อเพลง">
+          <i class="fa-solid fa-angles-left panel-rail-chevron" aria-hidden="true"></i>
+          <span class="panel-rail-title">เนื้อเพลง</span>
+          <i class="fa-solid fa-align-left panel-rail-icon" aria-hidden="true"></i>
+        </button>
       </section>
 
     </main>
   </div>
+
+  <!-- ===== Mobile mini-player (Spotify-style) =====
+       Floats above the app on mobile only (CSS media query). Shown once a
+       song is loaded (via .is-visible class set from script.js), hidden
+       when a full-screen overlay (fullscreen lyrics, editor, entry gate)
+       is open so it doesn't stack on top of their own transports. All 3
+       buttons mirror the primary player buttons in the controls-panel —
+       clicks are forwarded, so the mini-player is a passive skin. -->
+  <div id="miniPlayer" class="mini-player" hidden aria-label="Mini player">
+    <div class="mini-player-progress" id="miniPlayerProgress">
+      <div class="mini-player-progress-fill" id="miniPlayerProgressFill"></div>
+    </div>
+    <div class="mini-player-body">
+      <div class="mini-player-art" aria-hidden="true">
+        <i class="fa-solid fa-music"></i>
+      </div>
+      <div class="mini-player-info">
+        <div class="mini-player-title" id="miniPlayerTitle">—</div>
+        <div class="mini-player-time">
+          <span id="miniPlayerCurrent">0:00</span>
+          <span class="mini-player-sep">/</span>
+          <span id="miniPlayerTotal">0:00</span>
+        </div>
+      </div>
+      <div class="mini-player-actions">
+        <button id="miniPlayerPrev" class="mini-player-btn" type="button" aria-label="เพลงก่อนหน้า" title="เพลงก่อนหน้า">
+          <i class="fa-solid fa-backward-step"></i>
+        </button>
+        <button id="miniPlayerPlay" class="mini-player-btn primary" type="button" aria-label="Play / Pause">
+          <i class="fa-solid fa-play" id="miniPlayerPlayIcon"></i>
+        </button>
+        <button id="miniPlayerNext" class="mini-player-btn" type="button" aria-label="เพลงถัดไป" title="เพลงถัดไป">
+          <i class="fa-solid fa-forward-step"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+  <!-- ===== /Mobile mini-player ===== -->
 
   <!-- Bottom-sheet: choose which string to play notes on (note-picking mode) -->
   <div id="notePickSheet" class="note-pick-sheet" hidden>
@@ -335,9 +400,8 @@
                   aria-pressed="false" aria-label="สลับตำแหน่ง Chord ↔ Lyrics" title="สลับตำแหน่ง Chord ↔ Lyrics">
             <i class="fa-solid fa-arrow-right-arrow-left"></i>
           </button>
-          <button id="lyricsFullscreenAutoScroll" class="status-pill toggle-pill is-on" type="button" aria-pressed="true" title="เปิด/ปิด Auto Scroll">
+          <button id="lyricsFullscreenAutoScroll" class="status-pill toggle-pill is-on icon-only" type="button" aria-pressed="true" aria-label="เปิด/ปิด Auto Scroll" title="เปิด/ปิด Auto Scroll">
             <i class="fa-solid fa-arrows-up-down"></i>
-            <span>Auto Scroll</span>
           </button>
           <div class="font-size-ctrl">
             <button id="lyricsFsFontDown" class="icon-btn secondary" type="button" aria-label="ลดขนาดตัวอักษร" title="ลดขนาดตัวอักษร">A<span style="font-size:0.65em">−</span></button>
@@ -464,7 +528,7 @@
         <i class="fa-solid fa-guitar"></i> คอร์ด
       </button>
       <button id="editorTabNotation" class="editor-tab" data-tab="notation" type="button">
-        <i class="fa-solid fa-music"></i> โน้ต
+        <i class="fa-solid fa-music"></i> โน้ต + Tab
       </button>
     </div>
 
@@ -665,6 +729,69 @@
     </div>
   </div>
   <!-- ===== /Chord Picker Modal ===== -->
+
+  <!-- ===== Editor Tab-Position Picker Modal ===== -->
+  <!-- Opens from a note row's tab chip inside the Notation editor tab. Lets
+       the teacher pin a specific (string, fret) fingering for that note,
+       overriding the auto-picker in tabModel. "Auto" clears the override.
+       Grid mirrors the ukulele fretboard: 4 rows (A-E-C-G top-to-bottom,
+       matching UKE_TAB_ROW_ORDER) × 16 columns (fret 0–15). -->
+  <div id="ntTabModal" class="nttab-overlay" hidden role="dialog" aria-modal="true" aria-label="เลือกตำแหน่ง Tab">
+    <div class="nttab-panel">
+      <div class="nttab-header-bar">
+        <span class="nttab-title"><i class="fa-solid fa-guitar"></i> เลือกตำแหน่ง Tab</span>
+        <button id="ntTabCancelBtn" class="icon-btn" type="button" aria-label="ปิด">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div class="nttab-body">
+        <button id="ntTabAutoBtn" class="nttab-auto-btn" type="button">
+          <i class="fa-solid fa-wand-magic-sparkles"></i> Auto (ใช้ค่าที่ระบบเลือก)
+        </button>
+        <div id="ntTabGrid" class="nttab-grid" role="grid" aria-label="เลือก (สาย, fret)"></div>
+      </div>
+    </div>
+  </div>
+  <!-- ===== /Editor Tab-Position Picker Modal ===== -->
+
+  <!-- ===== Notation View Picker Modal ===== -->
+  <!-- Opens when the lyrics-panel's notation-mode button (#notationToggleBtn) is
+       clicked. Presents the notation-view options (Notation / Tab / Both / Image)
+       and applies the chosen one immediately. Image is only listed when the song
+       has a Letter Note Notation PNG. -->
+  <div id="notationViewModal" class="nvpick-overlay" hidden role="dialog" aria-modal="true" aria-label="เลือกโหมดการแสดงโน้ต">
+    <div class="nvpick-panel">
+      <div class="nvpick-header-bar">
+        <span class="nvpick-title"><i class="fa-solid fa-music"></i> เลือกโหมดการแสดง</span>
+        <button id="notationViewCancelBtn" class="icon-btn" type="button" aria-label="ปิด">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div class="nvpick-grid">
+        <button class="nvpick-option" type="button" data-view="notation">
+          <i class="fa-solid fa-music nvpick-option-icon" aria-hidden="true"></i>
+          <span class="nvpick-option-label">Notation</span>
+          <span class="nvpick-option-desc">โน้ตบนบรรทัด 5 เส้น</span>
+        </button>
+        <button class="nvpick-option" type="button" data-view="tab">
+          <i class="fa-solid fa-guitar nvpick-option-icon" aria-hidden="true"></i>
+          <span class="nvpick-option-label">Tab</span>
+          <span class="nvpick-option-desc">แท็บอูคูเลเล่ 4 สาย</span>
+        </button>
+        <button class="nvpick-option" type="button" data-view="both">
+          <i class="fa-solid fa-layer-group nvpick-option-icon" aria-hidden="true"></i>
+          <span class="nvpick-option-label">Both</span>
+          <span class="nvpick-option-desc">Notation + Tab คู่กัน</span>
+        </button>
+        <button class="nvpick-option" type="button" data-view="image" data-requires-image="true">
+          <i class="fa-solid fa-image nvpick-option-icon" aria-hidden="true"></i>
+          <span class="nvpick-option-label">Image</span>
+          <span class="nvpick-option-desc">รูปภาพ Letter Note Notation</span>
+        </button>
+      </div>
+    </div>
+  </div>
+  <!-- ===== /Notation View Picker Modal ===== -->
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/howler/2.2.4/howler.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>

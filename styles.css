@@ -402,7 +402,265 @@ h1 i { color: var(--accent); }
   box-shadow: var(--shadow);
   backdrop-filter: blur(20px);
   min-width: 0;                /* prevent grid blow-out from long content */
+  transition: padding 0.18s ease;
 }
+
+/* ── Mobile mini-player (Spotify-style) ────────────────────────────────
+   Hidden on desktop; shown as a slim glass bar at the bottom of the
+   viewport once a song is loaded (via `.is-visible`). Fully passive:
+   its 3 buttons forward clicks to the real player controls, and the
+   title/time/progress are updated from the same playback tick that
+   drives the rest of the UI. Progress fill sits at the top edge of the
+   bar (matches iOS Music / Spotify Mini). */
+.mini-player {
+  position: fixed;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  bottom: max(8px, env(safe-area-inset-bottom));
+  z-index: 200;
+  border-radius: 14px;
+  background: rgba(17, 22, 38, 0.85);
+  backdrop-filter: blur(24px) saturate(140%);
+  -webkit-backdrop-filter: blur(24px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+  color: var(--text);
+  transform: translateY(120%);
+  opacity: 0;
+  transition: transform 220ms ease, opacity 200ms ease;
+  pointer-events: none;
+}
+.mini-player.is-visible {
+  transform: translateY(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+.mini-player[hidden] { display: none !important; }
+
+.mini-player-progress {
+  height: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+  touch-action: none;
+}
+.mini-player-progress-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--primary), var(--accent));
+  border-radius: 0 3px 3px 0;
+  transition: width 60ms linear;
+}
+
+.mini-player-body {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+}
+
+.mini-player-art {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #38bdf8, #a3e635);
+  display: grid;
+  place-items: center;
+  color: #0b1120;
+  font-size: 1.05rem;
+  box-shadow: 0 4px 12px rgba(56, 189, 248, 0.28);
+}
+
+.mini-player-info {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+}
+.mini-player-title {
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+}
+.mini-player-time {
+  font-size: 0.68rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  display: flex;
+  gap: 3px;
+}
+.mini-player-sep { opacity: 0.5; }
+
+.mini-player-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+.mini-player-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background 150ms ease, transform 100ms ease;
+}
+.mini-player-btn:hover { background: rgba(255, 255, 255, 0.08); }
+.mini-player-btn:active { transform: scale(0.92); }
+.mini-player-btn.primary {
+  width: 40px;
+  height: 40px;
+  background: var(--primary);
+  color: #020617;
+  font-size: 1rem;
+  box-shadow: 0 4px 10px rgba(56, 189, 248, 0.35);
+}
+.mini-player-btn.primary:hover { background: var(--primary); filter: brightness(1.08); }
+
+/* Desktop: never show the mini-player — real controls-panel is always
+   visible in-flow. */
+@media (min-width: 761px) {
+  .mini-player { display: none !important; }
+}
+
+/* Hide when any full-screen overlay is open (fullscreen lyrics, editor,
+   entry gate) — those have their own transports. Body class is toggled
+   by openEditor / dismissEntryGate / lyrics-fullscreen wiring. */
+body.no-mini-player .mini-player { display: none !important; }
+
+/* ── Panel collapse (chord + lyrics) ──────────────────────────────────────
+   Desktop: collapsed panel becomes a 44px vertical rail with just an
+   icon + rotated title + expand button.
+   Mobile: collapsed = accordion (body hidden, section-title stays).
+   Persist: state.chordPanelCollapsed / state.lyricsPanelCollapsed. */
+
+/* Rail button — hidden by default, shown only when panel is collapsed
+   on desktop. It's a <button> so the entire rail is one big click target. */
+.panel-rail {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 14px;
+  padding: 14px 0;
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  border-radius: var(--radius);
+  transition: background 0.15s;
+}
+.panel-rail:hover { background: rgba(255, 255, 255, 0.04); }
+.panel-rail-chevron {
+  font-size: 15px;
+  color: var(--primary);
+}
+.panel-rail-title {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 1px;
+  color: var(--text);
+  opacity: 0.85;
+}
+.panel-rail-icon {
+  font-size: 16px;
+  opacity: 0.55;
+  margin-top: auto;
+}
+
+.panel-collapse-btn i { transition: transform 0.2s; }
+
+/* Desktop (>760px): true rail layout */
+@media (min-width: 761px) {
+  .panel.is-collapsed {
+    padding: 0;
+    overflow: hidden;
+  }
+  /* Hide the panel's normal body when collapsed */
+  .panel.is-collapsed > .section-title,
+  .panel.is-collapsed > .chord-stage,
+  .panel.is-collapsed > .lyrics-container {
+    display: none !important;
+  }
+  /* Show the rail */
+  .panel.is-collapsed > .panel-rail { display: flex; }
+}
+
+/* Grid column-width overrides driven by collapse state.
+   The controls (left) column always keeps its clamp; only the chord/lyrics
+   column shrinks to 44px. Works with the panels-swapped variant too, since
+   swap uses `order: 3` on chord-panel — column *slot* stays the same. */
+@media (min-width: 1181px) {
+  .main-grid.chord-collapsed {
+    grid-template-columns: clamp(340px, 28vw, 480px) 44px minmax(0, 1fr);
+  }
+  .main-grid.lyrics-collapsed {
+    grid-template-columns: clamp(340px, 28vw, 480px) clamp(280px, 22vw, 420px) 44px;
+  }
+  .main-grid.chord-collapsed.lyrics-collapsed {
+    grid-template-columns: clamp(340px, 28vw, 480px) 44px 44px;
+  }
+  /* Swapped: layout is controls | lyrics(fluid) | chord(clamp) — chord order:3 */
+  .main-grid.panels-swapped.chord-collapsed {
+    grid-template-columns: clamp(340px, 28vw, 480px) minmax(0, 1fr) 44px;
+  }
+  .main-grid.panels-swapped.lyrics-collapsed {
+    grid-template-columns: clamp(340px, 28vw, 480px) 44px minmax(0, 1fr);
+  }
+  .main-grid.panels-swapped.chord-collapsed.lyrics-collapsed {
+    grid-template-columns: clamp(340px, 28vw, 480px) 44px 44px;
+  }
+}
+
+/* Tablet (761–1180px): 2-col grid. Collapse one → 44px + 1fr. */
+@media (min-width: 761px) and (max-width: 1180px) {
+  .main-grid.chord-collapsed { grid-template-columns: 44px 1fr; }
+  .main-grid.lyrics-collapsed { grid-template-columns: 1fr 44px; }
+  .main-grid.chord-collapsed.lyrics-collapsed { grid-template-columns: 44px 44px; }
+  .main-grid.panels-swapped.chord-collapsed { grid-template-columns: 1fr 44px; }
+  .main-grid.panels-swapped.lyrics-collapsed { grid-template-columns: 44px 1fr; }
+  .main-grid.panels-swapped.chord-collapsed.lyrics-collapsed { grid-template-columns: 44px 44px; }
+}
+
+/* Mobile (≤760px): single column stack — accordion pattern.
+   Body hidden, section-title (with its collapse button = now an expand button)
+   stays visible. Rail element is hidden on mobile since the accordion
+   header IS the expand toggle. */
+@media (max-width: 760px) {
+  .panel.is-collapsed > .chord-stage,
+  .panel.is-collapsed > .lyrics-container {
+    display: none !important;
+  }
+  .panel.is-collapsed > .panel-rail { display: none !important; }
+  .panel.is-collapsed {
+    height: auto;
+    min-height: 0;
+    padding-bottom: 12px;
+  }
+}
+
+/* Rotate the collapse-button chevron 180° when the panel is collapsed —
+   the same button (in the section-title, visible on mobile) then reads
+   as "expand" instead of "collapse". On desktop the section-title is
+   hidden while collapsed so the rail button handles expansion instead. */
+.panel.is-collapsed .panel-collapse-btn i { transform: rotate(180deg); }
 
 .section-title {
   display: flex;
@@ -448,6 +706,20 @@ button.toggle-pill.is-on {
 }
 button.toggle-pill.is-off { opacity: 0.65; }
 button.toggle-pill:hover { transform: translateY(-1px); }
+
+/* Icon-only pill variant — square target that matches the sibling
+   .icon-btn buttons in the same header row (42px). Used by
+   #autoScrollToggle and its fullscreen mirror #lyricsFullscreenAutoScroll
+   after the "Auto Scroll" label was removed. */
+.status-pill.icon-only {
+  padding: 0;
+  width: 42px;
+  height: 42px;
+  min-height: 42px;
+  justify-content: center;
+  gap: 0;
+}
+.status-pill.icon-only i { font-size: 0.95rem; }
 
 /* Header dancer toggle: dim when dancer is off */
 #dancerToggleBtn[aria-pressed="false"] { opacity: 0.55; }
@@ -1110,6 +1382,17 @@ button.toggle-pill:hover { transform: translateY(-1px); }
   padding: 12px 20px max(20px, env(safe-area-inset-bottom));
   box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.35);
   animation: notePickSlideUp 0.22s cubic-bezier(0.32, 0.72, 0, 1);
+}
+/* On mobile the fixed mini-player sits at the bottom of the viewport
+   (~56px + safe-area). Lift the bottom-sheet above it so the two don't
+   overlap. Desktop is unaffected — mini-player is hidden there. */
+@media (max-width: 760px) {
+  .note-pick-sheet-panel {
+    margin-bottom: calc(72px + env(safe-area-inset-bottom));
+    padding-bottom: 20px;
+    border-radius: 22px;
+    border-bottom: 1px solid var(--border);
+  }
 }
 .note-pick-sheet-handle {
   width: 40px;
@@ -2982,6 +3265,326 @@ select option { font-family: inherit; }
   fill: var(--primary);
 }
 
+/* ── Ukulele tablature ─────────────────────────────────────────────────── */
+.tab-svg,
+.tab-combined-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+.tab-line {
+  stroke: var(--text);
+  stroke-width: 1;
+  opacity: 0.55;
+}
+.tab-barline {
+  stroke: var(--text);
+  stroke-width: 1;
+  opacity: 0.7;
+}
+.tab-barline-final {
+  stroke: var(--text);
+  stroke-width: 2.6;
+  opacity: 0.9;
+}
+/* The rect behind each fret digit takes the container/panel background
+   so the tab line "breaks" cleanly around the number — this is the same
+   convention printed uke tab uses. */
+.tab-num-bg {
+  fill: var(--panel, #0e1220);
+  stroke: none;
+}
+.tab-num {
+  fill: var(--text);
+  font-family: "Inter", "Segoe UI", sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+}
+/* "T A B" left label (first row only) — mask + letters */
+.tab-label-bg {
+  fill: var(--panel, #0e1220);
+  stroke: none;
+}
+.tab-label-letter {
+  fill: var(--text);
+  font-family: "Inter", "Segoe UI", sans-serif;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  opacity: 0.85;
+}
+/* Highlight the tab note when the playhead reaches it — mirrors the staff
+   .note-head.active treatment so both views flash in sync. */
+.tab-note.active .tab-num {
+  fill: var(--primary);
+  font-weight: 800;
+  filter: drop-shadow(0 0 4px rgba(56,189,248,0.35));
+}
+.tab-note.active .tab-num-bg {
+  fill: rgba(56,189,248,0.14);
+}
+
+/* ── Notation editor: per-note tab-position chip + picker modal ────────
+   Chip lives in each note row, between the pitch button and the duration
+   select. Shows the fingering that will actually render (auto or pinned).
+   Border color signals mode: subtle when auto, accent when pinned. */
+.editor-tab-chip {
+  min-width: 44px;
+  height: 30px;
+  padding: 0 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+  font-weight: 600;
+  font-size: 12.5px;
+  font-family: "Inter", "Segoe UI", sans-serif;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.editor-tab-chip:hover {
+  background: rgba(56, 189, 248, 0.10);
+  border-color: rgba(56, 189, 248, 0.35);
+}
+.editor-tab-chip.is-override {
+  border-color: var(--primary);
+  background: rgba(56, 189, 248, 0.14);
+  color: var(--primary);
+}
+.editor-tab-chip[hidden] { display: none !important; }
+
+/* Tab-position picker modal (fretboard grid) */
+.nttab-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 520;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.nttab-overlay[hidden] { display: none !important; }
+.nttab-panel {
+  background: var(--panel, #12172a);
+  color: var(--text);
+  border-radius: 16px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+  width: min(760px, 100%);
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.nttab-header-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.nttab-title {
+  font-weight: 700;
+  font-size: 15px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.nttab-body {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow: auto;
+}
+.nttab-auto-btn {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+}
+.nttab-auto-btn:hover {
+  background: rgba(56, 189, 248, 0.10);
+  border-color: rgba(56, 189, 248, 0.35);
+}
+.nttab-auto-btn.is-selected {
+  border-color: var(--primary);
+  background: rgba(56, 189, 248, 0.18);
+  color: var(--primary);
+}
+.nttab-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 720px;
+}
+.nttab-row {
+  display: grid;
+  grid-template-columns: 34px repeat(16, 1fr);
+  gap: 4px;
+  align-items: center;
+}
+.nttab-header .nttab-fret-label {
+  text-align: center;
+  font-size: 11px;
+  opacity: 0.6;
+  padding-bottom: 2px;
+}
+.nttab-string-name {
+  text-align: center;
+  font-weight: 700;
+  font-size: 14px;
+  opacity: 0.75;
+}
+.nttab-cell {
+  height: 34px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+  font-weight: 600;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+.nttab-cell:hover {
+  background: rgba(56, 189, 248, 0.14);
+  border-color: rgba(56, 189, 248, 0.4);
+}
+.nttab-cell.is-selected {
+  background: rgba(56, 189, 248, 0.28);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+/* On narrow screens the grid gets horizontal scroll rather than shrinking
+   past readability — 720px min-width above enforces that. */
+@media (max-width: 760px) {
+  .nttab-overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+  .nttab-panel {
+    width: 100%;
+    max-width: 100%;
+    border-radius: 16px 16px 0 0;
+    max-height: 88vh;
+  }
+  .nttab-body { overflow: auto; }
+}
+
+/* ── Notation view picker modal (Notation / Tab / Both / Image) ─────────
+   Opened by the lyrics-panel #notationToggleBtn. Same overlay pattern as
+   the chord/pitch pickers so it feels native inside the editor family. */
+.nvpick-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.nvpick-overlay[hidden] { display: none !important; }
+
+.nvpick-panel {
+  background: var(--panel, #12172a);
+  color: var(--text);
+  border-radius: 16px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+  width: min(420px, 100%);
+  max-height: min(85vh, 640px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.nvpick-header-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.nvpick-title {
+  font-weight: 700;
+  font-size: 15px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.nvpick-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  padding: 14px;
+  overflow-y: auto;
+}
+.nvpick-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 16px 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, transform 0.06s;
+  text-align: center;
+}
+.nvpick-option[hidden] { display: none !important; }
+.nvpick-option:hover {
+  background: rgba(56, 189, 248, 0.10);
+  border-color: rgba(56, 189, 248, 0.35);
+}
+.nvpick-option:active { transform: scale(0.97); }
+.nvpick-option.is-selected {
+  background: rgba(56, 189, 248, 0.16);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 1px var(--primary) inset;
+}
+.nvpick-option-icon {
+  font-size: 22px;
+  color: var(--primary);
+  margin-bottom: 2px;
+}
+.nvpick-option-label {
+  font-weight: 700;
+  font-size: 14px;
+}
+.nvpick-option-desc {
+  font-size: 11.5px;
+  opacity: 0.7;
+  line-height: 1.25;
+}
+
+/* Bottom-sheet layout on narrow screens — matches ntpitch modal convention.
+   Lifted above the mobile mini-player (fixed at bottom, ~56px + safe-area)
+   so the sheet doesn't sit flush on top of it. */
+@media (max-width: 760px) {
+  .nvpick-overlay {
+    align-items: flex-end;
+    padding: 0 0 calc(72px + env(safe-area-inset-bottom)) 0;
+  }
+  .nvpick-panel {
+    width: 100%;
+    max-width: 100%;
+    border-radius: 16px 16px 0 0;
+    max-height: 78vh;
+  }
+}
+
 /* ────────────────────────────────────────────────────────────────────────── */
 .lyric-section-label {
   display: inline-block;
@@ -3455,6 +4058,13 @@ select option { font-family: inherit; }
   .controls { gap: 6px; }
   .control-btn { width: 40px; height: 40px; font-size: 0.85rem; }
   .control-btn.primary { width: 52px; height: 52px; font-size: 1.05rem; }
+
+  /* Reserve space at the page bottom so the last panel isn't hidden
+     behind the fixed mini-player (Spotify-style). Height ≈ 56px bar
+     + safe-area. */
+  .app-shell {
+    padding-bottom: calc(68px + env(safe-area-inset-bottom));
+  }
 
   /* Notation editor rows: 2-line layout so they don't overflow on narrow screens
      Line 1: [time + fine-btns] [pitch] [del]

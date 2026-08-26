@@ -6,6 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - **Never run preview servers or browser tests.** The user verifies all changes themselves in real-time — it is faster for them. After finishing code edits, summarize what changed and stop. Do NOT call `preview_start`, `preview_screenshot`, `preview_snapshot`, or any `preview_*` tool.
 - **Never git commit or push without explicit user approval.**
+- **Whole-system impact analysis before every change.** Before editing anything, map out every place the change could touch — data model, Firestore rules, editor tabs, playback sync, main panel + fullscreen overlay, tests, migration script, related state fields. Then:
+  - **Low risk / clearly contained** → make the change AND update every affected place in the same pass (never patch only the exact spot the user pointed at while leaving mirrored code stale).
+  - **High risk / cross-cutting / potentially breaking** → stop, list the impacted areas and the risk, and let the user decide before touching code.
+  If unsure whether it's high risk, treat it as high risk and ask.
 
 ## Commands
 
@@ -66,6 +70,8 @@ npx vitest run tests/unit/chordEngine.test.js
 | `staffLayout.js` | Pure staff geometry: beat→x, measures, multi-row wrapping, bar lines (equal-width, vertically aligned) |
 | `staffRenderer.js` | Renders a parsed notation model to an SVG string (clef, key sig, time sig, noteheads, stems, flags, ledger lines, accidentals) |
 | `notationImage.js` | Resolves the `Letter Note Notation/<id>.png` reference-image path for lesson songs |
+| `tabModel.js` | Pitch → (string, fret) mapping for reentrant-tuned ukulele; smart fingering (keeps hand near previous position); per-note overrides via `tabString` / `tabFret` |
+| `tabRenderer.js` | Renders ukulele tab — `renderTab(model)` (standalone 4-line tab) and `renderCombined(model)` (staff on top + tab below per row, sharing bar-line x with the staff) |
 | `timestampEditor.js` | Editor row builder/mutators for the Lyrics tab of the timestamp editor |
 | `chordEditor.js` | Editor row builder/mutators for the Chords tab of the timestamp editor |
 | `notationEditor.js` | Editor state/mutators + JSON export for the Notation (โน้ต) tab of the editor |
@@ -84,7 +90,13 @@ The notation system uses a strict 3-module pipeline. **Do not mix responsibiliti
 ```
 notationModel.js  →  staffLayout.js  →  staffRenderer.js
   (semantics)         (geometry)          (SVG output)
+                           │
+                           ├──→  tabModel.js       (pitch → uke fingering)
+                           │
+                           └──→  tabRenderer.js    (SVG: tab-only + combined staff+tab)
 ```
+
+Both `staffRenderer` and `tabRenderer` consume the **same** `layoutStaff` output — that's what makes measures and notes line up between the two views in "both" mode. `staffRenderer` exports `renderStaffRowBody()` and `staffDrawContext()` so `tabRenderer.renderCombined()` can draw staff rows in-place inside a shared SVG rather than in two independent SVGs.
 
 ### notationModel.js — Musical Semantics
 
@@ -167,7 +179,34 @@ The local `Lyrics/`, `Chords/`, `Notation/` folders remain in the repo only as t
 - `pitch` — scientific notation (`"C4"`, `"F#4"`, `"Bb3"`, `"rest"`)
 - `dur` — `whole | half | quarter | eighth | sixteenth` (append `.` for dotted, e.g. `"quarter."`)
 - `time` — seconds into the audio; optional — only needed for playback highlight sync
+- `tabString` + `tabFret` (optional) — per-note ukulele-tab override. When BOTH are set and in range (`tabString` 0–3, `tabFret` 0–15), they pin the fingering used in Tab / Both views instead of the auto-picked one; partial or out-of-range values are ignored. `tabString` uses the internal string order `0=G, 1=C, 2=E, 3=A` (same as `src/data/ukeChords.js`).
 - Note order = melody order (NOT sorted by time; `parseNotation` reads them as-is)
+
+### Notation view picker (lyrics panel)
+
+The lyrics-panel header has a single button `#notationToggleBtn` that opens the **Notation View picker modal** (`#notationViewModal`, `.nvpick-overlay`, `z-index: 500`). The modal lists every valid rendering mode for the current song; the teacher picks one and it applies immediately. Backed by a single state field `state.notationView`, dispatched inside `renderLyricsEmptyState`:
+
+| `state.notationView` | Renderer | What the student sees |
+|---|---|---|
+| `notation` (default) | `renderStaff(model)` | 5-line staff only (legacy behavior) |
+| `tab`     | `renderTab(model)` | 4-line ukulele tab, top-to-bottom `A E C G` |
+| `both`    | `renderCombined(model)` | staff on top + tab below per row, bar lines aligned |
+| `image`   | `<img>` of `Letter Note Notation/<id>.png` | static reference PNG |
+
+Options in the modal are hidden per song availability: interactive views hide when the song has no notation/legacy melody; the Image option hides when there's no PNG. If the stored view becomes invalid (e.g. teacher loads a song without a PNG while view was "image"), `syncNotationBtns` transparently falls back to a safe view before rendering. The view resets to `notation` on every new-song load (start of `renderLyrics`); the picker itself re-renders via `renderLyricsEmptyState` directly to preserve the teacher's choice.
+
+Playback highlight: `_applyStaffHighlight` marks BOTH `.note-head[data-idx]` and `.tab-note[data-idx]` at the current index — combined mode flashes staff notehead and tab fret number in sync. Selector matches `.note-staff-svg, .tab-svg` (combined SVG carries both classes so a single query finds it).
+
+Fingering algorithm (`src/utils/tabModel.js`): reentrant tuning G4-C4-E4-A4 (MIDI 67-60-64-69). Each pitch resolves to all valid `(string, fret)` positions ≤ fret 15, then `pickBestPosition` picks the one closest to the previous note's hand position (string moves weighted 2×, fret moves 1×). First note / after a rest falls back to lowest-fret, lowest-string. A note carrying valid `tabString` + `tabFret` overrides the pick AND updates the "previous position" cursor so subsequent auto notes stay near it.
+
+### Editor: "โน้ต + Tab" tab
+
+The Notation editor tab (`#editorTabNotation`, labelled **โน้ต + Tab**) treats notation and ukulele tab as one linked data set — a teacher edits pitch/duration/time and the tab fingering is derived automatically:
+
+- **Preview** (`#ntPreview`) always renders `renderCombined(model)` so the teacher sees the tab fingering the notation produces in real time, aligned per row.
+- **Per-note tab chip** (`.editor-tab-chip`, between the pitch button and the duration select) shows the current fingering — `A0`, `G2`, etc. Amber outline = pinned override, subtle outline = auto. Hidden for rest rows.
+- **Tab-position picker modal** (`#ntTabModal`, `.nttab-overlay`, `z-index: 520`): fretboard grid (4 strings × 16 frets, drawn top-to-bottom as A/E/C/G to match `UKE_TAB_ROW_ORDER`). Tap a cell to pin, or **Auto** to clear the override. Wired inside `wireNotationConfigControls()` via `buildNtTabGrid()`. Escape/backdrop close without applying. Added to `handleEditorKeydown` modal-guard list.
+- **Round-trip:** `buildNoteRows` reads `tabString`/`tabFret` from JSON (defaulting to null); `exportToNotationJson` emits them only when BOTH are set and in range (0–3 / 0–15). Partial or out-of-range values are dropped, matching the `tabModel` "both or neither" contract.
 
 **Easiest authoring path:** Editor → **โน้ต** tab → configure + add notes (live staff preview) → **บันทึกขึ้น Cloud** (writes straight to Firestore; teacher login required). Copy JSON remains available as a manual export.
 
@@ -197,6 +236,15 @@ Notable `state` fields and their current behaviour — check these before editin
 **Fullscreen lyrics overlay (`#lyricsFullscreen` / `.lyrics-fs`):** Fixed overlay, `z-index: 300`, background `#090d18`. Structure: `.lyrics-fs-body` (flex column, fills space) → `.lyrics-fs-header` (glassmorphism, shows `#lyricsFsHeaderTitle` song title + action buttons) → `.lyrics-fs-main` (flex row: chord column + lyrics container) → `.lyrics-fs-player` (glassmorphism player bar at bottom). Chord column (`.lyrics-fs-chord-col`) is `clamp(280px, 28vw, 420px)` — responsive, scales with viewport. Chord badge inside is `clamp(160px, 20vw, 260px)`. Diagram SVG is `clamp(160px, 18vw, 240px)`. Player transport buttons: 36px/46px (secondary/primary). Progress bar in `.lyrics-fs-player-timeline` is overridden to 3px height with amber fill. Active-state button highlights use `var(--accent)` amber (not blue). `syncFsPlayer()` populates both `dom.lyricsFsPlayerTitle` (in player bar) and `dom.lyricsFsHeaderTitle` (in header) with the current song title. A-B loop markers (`dom.lyricsFsLoopMarkerA`, `dom.lyricsFsLoopMarkerB`, `dom.lyricsFsLoopRegion`) mirror the main timeline markers — both sets are updated together by `updateLoopMarkers()`.
 
 **Dancing character (Lottie):** Lives in `.header-brand` inside `<header>`, absolutely positioned to the right of the h1 so it doesn't affect header height. No toggle button — always visible. Controlled by `initLottieDancer()` / `swapLottie()` in `script.js`.
+
+**Panel collapse (chord + lyrics):** Each of the chord + lyrics panels has a **collapse button** in its `.section-title` (`#chordPanelCollapseBtn`, `#lyricsPanelCollapseBtn`). Backed by `state.chordPanelCollapsed` / `state.lyricsPanelCollapsed` (independent), persisted to `localStorage["ukulele-panel-collapse"] = {chord, lyrics}` via `applyPanelCollapse()` — the single source of truth. Restored on init via `restorePanelCollapse()`. Behavior differs by breakpoint:
+
+| Viewport | Collapsed state |
+|---|---|
+| Desktop (≥761px) | Panel becomes a **44px vertical rail** — hides `.section-title` + content, shows only `.panel-rail` (icon + vertical title + expand chevron). Rail is a `<button>` so anywhere on it re-expands. |
+| Mobile (≤760px)  | Accordion — hides the content (`.chord-stage` / `#lyricsContainer`) and the rail. `.section-title` stays; its collapse-button chevron rotates 180° via CSS to read as "expand". |
+
+Grid column widths are driven by `.main-grid.chord-collapsed` / `.main-grid.lyrics-collapsed` classes (+ variants combined with `.panels-swapped`) — three width tiers (>1180px, 761–1180px, ≤760px) each override `grid-template-columns` so the surviving panel grows into the freed space. Both panels can be collapsed at once (the left controls panel then dominates). Fullscreen lyrics overlay uses its own `.lyrics-fs-*` layout and is not affected.
 
 **Layout:** `.panel` (the 3 main cards) uses a **fixed** `height: 720px` on desktop (not `min-height`) so every song's panel is the same size regardless of lyrics/notation length — long content scrolls inside `.lyrics-container` (`overflow-y: auto`) instead of growing the card. Both mobile breakpoints reset this to `height: auto` for natural single-column stacking, and the mobile `.lyrics-container` gets its own smaller `max-height: 480px` cap (the desktop 760px cap is too tall to matter on a phone viewport). `.app-shell` caps overall page width at `min(1800px, 100%)`.
 
@@ -258,6 +306,7 @@ Do this proactively whenever writing CSS that sets `display: block/flex/inline-f
 | `staffLayout.test.js` | layoutStaff — note x positions, bar line positions, multi-row, pickup, equal measure widths |
 | `notationEditor.test.js` | buildNotationConfig, buildNoteRows, updateNoteField, stampNoteTime, computeMeasureMap, exportToNotationJson, etc. |
 | `songBuilder.test.js` | buildSong — lyrics, chords, notation integration |
+| `tabModel.test.js` | midiFromPitch, positionsForMidi, pickBestPosition, computeTabPositions (smart fingering + per-note overrides) |
 
 **CI:** `.github/workflows/test.yml` — runs `npm test` and `npm run test:coverage` on push/PR to `main`.
 

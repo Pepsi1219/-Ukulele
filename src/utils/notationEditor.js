@@ -6,7 +6,12 @@
  *   • a flat array of note rows, in play order.
  *
  * Note row shape:
- *   { pitch: string, dur: string, time: number|null }
+ *   { pitch: string, dur: string, time: number|null,
+ *     tabString: number|null, tabFret: number|null }
+ *
+ * `tabString` / `tabFret` are OPTIONAL per-note ukulele-tab overrides. Both
+ * must be set (and in range: string 0–3, fret 0–15) for the override to
+ * apply; otherwise the renderer auto-picks a fingering via `tabModel`.
  *
  * Unlike the chord editor, note rows are NEVER reordered on export — their
  * array order is the melody order that drives the drawn rhythm. `time` is only
@@ -31,9 +36,11 @@ export function buildNotationConfig(notationObj) {
 export function buildNoteRows(notationObj) {
   const notes = notationObj && Array.isArray(notationObj.notes) ? notationObj.notes : [];
   return notes.map(n => ({
-    pitch: n && n.pitch != null ? String(n.pitch) : "",
-    dur:   n && n.dur   != null ? String(n.dur)   : "quarter",
-    time:  n && Number.isFinite(Number(n.time)) ? Number(n.time) : null,
+    pitch:     n && n.pitch != null ? String(n.pitch) : "",
+    dur:       n && n.dur   != null ? String(n.dur)   : "quarter",
+    time:      n && Number.isFinite(Number(n.time)) ? Number(n.time) : null,
+    tabString: n && Number.isFinite(Number(n.tabString)) ? Number(n.tabString) : null,
+    tabFret:   n && Number.isFinite(Number(n.tabFret))   ? Number(n.tabFret)   : null,
   }));
 }
 
@@ -202,6 +209,19 @@ export function exportToNotationJson(config, rows) {
       };
       if (r.time !== null && Number.isFinite(Number(r.time))) {
         note.time = Number(r.time);
+      }
+      // Emit tab override only when BOTH fields are set and in range —
+      // matches the "both or neither" contract that tabModel consumes.
+      // Guard: reject null/undefined explicitly, since Number(null)===0
+      // would otherwise silently persist an unset field as fret 0.
+      if (r.tabString != null && r.tabFret != null) {
+        const tabString = Number(r.tabString);
+        const tabFret   = Number(r.tabFret);
+        if (Number.isFinite(tabString) && Number.isFinite(tabFret) &&
+            tabString >= 0 && tabString <= 3 && tabFret >= 0 && tabFret <= 15) {
+          note.tabString = tabString;
+          note.tabFret   = tabFret;
+        }
       }
       return note;
     });

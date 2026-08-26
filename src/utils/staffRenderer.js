@@ -40,14 +40,73 @@ const CLEF_GLYPH = { treble: "\u{1D11E}", bass: "\u{1D122}" };
  * @param {{config:Object, notes:Array}} model  output of parseNotation()/chordsToNotation()
  * @returns {string}  SVG element as a string, or "" when there is nothing to draw.
  */
+/**
+ * Builds the SVG *body* (no outer <svg>) for a single staff row. Exported so
+ * the tab renderer's "notation + tab stacked" combined view can compose staff
+ * rows and tab rows into one SVG with shared bar-line x-positions.
+ *
+ * @param {Object} row     row from layoutStaff (has notes, bars, index)
+ * @param {Object} L       full layout (needed for rightEdge)
+ * @param {Object} config  parsed notation config (clef, key, timeSignature)
+ * @param {number[]} keySteps   staff steps for each key-signature accidental
+ * @param {number} keySigW      total key-signature width in svg units
+ * @param {number} yOff         y offset at which to draw this row
+ * @param {boolean} includeTimeSig  draw the time signature (typically row 0 only)
+ * @returns {string}  SVG body markup for the row
+ */
+export function renderStaffRowBody(row, L, config, keySteps, keySigW, yOff, includeTimeSig) {
+  const lineY = (off, i) => off + MARGIN_T + STAFF_H - i * LINE_GAP;
+  const stepY = (off, s) => off + MARGIN_T + STAFF_H - s * (LINE_GAP / 2);
+
+  let body = "";
+
+  // Staff lines
+  for (let i = 0; i < 5; i++) {
+    body += `<line x1="${PAD_L}" x2="${L.rightEdge}" y1="${lineY(yOff, i)}" y2="${lineY(yOff, i)}" class="staff-line"/>`;
+  }
+
+  // Clef
+  body += clefGlyph(config.clef, PAD_L + 3, lineY, yOff);
+
+  // Key signature (repeated on every row, per convention)
+  const symbol = L.keySig.type === "sharp" ? "♯" : "♭";
+  L.keySig.steps.forEach((_, i) => {
+    const kx = PAD_L + CLEF_W + i * KEYSIG_W + KEYSIG_W / 2;
+    body += `<text x="${kx}" y="${stepY(yOff, keySteps[i])}" dy="0.34em" text-anchor="middle" class="staff-accidental">${symbol}</text>`;
+  });
+
+  // Time signature — first row only (caller controls)
+  if (includeTimeSig) {
+    const tx = PAD_L + CLEF_W + keySigW + TSIG_W / 2;
+    body += `<text x="${tx}" y="${lineY(yOff, 3)}" dy="0.34em" text-anchor="middle" class="staff-timesig">${config.timeSignature[0]}</text>`;
+    body += `<text x="${tx}" y="${lineY(yOff, 1)}" dy="0.34em" text-anchor="middle" class="staff-timesig">${config.timeSignature[1]}</text>`;
+  }
+
+  // Notes
+  for (const n of row.notes) {
+    body += n.isRest
+      ? restGlyph(n, yOff, lineY, stepY)
+      : noteGlyph(n, yOff, stepY);
+  }
+
+  // Bar lines
+  for (const bar of row.bars) {
+    if (bar.isFinal) {
+      body += `<line x1="${bar.x - 4}" y1="${lineY(yOff, 4)}" x2="${bar.x - 4}" y2="${lineY(yOff, 0)}" class="barline"/>`;
+      body += `<line x1="${bar.x}" y1="${lineY(yOff, 4)}" x2="${bar.x}" y2="${lineY(yOff, 0)}" class="barline-final"/>`;
+    } else {
+      body += `<line x1="${bar.x}" y1="${lineY(yOff, 4)}" x2="${bar.x}" y2="${lineY(yOff, 0)}" class="barline"/>`;
+    }
+  }
+
+  return body;
+}
+
 export function renderStaff(model) {
   if (!model || !Array.isArray(model.notes) || !model.notes.length) return "";
 
   const L = layoutStaff(model);
   const { config } = L;
-
-  const lineY = (yOff, i) => yOff + MARGIN_T + STAFF_H - i * LINE_GAP;
-  const stepY = (yOff, s) => yOff + MARGIN_T + STAFF_H - s * (LINE_GAP / 2);
 
   const keySteps = config.key && L.keySig.type !== "none"
     ? KEYSIG_STEPS[config.clef][L.keySig.type]
@@ -55,51 +114,28 @@ export function renderStaff(model) {
   const keySigW = L.keySig.steps.length * KEYSIG_W;
 
   let body = "";
-
   for (const row of L.rows) {
-    const yOff = row.yOffset;
-
-    // Staff lines
-    for (let i = 0; i < 5; i++) {
-      body += `<line x1="${PAD_L}" x2="${L.rightEdge}" y1="${lineY(yOff, i)}" y2="${lineY(yOff, i)}" class="staff-line"/>`;
-    }
-
-    // Clef
-    body += clefGlyph(config.clef, PAD_L + 3, lineY, yOff);
-
-    // Key signature (repeated on every row, per convention)
-    const symbol = L.keySig.type === "sharp" ? "♯" : "♭";
-    L.keySig.steps.forEach((_, i) => {
-      const kx = PAD_L + CLEF_W + i * KEYSIG_W + KEYSIG_W / 2;
-      body += `<text x="${kx}" y="${stepY(yOff, keySteps[i])}" dy="0.34em" text-anchor="middle" class="staff-accidental">${symbol}</text>`;
-    });
-
-    // Time signature — first row only
-    if (row.index === 0) {
-      const tx = PAD_L + CLEF_W + keySigW + TSIG_W / 2;
-      body += `<text x="${tx}" y="${lineY(yOff, 3)}" dy="0.34em" text-anchor="middle" class="staff-timesig">${config.timeSignature[0]}</text>`;
-      body += `<text x="${tx}" y="${lineY(yOff, 1)}" dy="0.34em" text-anchor="middle" class="staff-timesig">${config.timeSignature[1]}</text>`;
-    }
-
-    // Notes
-    for (const n of row.notes) {
-      body += n.isRest
-        ? restGlyph(n, yOff, lineY, stepY)
-        : noteGlyph(n, yOff, stepY);
-    }
-
-    // Bar lines
-    for (const bar of row.bars) {
-      if (bar.isFinal) {
-        body += `<line x1="${bar.x - 4}" y1="${lineY(yOff, 4)}" x2="${bar.x - 4}" y2="${lineY(yOff, 0)}" class="barline"/>`;
-        body += `<line x1="${bar.x}" y1="${lineY(yOff, 4)}" x2="${bar.x}" y2="${lineY(yOff, 0)}" class="barline-final"/>`;
-      } else {
-        body += `<line x1="${bar.x}" y1="${lineY(yOff, 4)}" x2="${bar.x}" y2="${lineY(yOff, 0)}" class="barline"/>`;
-      }
-    }
+    body += renderStaffRowBody(row, L, config, keySteps, keySigW, row.yOffset, row.index === 0);
   }
 
   return `<svg class="note-staff-svg" viewBox="0 0 ${L.width} ${L.height}" width="100%" preserveAspectRatio="xMidYMin meet" xmlns="http://www.w3.org/2000/svg" aria-label="Musical staff notation">${body}</svg>`;
+}
+
+/**
+ * Resolves the drawing context that `renderStaffRowBody` needs: keySteps and
+ * keySigW derived from the model's config + key signature. Exposed so the
+ * combined renderer can reuse it without recomputing.
+ *
+ * @param {Object} L  full layoutStaff() output
+ * @returns {{config:Object, keySteps:number[], keySigW:number}}
+ */
+export function staffDrawContext(L) {
+  const { config } = L;
+  const keySteps = config.key && L.keySig.type !== "none"
+    ? KEYSIG_STEPS[config.clef][L.keySig.type]
+    : [];
+  const keySigW = L.keySig.steps.length * KEYSIG_W;
+  return { config, keySteps, keySigW };
 }
 
 // ── Glyph builders ────────────────────────────────────────────────────────--

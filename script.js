@@ -28,6 +28,11 @@ import { logSession, fetchAllSessions, prunePracticeLog, clearAllSessions, RETEN
 import { parseNotation,
          chordsToNotation }         from "./src/utils/notationModel.js";
 import { renderStaff }              from "./src/utils/staffRenderer.js";
+import { renderTab,
+         renderCombined }           from "./src/utils/tabRenderer.js";
+import { computeTabPositions,
+         UKE_TAB_ROW_ORDER,
+         MAX_FRET as UKE_MAX_FRET } from "./src/utils/tabModel.js";
 import { getChordData,
          renderChordDiagramSVG,
          renderNoteDiagramSVG,
@@ -173,7 +178,16 @@ const state = {
   lyricsFontScale: 1.0,          // multiplier for lyrics text size (0.75–3.0) — shared by normal panel + fullscreen
   activeStaffNoteIdx: -1,        // data-idx of the highlighted note in the SVG staff (-1 = none)
   staffNoteTimes: [],            // [{time, idx}] for the current staff — drives highlight sync
-  notationMode: "interactive",   // "interactive" | "image" — toggle in renderLyricsEmptyState
+  chordPanelCollapsed:  false,   // true → chord panel is collapsed (rail on desktop, accordion on mobile)
+  lyricsPanelCollapsed: false,   // true → lyrics panel collapsed
+                                  // Persisted to localStorage under "ukulele-panel-collapse".
+  notationView: "notation",      // "notation" | "tab" | "both" | "image"
+                                  //   "notation" = 5-line staff only (default)
+                                  //   "tab"      = ukulele tablature only (4 lines + fret numbers)
+                                  //   "both"     = staff on top + tab below (lesson-sheet style)
+                                  //   "image"    = static Letter Note Notation PNG
+                                  // Chosen via the view-picker modal opened from #notationToggleBtn.
+                                  // Reset to "notation" on every song select (renderLyrics).
   // ── Favorites ──
   favorites:       new Set(),   // Set of song IDs marked as favorites
   favFilterOn:     false,       // true = show only favorite songs in dropdown
@@ -213,6 +227,18 @@ const dom = {
   seekFwdBtn:        document.getElementById("seekFwdBtn"),
   prevSongBtn:       document.getElementById("prevSongBtn"),
   nextSongBtn:       document.getElementById("nextSongBtn"),
+
+  // Mobile mini-player (Spotify-style)
+  miniPlayer:            document.getElementById("miniPlayer"),
+  miniPlayerTitle:       document.getElementById("miniPlayerTitle"),
+  miniPlayerCurrent:     document.getElementById("miniPlayerCurrent"),
+  miniPlayerTotal:       document.getElementById("miniPlayerTotal"),
+  miniPlayerPlay:        document.getElementById("miniPlayerPlay"),
+  miniPlayerPlayIcon:    document.getElementById("miniPlayerPlayIcon"),
+  miniPlayerPrev:        document.getElementById("miniPlayerPrev"),
+  miniPlayerNext:        document.getElementById("miniPlayerNext"),
+  miniPlayerProgress:    document.getElementById("miniPlayerProgress"),
+  miniPlayerProgressFill:document.getElementById("miniPlayerProgressFill"),
   audioModeToggle:   document.getElementById("audioModeToggle"),
   currentTime:       document.getElementById("currentTime"),
   durationTime:      document.getElementById("durationTime"),
@@ -252,6 +278,14 @@ const dom = {
   // Layout swap (Chord ↔ Lyrics)
   swapPanelsBtn:   document.getElementById("swapPanelsBtn"),
   mainGrid:        document.querySelector(".main-grid"),
+
+  // Panel collapse
+  chordPanel:                 document.getElementById("chordPanel"),
+  chordPanelCollapseBtn:      document.getElementById("chordPanelCollapseBtn"),
+  chordPanelExpandBtn:        document.getElementById("chordPanelExpandBtn"),
+  lyricsPanel:                document.getElementById("lyricsPanel"),
+  lyricsPanelCollapseBtn:     document.getElementById("lyricsPanelCollapseBtn"),
+  lyricsPanelExpandBtn:       document.getElementById("lyricsPanelExpandBtn"),
 
   // Timestamp / Chord Editor
   editorTabLyrics:    document.getElementById("editorTabLyrics"),
@@ -315,6 +349,12 @@ const dom = {
 
   // Lyrics Fullscreen
   notationToggleBtn:         document.getElementById("notationToggleBtn"),
+  notationViewModal:         document.getElementById("notationViewModal"),
+  notationViewCancelBtn:     document.getElementById("notationViewCancelBtn"),
+  ntTabModal:                document.getElementById("ntTabModal"),
+  ntTabCancelBtn:            document.getElementById("ntTabCancelBtn"),
+  ntTabAutoBtn:              document.getElementById("ntTabAutoBtn"),
+  ntTabGrid:                 document.getElementById("ntTabGrid"),
   lyricsExpandBtn:           document.getElementById("lyricsExpandBtn"),
   lyricsFullscreen:          document.getElementById("lyricsFullscreen"),
   lyricsFullscreenContainer: document.getElementById("lyricsFullscreenContainer"),
@@ -399,6 +439,7 @@ function formatEditorTime(seconds) {
 /** Opens the editor for the currently selected song. */
 function openEditor() {
   if (!state.selectedSong || !state.duration) return;
+  setMiniPlayerHidden(true);
   state.editorOpen     = true;
   state.editorTab      = "lyrics";
   state.editorRows     = buildEditorRows(state.selectedSong.lyrics ?? []);
@@ -467,6 +508,7 @@ function closeEditor() {
   state.editorOpen = false;
   if (dom.editorPanel) dom.editorPanel.hidden = true;
   if (dom.mainGrid)    dom.mainGrid.hidden    = false;
+  setMiniPlayerHidden(false);
 }
 
 // Detect whether the browser supports field-sizing:content natively.
@@ -1206,7 +1248,11 @@ function renderNotationPreview() {
   }
   const model = parseNotation({ config: state.notationConfig, notes: state.notationRows });
   state.notationTimeline = buildNotationTimeline(state.notationRows);
-  dom.ntPreview.innerHTML = renderStaff(model);
+  // Editor preview shows the combined "Notation + Tab" view so the teacher
+  // sees the tab fingering their notation produces in real time. Same data,
+  // two aligned views — matches the "notation and tab are paired data" UX
+  // decision.
+  dom.ntPreview.innerHTML = renderCombined(model);
   syncNotationPlaybackHighlight(getCurrentPlaybackSeconds(), true);
   updateNotationNowPlaying(getCurrentPlaybackSeconds());
   updateNotationSummary(getCurrentPlaybackSeconds());
@@ -1365,6 +1411,13 @@ function renderNotationRows() {
   // Running-beat map → drives the "measure complete" dividers + overflow flags.
   const mmap = computeMeasureMap(state.notationRows, state.notationConfig.timeSignature);
 
+  // Per-note tab positions (auto + overrides) so each row can show the
+  // fingering that will actually render. We compute this once per re-render
+  // and index into it by note.idx (== source row order, since parseNotation
+  // preserves order and computeTabPositions maps 1:1 with model.notes).
+  const _tabModel = parseNotation({ config: state.notationConfig, notes: state.notationRows });
+  const _tabPositions = computeTabPositions(_tabModel);
+
   state.notationRows.forEach((row, i) => {
     const el = document.createElement("div");
     el.className = "editor-row editor-notation-row";
@@ -1413,6 +1466,38 @@ function renderNotationRows() {
       openNtPitchModal(i);
     });
     el.appendChild(pitchBtn);
+
+    // Tab-position chip — shows the fingering (auto or pinned) and opens
+    // the tab-position picker on click. Hidden for rests and empty-pitch
+    // placeholder rows — a fingering only exists once a pitch is chosen.
+    const rawPitch = String(row.pitch || "").trim();
+    const isRest   = rawPitch.toLowerCase() === "rest";
+    const noPitch  = rawPitch === "";
+    const tabBtn = document.createElement("button");
+    tabBtn.type = "button";
+    tabBtn.className = "editor-tab-chip";
+    if (isRest || noPitch) {
+      tabBtn.hidden = true;
+    } else {
+      const pos = _tabPositions[i];
+      const hasOverride = row.tabString != null && row.tabFret != null;
+      if (pos) {
+        const stringName = UKE_STRING_NAMES[pos.stringIdx] || "?";
+        tabBtn.textContent = `${stringName}${pos.fret}`;
+        tabBtn.title = hasOverride
+          ? `Tab: ${stringName}${pos.fret} (ปักหมุด) — กดเพื่อเปลี่ยน / Auto`
+          : `Tab: ${stringName}${pos.fret} (auto) — กดเพื่อปักหมุด`;
+      } else {
+        tabBtn.textContent = "—";
+        tabBtn.title = "ไม่มีตำแหน่งบนอูคูเลเล่ — กดเพื่อกำหนดเอง";
+      }
+      tabBtn.classList.toggle("is-override", hasOverride);
+    }
+    tabBtn.addEventListener("click", e => {
+      e.stopPropagation();
+      openNtTabModal(i);
+    });
+    el.appendChild(tabBtn);
 
     // Duration dropdown
     const durSelect      = document.createElement("select");
@@ -1690,6 +1775,107 @@ function selectNtPitch(pitch) {
   closeNtPitchModal();
 }
 
+// ── Tab-position picker (editor row → open, pin a fingering) ────────────────
+// Row index currently being edited (-1 = no modal open).
+let _ntTabTargetIdx = -1;
+
+const UKE_STRING_NAMES = ["G", "C", "E", "A"]; // by internal string index 0..3
+
+/**
+ * Builds the (string × fret) grid inside the tab-position picker modal.
+ * Layout mirrors what the student sees in the tab renderer: 4 rows in
+ * top-to-bottom display order (A, E, C, G — per UKE_TAB_ROW_ORDER), 16
+ * columns for frets 0–15. Idempotent (only builds if not built yet).
+ */
+function buildNtTabGrid() {
+  const grid = dom.ntTabGrid;
+  if (!grid || grid.dataset.built === "true") return;
+
+  // Fret-number header row
+  const header = document.createElement("div");
+  header.className = "nttab-row nttab-header";
+  header.appendChild(document.createElement("span")); // corner spacer
+  for (let f = 0; f <= UKE_MAX_FRET; f++) {
+    const cell = document.createElement("span");
+    cell.className = "nttab-fret-label";
+    cell.textContent = String(f);
+    header.appendChild(cell);
+  }
+  grid.appendChild(header);
+
+  // One row per display string (A on top, G on bottom)
+  UKE_TAB_ROW_ORDER.forEach(stringIdx => {
+    const row = document.createElement("div");
+    row.className = "nttab-row";
+
+    const nameCell = document.createElement("span");
+    nameCell.className = "nttab-string-name";
+    nameCell.textContent = UKE_STRING_NAMES[stringIdx];
+    row.appendChild(nameCell);
+
+    for (let f = 0; f <= UKE_MAX_FRET; f++) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "nttab-cell";
+      btn.dataset.string = String(stringIdx);
+      btn.dataset.fret = String(f);
+      btn.textContent = String(f);
+      btn.addEventListener("click", () => selectNtTabPosition(stringIdx, f));
+      row.appendChild(btn);
+    }
+    grid.appendChild(row);
+  });
+
+  grid.dataset.built = "true";
+}
+
+function openNtTabModal(rowIdx) {
+  _ntTabTargetIdx = rowIdx;
+  buildNtTabGrid();
+  const row = state.notationRows[rowIdx];
+  if (!row) return;
+  const hasOverride = row.tabString != null && row.tabFret != null;
+  dom.ntTabGrid.querySelectorAll(".nttab-cell").forEach(btn => {
+    const s = Number(btn.dataset.string);
+    const f = Number(btn.dataset.fret);
+    btn.classList.toggle(
+      "is-selected",
+      hasOverride && s === row.tabString && f === row.tabFret,
+    );
+  });
+  if (dom.ntTabAutoBtn) {
+    dom.ntTabAutoBtn.classList.toggle("is-selected", !hasOverride);
+  }
+  if (dom.ntTabModal) dom.ntTabModal.hidden = false;
+}
+
+function closeNtTabModal() {
+  if (dom.ntTabModal) dom.ntTabModal.hidden = true;
+  _ntTabTargetIdx = -1;
+}
+
+function selectNtTabPosition(stringIdx, fret) {
+  if (_ntTabTargetIdx < 0) return;
+  state.notationRows = updateNoteField(state.notationRows, _ntTabTargetIdx, {
+    tabString: stringIdx,
+    tabFret: fret,
+  });
+  reRenderNotationRows();
+  renderNotationPreview();
+  closeNtTabModal();
+}
+
+function clearNtTabOverride() {
+  if (_ntTabTargetIdx < 0) return;
+  state.notationRows = updateNoteField(state.notationRows, _ntTabTargetIdx, {
+    tabString: null,
+    tabFret: null,
+  });
+  reRenderNotationRows();
+  renderNotationPreview();
+  closeNtTabModal();
+}
+
 /** Wires the notation config controls + add-note button (once, at init). */
 function wireNotationConfigControls() {
   // Config fields (now inside the modal) — live-update preview as user changes values
@@ -1772,6 +1958,21 @@ function wireNotationConfigControls() {
     if (e.key === "Escape" && dom.ntPitchModal && !dom.ntPitchModal.hidden) {
       e.stopImmediatePropagation();
       closeNtPitchModal();
+    }
+  });
+
+  // Wire tab-position picker modal (per-note ukulele fingering override)
+  if (dom.ntTabCancelBtn) dom.ntTabCancelBtn.addEventListener("click", closeNtTabModal);
+  if (dom.ntTabAutoBtn)   dom.ntTabAutoBtn.addEventListener("click", clearNtTabOverride);
+  if (dom.ntTabModal) {
+    dom.ntTabModal.addEventListener("click", e => {
+      if (e.target === dom.ntTabModal) closeNtTabModal();
+    });
+  }
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape" && dom.ntTabModal && !dom.ntTabModal.hidden) {
+      e.stopImmediatePropagation();
+      closeNtTabModal();
     }
   });
 
@@ -1865,6 +2066,7 @@ function handleEditorExport() {
 function handleEditorKeydown(e) {
   if (dom.ntConfigModal   && !dom.ntConfigModal.hidden)   return;
   if (dom.ntPitchModal    && !dom.ntPitchModal.hidden)    return;
+  if (dom.ntTabModal      && !dom.ntTabModal.hidden)      return;
   if (dom.chordPickModal  && !dom.chordPickModal.hidden)  return;
   if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
 
@@ -2268,6 +2470,69 @@ function togglePanelSwap() {
 }
 
 /* =========================
+   Panel Collapse (chord + lyrics — independent)
+========================= */
+
+/**
+ * Applies both collapse states to the DOM + persists to localStorage.
+ * Owns the single source of truth so callers don't have to remember to
+ * mirror in localStorage. Adds `chord-collapsed` / `lyrics-collapsed`
+ * classes on .main-grid (drives grid-template-columns overrides in CSS)
+ * and `is-collapsed` on each panel (drives rail vs body visibility).
+ *
+ * Guard: it's fine for BOTH to be collapsed at once — user may want the
+ * left controls panel to dominate — so no forced-open rule.
+ */
+function applyPanelCollapse() {
+  const chord  = !!state.chordPanelCollapsed;
+  const lyrics = !!state.lyricsPanelCollapsed;
+
+  if (dom.mainGrid) {
+    dom.mainGrid.classList.toggle("chord-collapsed",  chord);
+    dom.mainGrid.classList.toggle("lyrics-collapsed", lyrics);
+  }
+  if (dom.chordPanel)  dom.chordPanel.classList.toggle("is-collapsed",  chord);
+  if (dom.lyricsPanel) dom.lyricsPanel.classList.toggle("is-collapsed", lyrics);
+
+  // Keep the collapse button's aria-pressed + title in sync so screen
+  // readers and hover tooltips reflect the true state.
+  if (dom.chordPanelCollapseBtn) {
+    dom.chordPanelCollapseBtn.setAttribute("aria-pressed", String(chord));
+    dom.chordPanelCollapseBtn.title = chord ? "ขยายพาเนลคอร์ด" : "ย่อพาเนลคอร์ด";
+  }
+  if (dom.lyricsPanelCollapseBtn) {
+    dom.lyricsPanelCollapseBtn.setAttribute("aria-pressed", String(lyrics));
+    dom.lyricsPanelCollapseBtn.title = lyrics ? "ขยายพาเนลเนื้อเพลง" : "ย่อพาเนลเนื้อเพลง";
+  }
+
+  try {
+    localStorage.setItem("ukulele-panel-collapse",
+      JSON.stringify({ chord, lyrics }));
+  } catch { /* localStorage may be blocked (private mode) — non-fatal */ }
+}
+
+function toggleChordPanelCollapse() {
+  state.chordPanelCollapsed = !state.chordPanelCollapsed;
+  applyPanelCollapse();
+}
+function toggleLyricsPanelCollapse() {
+  state.lyricsPanelCollapsed = !state.lyricsPanelCollapsed;
+  applyPanelCollapse();
+}
+
+/** Restores collapse state from localStorage on init. Silent on parse errors. */
+function restorePanelCollapse() {
+  try {
+    const raw = localStorage.getItem("ukulele-panel-collapse");
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    state.chordPanelCollapsed  = !!(parsed && parsed.chord);
+    state.lyricsPanelCollapsed = !!(parsed && parsed.lyrics);
+  } catch { /* ignore corrupted value */ }
+  applyPanelCollapse();
+}
+
+/* =========================
    Lottie Character Animations
 ========================= */
 function initLottieDancer() {
@@ -2500,6 +2765,7 @@ function loadSongAudio(song) {
 
   dom.currentSongTitle.textContent = song.title;
   updateBpm(song.bpm);   // also updates Tone.Transport BPM
+  updateMiniPlayerForSong(song);
 
   renderLyrics(song.lyrics, song);
   resetProgress();
@@ -2629,6 +2895,11 @@ function updatePlayPauseIcon() {
   dom.playPauseBtn.innerHTML = `<i class="fa-solid ${state.isPlaying ? "fa-pause" : "fa-play"}"></i>`;
   updateEditorPlayPauseIcon();
   syncFsPlayPauseIcon();
+  // Mirror to mobile mini-player (cheap; icon element is preserved so we
+  // just swap its class instead of blowing away innerHTML).
+  if (dom.miniPlayerPlayIcon) {
+    dom.miniPlayerPlayIcon.className = `fa-solid ${state.isPlaying ? "fa-pause" : "fa-play"}`;
+  }
 }
 
 // Seek by a relative offset in seconds (negative = backward, positive = forward)
@@ -2721,6 +2992,45 @@ function stopAnimationLoop() {
   if (state.rafId) { cancelAnimationFrame(state.rafId); state.rafId = null; }
 }
 
+/* =========================
+   Mobile mini-player (Spotify-style)
+========================= */
+
+/**
+ * Sets the mini-player's title and reveals it. Called from loadSongAudio()
+ * so it appears as soon as the user picks a song. It's a passive skin —
+ * clicks forward to the real playPause/prev/next buttons, and the icon +
+ * progress + time are pushed from the same tick that updates the main UI.
+ * Desktop hides it via CSS media query; no need to guard here.
+ */
+function updateMiniPlayerForSong(song) {
+  if (!dom.miniPlayer) return;
+  if (dom.miniPlayerTitle) dom.miniPlayerTitle.textContent = song ? song.title : "—";
+  // Ensure it's mounted before the .is-visible transition fires.
+  dom.miniPlayer.hidden = false;
+  requestAnimationFrame(() => dom.miniPlayer.classList.add("is-visible"));
+}
+
+/**
+ * Toggles a `no-mini-player` body class so the mini-player is hidden
+ * whenever another full-screen surface (fullscreen lyrics, editor, entry
+ * gate) is showing — those have their own transports and shouldn't stack.
+ */
+function setMiniPlayerHidden(hidden) {
+  document.body.classList.toggle("no-mini-player", !!hidden);
+}
+
+/** Seek-by-tap on the mini-player's progress strip. Same math as the main
+    progressTrack — sets sound.seek() proportional to click x. */
+function handleMiniPlayerProgressClick(e) {
+  if (!state.sound || !state.duration) return;
+  const rect = dom.miniPlayerProgress.getBoundingClientRect();
+  const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+  const pct = Math.max(0, Math.min(1, x / rect.width));
+  state.sound.seek(pct * state.duration);
+  updateProgress(pct * state.duration);
+}
+
 function updateProgress(currentSeconds) {
   const duration = state.duration || 0;
   const percent = duration > 0 ? Math.min((currentSeconds / duration) * 100, 100) : 0;
@@ -2734,6 +3044,11 @@ function updateProgress(currentSeconds) {
     if (dom.lyricsFsCurrentTime)   dom.lyricsFsCurrentTime.textContent = formatTime(currentSeconds);
     if (dom.lyricsFsDurationTime)  dom.lyricsFsDurationTime.textContent = formatTime(duration);
   }
+  // Mobile mini-player mirror (CSS media query hides it on desktop, so
+  // updating unconditionally here is fine — no visual cost).
+  if (dom.miniPlayerProgressFill) dom.miniPlayerProgressFill.style.width = `${percent}%`;
+  if (dom.miniPlayerCurrent) dom.miniPlayerCurrent.textContent = formatTime(currentSeconds);
+  if (dom.miniPlayerTotal)   dom.miniPlayerTotal.textContent   = formatTime(duration);
 }
 
 function updateTimedDisplays(currentSeconds) {
@@ -2747,7 +3062,10 @@ function updateTimedDisplays(currentSeconds) {
    Lyrics Functions
 ========================= */
 function renderLyrics(lyrics, song = null) {
-  state.notationMode = "interactive";
+  // New song → default view. The view picker never routes through here —
+  // it re-renders via renderLyricsEmptyState() directly so it can preserve
+  // whatever the teacher just chose.
+  state.notationView = "notation";
   dom.lyricsContainer.classList.remove("has-staff");
   state.activeStaffNoteIdx = -1;
   state.staffNoteTimes = [];
@@ -2819,17 +3137,90 @@ function renderLyrics(lyrics, song = null) {
  *
  * @param {{ id: string, title: string } | null} song
  */
+/**
+ * View-mode metadata used by the button title, the aria-pressed state, and
+ * the modal's initial selection highlight. Keeps every UI surface in sync
+ * with the single source of truth: state.notationView.
+ */
+const NOTATION_VIEW_META = {
+  notation: { label: "Notation", icon: "fa-music",       title: "กำลังแสดง Notation — กดเพื่อเปลี่ยนโหมด" },
+  tab:      { label: "Tab",      icon: "fa-guitar",      title: "กำลังแสดง Tab — กดเพื่อเปลี่ยนโหมด" },
+  both:     { label: "Both",     icon: "fa-layer-group", title: "กำลังแสดง Notation + Tab — กดเพื่อเปลี่ยนโหมด" },
+  image:    { label: "Image",    icon: "fa-image",       title: "กำลังแสดงรูปภาพ — กดเพื่อเปลี่ยนโหมด" },
+};
+
+/**
+ * Shows the single view-mode button whenever the song has anything to
+ * interactively render (staff, tab, or image). The button opens a modal
+ * that lists the valid modes; its icon / title mirror the CURRENT view so
+ * the teacher always knows which mode they're in without opening the modal.
+ */
 function syncNotationBtns(hasInteractive, hasImage) {
-  const showToggle = hasInteractive && hasImage;
   const btn = dom.notationToggleBtn;
   if (!btn) return;
-  btn.hidden = !showToggle;
-  const isImage = state.notationMode === "image";
-  btn.classList.toggle("is-on", isImage);
-  btn.setAttribute("aria-pressed", isImage ? "true" : "false");
-  btn.title = isImage
-    ? "กดเพื่อกลับไปแบบ Interactive"
-    : "กดเพื่อแสดงรูปภาพ Letter Note Notation";
+
+  const show = hasInteractive || hasImage;
+  btn.hidden = !show;
+  if (!show) return;
+
+  // If the currently stored view is not valid for this song (e.g. teacher
+  // just loaded a song that has no PNG while view was "image"), fall back
+  // to notation so the render dispatch has something safe to draw.
+  if (state.notationView === "image" && !hasImage) state.notationView = "notation";
+  if (state.notationView !== "image" && !hasInteractive) state.notationView = hasImage ? "image" : "notation";
+
+  const meta = NOTATION_VIEW_META[state.notationView] || NOTATION_VIEW_META.notation;
+  const iconEl = btn.querySelector("i");
+  if (iconEl) iconEl.className = `fa-solid ${meta.icon}`;
+  btn.title = meta.title;
+  btn.setAttribute("aria-label", meta.title);
+  // aria-pressed: "true" when we're not on the default (notation) view — this
+  // matches how the auto-scroll pill treats "toggled on".
+  btn.setAttribute("aria-pressed", state.notationView !== "notation" ? "true" : "false");
+  btn.classList.toggle("is-on", state.notationView !== "notation");
+}
+
+/**
+ * Opens the view-picker modal, filters options based on what's available
+ * for the current song (Image only when a PNG exists), and marks the
+ * current view as selected.
+ */
+function openNotationViewModal() {
+  const modal = dom.notationViewModal;
+  if (!modal) return;
+  const song = state.selectedSong;
+  const hasImage = !!(song && getNotationImagePath(song.id));
+  const hasInteractive = !!(song && (song.notation ||
+    (song.id && song.id.startsWith("lesson") && song.chords && song.chords.length)));
+
+  modal.querySelectorAll(".nvpick-option").forEach(opt => {
+    const view = opt.dataset.view;
+    const needsImage = opt.dataset.requiresImage === "true";
+    // Hide options that don't apply to this song
+    const enabled = needsImage ? hasImage : hasInteractive;
+    opt.hidden = !enabled;
+    opt.classList.toggle("is-selected", view === state.notationView);
+  });
+
+  modal.hidden = false;
+  if (dom.notationToggleBtn) dom.notationToggleBtn.setAttribute("aria-expanded", "true");
+}
+
+function closeNotationViewModal() {
+  if (dom.notationViewModal) dom.notationViewModal.hidden = true;
+  if (dom.notationToggleBtn) dom.notationToggleBtn.setAttribute("aria-expanded", "false");
+}
+
+/**
+ * Applies a picked view and re-renders the notation area. Goes through
+ * renderLyricsEmptyState (not renderLyrics) so the picker preserves the
+ * user's choice — renderLyrics would reset the view to "notation".
+ */
+function applyNotationView(view) {
+  if (!NOTATION_VIEW_META[view]) return;
+  state.notationView = view;
+  closeNotationViewModal();
+  renderLyricsEmptyState(state.selectedSong);
 }
 
 function renderLyricsEmptyState(song) {
@@ -2848,11 +3239,16 @@ function renderLyricsEmptyState(song) {
 
   const notationPath   = song ? getNotationImagePath(song.id) : null;
   const hasImage       = !!notationPath;
-  const useInteractive = hasInteractive && (!hasImage || state.notationMode === "interactive");
 
+  // Sync button (and fall back to a safe view when the current one isn't
+  // available for this song) BEFORE dispatching — the sync mutates
+  // state.notationView when necessary.
   syncNotationBtns(hasInteractive, hasImage);
 
-  if (useInteractive) {
+  // Interactive views (notation / tab / both) all need a parsed model.
+  const wantInteractive = hasInteractive && state.notationView !== "image";
+
+  if (wantInteractive) {
     dom.lyricsContainer.innerHTML = "";
     dom.lyricsContainer.classList.add("has-staff");
     state.activeStaffNoteIdx = -1;
@@ -2864,7 +3260,15 @@ function renderLyricsEmptyState(song) {
 
     const staffWrap = document.createElement("div");
     staffWrap.className = "staff-scroll";
-    staffWrap.innerHTML = renderStaff(model);
+    if (state.notationView === "tab") {
+      staffWrap.classList.add("staff-scroll-tab");
+      staffWrap.innerHTML = renderTab(model);
+    } else if (state.notationView === "both") {
+      staffWrap.classList.add("staff-scroll-both");
+      staffWrap.innerHTML = renderCombined(model);
+    } else {
+      staffWrap.innerHTML = renderStaff(model);
+    }
     dom.lyricsContainer.appendChild(staffWrap);
 
     if (state.lyricsFullscreen) { syncFullscreenLyrics(); syncFsPlayer(); }
@@ -2956,6 +3360,7 @@ function updateCurrentLyric(currentSeconds) {
 function openLyricsFullscreen() {
   state.lyricsFullscreen = true;
   dom.lyricsFullscreen.hidden = false;
+  setMiniPlayerHidden(true);
 
   // Clone lyrics content into fullscreen container
   syncFullscreenLyrics();
@@ -2977,6 +3382,7 @@ function closeLyricsFullscreen() {
   state.lyricsFullscreen = false;
   dom.lyricsFullscreen.hidden = true;
   dom.lyricsFullscreenContainer.innerHTML = "";
+  setMiniPlayerHidden(false);
 }
 
 function syncFullscreenLyrics() {
@@ -3428,19 +3834,26 @@ function updateStaffHighlight(idx) {
 }
 
 function _applyStaffHighlight(container, idx) {
-  const svg = container.querySelector(".note-staff-svg");
+  // Match ANY of the three interactive SVGs — plain staff, tab-only, and
+  // combined. `.tab-combined-svg` also carries `.note-staff-svg` so a single
+  // selector matches it either way; the third selector is standalone tab.
+  const svg = container.querySelector(".note-staff-svg, .tab-svg");
   if (!svg) return;
 
-  svg.querySelectorAll(".note-head").forEach(g => g.classList.remove("active", "next"));
+  // Both staff notes (.note-head) and tab notes (.tab-note) share the same
+  // data-idx (they're the same note in two views), so we clear+mark both.
+  svg.querySelectorAll(".note-head, .tab-note").forEach(g => g.classList.remove("active", "next"));
 
   if (idx < 0) return;
 
-  const activeEl = svg.querySelector(`.note-head[data-idx="${idx}"]`);
-  if (!activeEl) return;
-  activeEl.classList.add("active");
+  const activeEls = svg.querySelectorAll(`[data-idx="${idx}"]`);
+  if (!activeEls.length) return;
+  activeEls.forEach(el => el.classList.add("active"));
 
   // Vertical auto-scroll: keep the active note in view inside the lyrics container.
-  const activeRect    = activeEl.getBoundingClientRect();
+  // Use the staff notehead if available (visually the top), otherwise the tab note.
+  const anchor = activeEls[0];
+  const activeRect    = anchor.getBoundingClientRect();
   const containerRect = container.getBoundingClientRect();
   const noteTopRel    = activeRect.top - containerRect.top;
   const noteBotRel    = activeRect.bottom - containerRect.top;
@@ -3645,6 +4058,14 @@ function bindEvents() {
   dom.prevSongBtn.addEventListener("click", () => changeSong(-1));
   dom.nextSongBtn.addEventListener("click", () => changeSong(1));
 
+  // ── Mobile mini-player: forward clicks to the real controls ──
+  if (dom.miniPlayerPlay) dom.miniPlayerPlay.addEventListener("click", togglePlayPause);
+  if (dom.miniPlayerPrev) dom.miniPlayerPrev.addEventListener("click", () => changeSong(-1));
+  if (dom.miniPlayerNext) dom.miniPlayerNext.addEventListener("click", () => changeSong(1));
+  if (dom.miniPlayerProgress) {
+    dom.miniPlayerProgress.addEventListener("click", handleMiniPlayerProgressClick);
+  }
+
   if (dom.speedGearBtn)    dom.speedGearBtn.addEventListener("click", toggleSpeedModal);
   if (dom.speedModalClose) dom.speedModalClose.addEventListener("click", closeSpeedModal);
   if (dom.speedSliderInput) dom.speedSliderInput.addEventListener("input", e => setSpeed(Number(e.target.value)));
@@ -3780,13 +4201,37 @@ function bindEvents() {
     dom.swapPanelsBtn.addEventListener("click", togglePanelSwap);
   }
 
+  // ── Panel collapse (chord + lyrics, independent) ──
+  if (dom.chordPanelCollapseBtn)  dom.chordPanelCollapseBtn.addEventListener("click",  toggleChordPanelCollapse);
+  if (dom.chordPanelExpandBtn)    dom.chordPanelExpandBtn.addEventListener("click",    toggleChordPanelCollapse);
+  if (dom.lyricsPanelCollapseBtn) dom.lyricsPanelCollapseBtn.addEventListener("click", toggleLyricsPanelCollapse);
+  if (dom.lyricsPanelExpandBtn)   dom.lyricsPanelExpandBtn.addEventListener("click",   toggleLyricsPanelCollapse);
+
   // ── Notation toggle (header button) ──
   if (dom.notationToggleBtn) {
-    dom.notationToggleBtn.addEventListener("click", () => {
-      state.notationMode = state.notationMode === "image" ? "interactive" : "image";
-      renderLyricsEmptyState(state.selectedSong);
+    dom.notationToggleBtn.addEventListener("click", openNotationViewModal);
+  }
+
+  // ── Notation view picker modal ──
+  if (dom.notationViewModal) {
+    // Option click → apply that view.
+    dom.notationViewModal.querySelectorAll(".nvpick-option").forEach(opt => {
+      opt.addEventListener("click", () => applyNotationView(opt.dataset.view));
+    });
+    // Backdrop click (target is the overlay itself, not a child) → close.
+    dom.notationViewModal.addEventListener("click", e => {
+      if (e.target === dom.notationViewModal) closeNotationViewModal();
     });
   }
+  if (dom.notationViewCancelBtn) {
+    dom.notationViewCancelBtn.addEventListener("click", closeNotationViewModal);
+  }
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape" && dom.notationViewModal && !dom.notationViewModal.hidden) {
+      e.stopImmediatePropagation();
+      closeNotationViewModal();
+    }
+  });
 
   // ── Lyrics Fullscreen ──
   if (dom.lyricsExpandBtn) dom.lyricsExpandBtn.addEventListener("click", openLyricsFullscreen);
@@ -4120,6 +4565,10 @@ function makeHistorySection(title) {
 function dismissEntryGate() {
   if (dom.entryGate) dom.entryGate.hidden = true;
   if (dom.appShell)  dom.appShell.hidden  = false;
+  // Mini-player was suppressed while the gate covered the app; only reveal
+  // when a song is already loaded — otherwise updateMiniPlayerForSong()
+  // will lift the flag when the user picks a song.
+  if (state.selectedSong) setMiniPlayerHidden(false);
 }
 
 /** Re-shows the entry gate from the main app (the header's "กลับไปหน้าแรก" button). */
@@ -4127,6 +4576,7 @@ function showEntryGate() {
   if (dom.appShell)  dom.appShell.hidden  = true;
   if (dom.entryGate) dom.entryGate.hidden = false;
   if (dom.entryGateStatus) { dom.entryGateStatus.hidden = true; dom.entryGateStatus.textContent = ""; dom.entryGateStatus.classList.remove("is-err"); }
+  setMiniPlayerHidden(true);
 }
 
 /** Gate's "เข้าใช้งาน" button — explicit student path; overrides any stale/persisted teacher session. */
@@ -4244,8 +4694,12 @@ async function handleEditorSave() {
   if (!rows.length) return;
 
   const btn = dom.editorSaveBtn;
+  // Every state re-write MUST wrap the text in <span class="btn-label"> so the
+  // mobile rule `.editor-topbar .btn-label { display: none }` (paired with a
+  // 36px icon-only button width) can still hide the label — otherwise the text
+  // overflows the tiny button and wraps under the icon (seen on save success).
   btn.disabled = true;
-  btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> กำลังบันทึก...`;
+  btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i><span class="btn-label"> กำลังบันทึก...</span>`;
   try {
     await saveSongData(state.selectedSong.id, kind, json);
 
@@ -4260,15 +4714,15 @@ async function handleEditorSave() {
       state.selectedSong.notation = parsed;
     }
 
-    btn.innerHTML = `<i class="fa-solid fa-check"></i> บันทึกแล้ว`;
+    btn.innerHTML = `<i class="fa-solid fa-check"></i><span class="btn-label"> บันทึกแล้ว</span>`;
   } catch (err) {
     console.error("Save failed:", err);
-    btn.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> บันทึกไม่สำเร็จ`;
+    btn.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i><span class="btn-label"> บันทึกไม่สำเร็จ</span>`;
     alert(`บันทึกไม่สำเร็จ: ${err.message || err}`);
   } finally {
     btn.disabled = false;
     setTimeout(() => {
-      btn.innerHTML = `<i class="fa-solid fa-cloud-arrow-up"></i> บันทึกขึ้น Cloud`;
+      btn.innerHTML = `<i class="fa-solid fa-cloud-arrow-up"></i><span class="btn-label"> บันทึกขึ้น Cloud</span>`;
     }, 3000);
   }
 }
@@ -4288,6 +4742,9 @@ async function initApp() {
   // Restore saved Panel-Swap preference (default: off)
   const savedSwap = localStorage.getItem("ukulele-panel-swap");
   applyPanelSwap(savedSwap === "on");
+
+  // Restore panel-collapse state (chord + lyrics, independent)
+  restorePanelCollapse();
 
   // Restore Favorites (per-device). Practice Log is fetched on-demand from
   // Firestore when a teacher opens the History panel — see openHistoryPanel().

@@ -216,6 +216,14 @@ function parseNote(raw, idx, clef) {
   const dur = parseDuration(raw && raw.dur);
   const time = raw && isFinite(Number(raw.time)) ? Number(raw.time) : null;
 
+  // Optional per-note tab overrides — let a teacher pin a fingering when
+  // the automatic pitch→(string,fret) mapping doesn't match their intent.
+  // Both fields are required for the override to apply (see tabModel).
+  const tabStringRaw = raw && raw.tabString;
+  const tabFretRaw   = raw && raw.tabFret;
+  const tabString = Number.isFinite(Number(tabStringRaw)) ? Number(tabStringRaw) : null;
+  const tabFret   = Number.isFinite(Number(tabFretRaw))   ? Number(tabFretRaw)   : null;
+
   return {
     idx,
     isRest,
@@ -230,6 +238,8 @@ function parseNote(raw, idx, clef) {
     filled:    dur.filled,
     durBeats:  dur.beats,
     time,
+    tabString,
+    tabFret,
   };
 }
 
