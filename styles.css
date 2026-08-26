@@ -4059,6 +4059,19 @@ select option { font-family: inherit; }
   .control-btn { width: 40px; height: 40px; font-size: 0.85rem; }
   .control-btn.primary { width: 52px; height: 52px; font-size: 1.05rem; }
 
+  /* PERF: strip backdrop-filter blur from the big surfaces on mobile.
+     Mobile GPUs stall painting when several blur layers stack — noticeable
+     as jank on scroll, stop/pause, and modal open. The mini-player keeps
+     its blur (single small bar, low cost). Aesthetic loss is minor:
+     underlying background is already dark solid. */
+  .panel,
+  .note-pick-sheet-panel,
+  .lyrics-fs-header,
+  .lyrics-fs-player {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
   /* Reserve space at the page bottom so the last panel isn't hidden
      behind the fixed mini-player (Spotify-style). Height ≈ 56px bar
      + safe-area. */

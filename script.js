@@ -132,6 +132,9 @@ const state = {
   selectedSong: null,
   sound: null,
   isPlaying: false,
+  pendingAutoPlay: false,        // set by changeSong() → picked up in Howl onload/onloaderror
+                                  //   so prev/next kicks off playback automatically
+                                  //   (Spotify-style, matches user expectation).
   duration: 0,
   speed: 1,
   currentLyricIndex: -1,
@@ -2611,30 +2614,32 @@ function setEmptyState(container, msg, tag = "p") {
 async function loadSongs() {
   if (dom.songSelect) dom.songSelect.disabled = true; // prevent selection mid-load
   try {
-    // Song list (id, title, mp3 path, bpm) stays local — served as a static
-    // file alongside songs/ and vocal/ audio. Only the editable payloads
-    // (lyrics/chords/notation) live in Firestore, keyed by song id.
+    // Song list (id, title, mp3 path, bpm) stays local. Payloads
+    // (lyrics/chords/notation) are fetched **lazily** from Firestore in
+    // ensureSongDataLoaded() so app startup doesn't wait for N × 3
+    // Firestore round-trips (very noticeable on mobile 4G with ~20 songs).
     const manifest = await fetchJson(MANIFEST_JSON_PATH);
     if (!manifest || !Array.isArray(manifest.songs)) {
       throw new Error("manifest.json ต้องมี key ชื่อ songs และเป็น Array");
     }
 
-    const songs = await Promise.all(manifest.songs.map(async meta => {
-      const { lyrics, chords, notation } = await fetchSongData(meta.id).catch(err => {
-        console.warn(`โหลดข้อมูลเพลง ${meta.id} ไม่สำเร็จ:`, err.message);
-        return { lyrics: [], chords: null, notation: null };
-      });
-      return buildSong(meta, lyrics, chords, notation);
-    }));
-
-    state.songs = songs;
-    setLoadStatus("success", "โหลดสำเร็จ");
+    // Build song objects with EMPTY payloads. `_dataLoaded` marks whether
+    // the song has been hydrated from Firestore yet — used as the cache key
+    // by ensureSongDataLoaded().
+    state.songs = manifest.songs.map(meta => {
+      const song = buildSong(meta, [], null, null);
+      song._dataLoaded = false;
+      return song;
+    });
+    setLoadStatus("success", "พร้อมใช้งาน");
   } catch (error) {
     console.error(error);
-    // Fallback to embedded demo data
-    state.songs = (fallbackSongs.songs || []).map(s =>
-      buildSong(s, s.lyrics, null)
-    );
+    // Fallback to embedded demo data (already has payloads inline)
+    state.songs = (fallbackSongs.songs || []).map(s => {
+      const song = buildSong(s, s.lyrics, null);
+      song._dataLoaded = true; // demo data ships with payloads
+      return song;
+    });
     setLoadStatus("error", "โหลดไม่สำเร็จ — ใช้ข้อมูลตัวอย่าง");
   } finally {
     if (dom.songSelect) dom.songSelect.disabled = false;
@@ -2643,6 +2648,42 @@ async function loadSongs() {
   renderSongSelect();
   // Default state: empty until user picks audio mode AND a song
   showIdleState();
+}
+
+/**
+ * Hydrates one song's lyrics/chords/notation from Firestore on first use.
+ * Subsequent calls are no-ops (cache-by-`_dataLoaded` flag on the song
+ * object). Safe to call multiple times — the concurrent-fetch race is
+ * avoided by stashing the in-flight promise on the song.
+ */
+async function ensureSongDataLoaded(song) {
+  if (!song) return;
+  if (song._dataLoaded) return;
+  if (song._loadingPromise) return song._loadingPromise;
+
+  song._loadingPromise = (async () => {
+    try {
+      const { lyrics, chords, notation } = await fetchSongData(song.id);
+      // Re-run buildSong to apply the derivation logic (chords from lyrics
+      // when explicit chords are absent, notation validation, etc.) and
+      // copy the payload fields onto the existing song object so anything
+      // holding a ref (state.selectedSong) sees the update.
+      const hydrated = buildSong(
+        { id: song.id, title: song.title, mp3: song.mp3, bpm: song.bpm },
+        lyrics, chords, notation,
+      );
+      song.lyrics   = hydrated.lyrics;
+      song.chords   = hydrated.chords;
+      song.notation = hydrated.notation;
+      song._dataLoaded = true;
+    } catch (err) {
+      console.warn(`โหลดข้อมูลเพลง ${song.id} ไม่สำเร็จ:`, err.message);
+      // Leave the empty payloads in place; user can retry by re-selecting.
+    } finally {
+      song._loadingPromise = null;
+    }
+  })();
+  return song._loadingPromise;
 }
 
 function renderSongSelect() {
@@ -2734,13 +2775,30 @@ function showIdleState() {
 /* =========================
    Player Functions
 ========================= */
-function selectSong(songId) {
+async function selectSong(songId) {
   const song = state.songs.find(s => s.id === songId);
   if (!song) return;
 
   state.selectedSong = song;
   dom.songSelect.value = song.id;
   updateFavoriteBtn();
+
+  // Show the mini-player IMMEDIATELY with the title (from manifest, no
+  // network needed) so the user gets instant feedback instead of waiting
+  // for Firestore + MP3 load. It stays visible while data + audio hydrate.
+  updateMiniPlayerForSong(song);
+
+  // Lazy-hydrate payloads from Firestore on first selection. Cached
+  // on the song object so re-selects are instant. Await BEFORE render
+  // so the panel doesn't flash empty then repaint with content.
+  if (!song._dataLoaded) {
+    setLoadStatus("loading", "กำลังโหลดเพลง...");
+    await ensureSongDataLoaded(song);
+    setLoadStatus("success", "พร้อมใช้งาน");
+    // User may have picked a different song while this one was loading —
+    // bail so we don't clobber the new selection with stale render.
+    if (state.selectedSong !== song) return;
+  }
 
   // Only proceed to load audio + render content if BOTH mode and song are picked
   if (state.audioMode) {
@@ -2765,7 +2823,10 @@ function loadSongAudio(song) {
 
   dom.currentSongTitle.textContent = song.title;
   updateBpm(song.bpm);   // also updates Tone.Transport BPM
-  updateMiniPlayerForSong(song);
+  // NOTE: mini-player is now revealed earlier, in selectSong(), so it
+  // pops up instantly with the title while Firestore + MP3 load in the
+  // background. Don't call updateMiniPlayerForSong here or the reveal
+  // would keep waiting for audio hydration.
 
   renderLyrics(song.lyrics, song);
   resetProgress();
@@ -2787,6 +2848,12 @@ function loadSongAudio(song) {
       setLoopButtonsEnabled(true);
       if (dom.editorToggleBtn) dom.editorToggleBtn.disabled = false;
       applyPreservePitch();
+      // Auto-play if navigation (prev/next) requested it. Clear the flag
+      // either way so a later dropdown pick doesn't inherit it.
+      if (state.pendingAutoPlay) {
+        state.pendingAutoPlay = false;
+        state.sound.play();
+      }
     },
 
     onloaderror: (_, error) => {
@@ -2797,6 +2864,9 @@ function loadSongAudio(song) {
       dom.seekBackBtn.disabled = true;
       dom.seekFwdBtn.disabled = true;
       setChordDisplay("MP3?");
+      // Don't leave pendingAutoPlay set — it would trigger on the next
+      // song load, which is not what the user asked for.
+      state.pendingAutoPlay = false;
     },
 
     onplay: () => {
@@ -2842,11 +2912,14 @@ function loadSongAudio(song) {
   });
 }
 
-// Cycle to previous/next song in manifest order
+// Cycle to previous/next song in manifest order. Prev/next always
+// auto-plays once the new MP3 finishes loading — matches Spotify /
+// YouTube behavior the user expects (dropdown selection does NOT
+// auto-play; that's a browse action).
 function changeSong(delta) {
   if (!state.songs.length) return;
+  state.pendingAutoPlay = true;
   if (!state.selectedSong) {
-    // No song selected yet — just pick the first one
     selectSong(state.songs[0].id);
     return;
   }
@@ -3044,11 +3117,15 @@ function updateProgress(currentSeconds) {
     if (dom.lyricsFsCurrentTime)   dom.lyricsFsCurrentTime.textContent = formatTime(currentSeconds);
     if (dom.lyricsFsDurationTime)  dom.lyricsFsDurationTime.textContent = formatTime(duration);
   }
-  // Mobile mini-player mirror (CSS media query hides it on desktop, so
-  // updating unconditionally here is fine — no visual cost).
-  if (dom.miniPlayerProgressFill) dom.miniPlayerProgressFill.style.width = `${percent}%`;
-  if (dom.miniPlayerCurrent) dom.miniPlayerCurrent.textContent = formatTime(currentSeconds);
-  if (dom.miniPlayerTotal)   dom.miniPlayerTotal.textContent   = formatTime(duration);
+  // Mobile mini-player mirror — skip on desktop where the mini-player is
+  // hidden by CSS media query anyway; those DOM writes run 60×/sec and
+  // add up. `matchMedia` is cheap (native) and the result changes only
+  // on viewport resize, which is rare in this app.
+  if (window.matchMedia("(max-width: 760px)").matches) {
+    if (dom.miniPlayerProgressFill) dom.miniPlayerProgressFill.style.width = `${percent}%`;
+    if (dom.miniPlayerCurrent) dom.miniPlayerCurrent.textContent = formatTime(currentSeconds);
+    if (dom.miniPlayerTotal)   dom.miniPlayerTotal.textContent   = formatTime(duration);
+  }
 }
 
 function updateTimedDisplays(currentSeconds) {
