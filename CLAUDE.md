@@ -193,7 +193,11 @@ The lyrics-panel header has a single button `#notationToggleBtn` that opens the 
 | `both`    | `renderCombined(model)` | staff on top + tab below per row, bar lines aligned |
 | `image`   | `<img>` of `Letter Note Notation/<id>.png` | static reference PNG |
 
-Options in the modal are hidden per song availability: interactive views hide when the song has no notation/legacy melody; the Image option hides when there's no PNG. If the stored view becomes invalid (e.g. teacher loads a song without a PNG while view was "image"), `syncNotationBtns` transparently falls back to a safe view before rendering. The view resets to `notation` on every new-song load (start of `renderLyrics`); the picker itself re-renders via `renderLyricsEmptyState` directly to preserve the teacher's choice.
+Options in the modal are hidden per song availability: interactive views hide when the song has no notation/legacy melody; the Image option hides when there's no PNG. If the stored view becomes invalid (e.g. teacher loads a song without a PNG while view was "image"), `syncNotationBtns` transparently falls back to a safe view before rendering. The view resets to `notation` **only when the song id actually changes** (tracked via module-level `_lastRenderedSongId` in `renderLyrics`); re-rendering the same song — e.g. after `handleEditorSave(kind="lyrics")` — preserves the teacher's view choice. The picker itself re-renders via `renderLyricsEmptyState` directly to preserve its choice on any single-song refresh.
+
+**Two buttons open the modal** — the main lyrics panel's `#notationToggleBtn` and the fullscreen mirror `#lyricsFsNotationToggleBtn`. Both are driven by `syncNotationBtns` through a small `applyTo(btn)` helper, so they always show the same icon + `aria-pressed` state. The modal (z 500) sits above the fullscreen overlay (z 300).
+
+**Single source of truth for "has interactive notation?"** — the helper `songHasInteractiveNotation(song)` is used by both `renderLyricsEmptyState` (dispatch) AND `openNotationViewModal` (which options to enable). Do NOT re-implement the lesson-song heuristic inline anywhere else.
 
 Playback highlight: `_applyStaffHighlight` marks BOTH `.note-head[data-idx]` and `.tab-note[data-idx]` at the current index — combined mode flashes staff notehead and tab fret number in sync. Selector matches `.note-staff-svg, .tab-svg` (combined SVG carries both classes so a single query finds it).
 
@@ -231,9 +235,11 @@ Notable `state` fields and their current behaviour — check these before editin
 
 **Chord picker modal (`#chordPickModal` / `.chpick-overlay`):** `z-index: 460`. Replaces the old free-text chord input in the Chord editor tab — each chord row shows a `.editor-chname-btn` button; clicking opens this modal. Chords grouped into six sections (Major, Minor, Dom 7, Minor 7, Major 7, Suspended) built from `CHORD_GROUPS` constant; a "ว่าง (ไม่มีคอร์ด)" button at the top selects an empty chord. Single tap calls `selectChordPick()` → `updateChordName()` → re-render and close. Adding a new row via `makeChordInsertDivider` opens this modal automatically. Wired inside `wireNotationConfigControls()` via `buildChordPickGrid()`. Escape / backdrop closes without applying. Bottom sheet on mobile, centered dialog on desktop.
 
-**Editor modal guard in `handleEditorKeydown`:** The function checks three modals at the top before processing keyboard shortcuts — `ntConfigModal`, `ntPitchModal`, and `chordPickModal`. If any is visible, it returns immediately so Escape (and other keys) route to the modal's own document-level handler instead of closing the editor.
+**Editor modal guard in `handleEditorKeydown`:** The function checks FOUR modals at the top before processing keyboard shortcuts — `ntConfigModal`, `ntPitchModal`, `ntTabModal`, and `chordPickModal`. If any is visible, it returns immediately so Escape (and other keys) route to the modal's own document-level handler instead of closing the editor.
 
-**Fullscreen lyrics overlay (`#lyricsFullscreen` / `.lyrics-fs`):** Fixed overlay, `z-index: 300`, background `#090d18`. Structure: `.lyrics-fs-body` (flex column, fills space) → `.lyrics-fs-header` (glassmorphism, shows `#lyricsFsHeaderTitle` song title + action buttons) → `.lyrics-fs-main` (flex row: chord column + lyrics container) → `.lyrics-fs-player` (glassmorphism player bar at bottom). Chord column (`.lyrics-fs-chord-col`) is `clamp(280px, 28vw, 420px)` — responsive, scales with viewport. Chord badge inside is `clamp(160px, 20vw, 260px)`. Diagram SVG is `clamp(160px, 18vw, 240px)`. Player transport buttons: 36px/46px (secondary/primary). Progress bar in `.lyrics-fs-player-timeline` is overridden to 3px height with amber fill. Active-state button highlights use `var(--accent)` amber (not blue). `syncFsPlayer()` populates both `dom.lyricsFsPlayerTitle` (in player bar) and `dom.lyricsFsHeaderTitle` (in header) with the current song title. A-B loop markers (`dom.lyricsFsLoopMarkerA`, `dom.lyricsFsLoopMarkerB`, `dom.lyricsFsLoopRegion`) mirror the main timeline markers — both sets are updated together by `updateLoopMarkers()`.
+**Fullscreen lyrics overlay (`#lyricsFullscreen` / `.lyrics-fs`):** Fixed overlay, `z-index: 300`, background `#090d18`. Structure: `.lyrics-fs-body` (flex column, fills space) → `.lyrics-fs-header` (glassmorphism, shows `#lyricsFsHeaderTitle` song title + action buttons including `#lyricsFsNotationToggleBtn` — the fullscreen mirror of the view picker) → `.lyrics-fs-main` (flex row: chord column + lyrics container) → `.lyrics-fs-player` (glassmorphism player bar at bottom). Chord column (`.lyrics-fs-chord-col`) is `clamp(280px, 28vw, 420px)` — responsive, scales with viewport. Chord badge inside is `clamp(160px, 20vw, 260px)`. Diagram SVG is `clamp(160px, 18vw, 240px)`. Player transport buttons: 36px/46px (secondary/primary). Progress bar in `.lyrics-fs-player-timeline` is overridden to 3px height with amber fill. Active-state button highlights use `var(--accent)` amber (not blue). `syncFsPlayer()` populates both `dom.lyricsFsPlayerTitle` (in player bar) and `dom.lyricsFsHeaderTitle` (in header) with the current song title. A-B loop markers (`dom.lyricsFsLoopMarkerA`, `dom.lyricsFsLoopMarkerB`, `dom.lyricsFsLoopRegion`) mirror the main timeline markers — both sets are updated together by `updateLoopMarkers()`. The tiny status pills `#currentChordLabel` (main panel) and `#lyricsFsChordLabel` (fullscreen) were removed — the big chord badge in `.chord-stage` / `.lyrics-fs-chord-display` is the single visible indicator now.
+
+**`openLyricsFullscreen()` / `closeLyricsFullscreen()`** toggle `body.no-mini-player` via `setMiniPlayerHidden(true|false)` so the mobile mini-player doesn't stack over the fullscreen player bar. The editor and entry gate do the same at their open/close.
 
 **Dancing character (Lottie):** Lives in `.header-brand` inside `<header>`, absolutely positioned to the right of the h1 so it doesn't affect header height. No toggle button — always visible. Controlled by `initLottieDancer()` / `swapLottie()` in `script.js`.
 
@@ -247,6 +253,36 @@ Notable `state` fields and their current behaviour — check these before editin
 Grid column widths are driven by `.main-grid.chord-collapsed` / `.main-grid.lyrics-collapsed` classes (+ variants combined with `.panels-swapped`) — three width tiers (>1180px, 761–1180px, ≤760px) each override `grid-template-columns` so the surviving panel grows into the freed space. Both panels can be collapsed at once (the left controls panel then dominates). Fullscreen lyrics overlay uses its own `.lyrics-fs-*` layout and is not affected.
 
 **Layout:** `.panel` (the 3 main cards) uses a **fixed** `height: 720px` on desktop (not `min-height`) so every song's panel is the same size regardless of lyrics/notation length — long content scrolls inside `.lyrics-container` (`overflow-y: auto`) instead of growing the card. Both mobile breakpoints reset this to `height: auto` for natural single-column stacking, and the mobile `.lyrics-container` gets its own smaller `max-height: 480px` cap (the desktop 760px cap is too tall to matter on a phone viewport). `.app-shell` caps overall page width at `min(1800px, 100%)`.
+
+**Top header actions (mobile crowding fix):** the header keeps only two icon buttons — `#backToGateBtn` and `#themeToggleBtn` — so it never wraps to two rows on narrow screens. `#swapPanelsBtn` was moved into `.chord-panel-actions` (was in the header); it hides with the chord panel when collapsed, but swap is a rare-use action so the trade is acceptable.
+
+**Mobile mini-player (`#miniPlayer`, `.mini-player`, `z-index: 200`):** Spotify-style floating glass bar shown on `≤760px` only (`@media (min-width: 761px)` hides it). Structure: 3px `.mini-player-progress` at top → 40×40 album-art tile → title + `MM:SS/MM:SS` time → prev / play(primary) / next buttons. Fully passive — its buttons forward to `togglePlayPause` / `changeSong(-1|1)` / seek-on-tap; the icon + progress + time mirror the same `updateProgress` + `updatePlayPauseIcon` calls the main UI uses. Revealed early in `selectSong()` (before the Firestore fetch resolves) via `updateMiniPlayerForSong(song)` — pill slides up instantly with the manifest title. Hidden via `body.no-mini-player` (toggled by `setMiniPlayerHidden`) whenever a full-screen surface takes over (fullscreen lyrics, editor, entry gate). `updateProgress` gates its mini-player DOM writes behind a module-level `_isMobileViewport` boolean (fed by a cached `matchMedia('(max-width: 760px)')` with a `change` listener) so desktop pays zero cost per RAF tick.
+
+---
+
+## Song loading pipeline
+
+`loadSongs()` fetches ONLY `manifest.json` at startup — payloads are lazy. Each song object starts with empty `lyrics/[]`, `chords: null`, `notation: null`, and `_dataLoaded: false`; `ensureSongDataLoaded(song)` hydrates on first selection with a three-tier cache:
+
+1. **In-memory** (`song._dataLoaded` flag on the song object) — instant, per SPA session.
+2. **sessionStorage** (`uke-song:{id}`) — instant, survives page reload within the tab. Written after a Firestore hit; invalidated by `handleEditorSave()` via `invalidateSongCache(id)` so a reload sees fresh data after a save.
+3. **Firestore** (`fetchSongData`) — 3 parallel doc reads (lyrics / chords / notation). ~300-800ms on mobile 4G, only when both caches miss.
+
+Concurrent-fetch guard: `song._loadingPromise` stashes the in-flight promise, so a race (e.g. mini-player prev/next spam) awaits the same fetch rather than doubling network work.
+
+**Parallel with MP3:** `selectSong(songId, {autoPlay})` kicks `loadSongAudio(song, {autoPlay})` *immediately* (Howl.src reads the mp3 path from the manifest — already in memory) IN PARALLEL with `ensureSongDataLoaded`. When Firestore payloads arrive, `renderLyrics(song.lyrics, song)` repaints the container. Before this, we serialized Firestore → MP3, wasting the full Firestore RTT.
+
+**Race guard for stale renders:** after `await ensureSongDataLoaded`, we check `state.selectedSong !== song` and bail — if the user picked another song mid-load, the older run must not clobber the newer render.
+
+**Auto-play is a closure parameter, not a shared flag** — `changeSong(delta)` calls `selectSong(id, {autoPlay: true})`; `loadSongAudio` captures it in the Howl.onload closure. This replaced an earlier `state.pendingAutoPlay` flag that leaked (needed cleanup on Stop, dropdown-pick, setAudioMode; forgetting any one was a bug). `state.sound !== thisSound` guards in Howl.onload/onloaderror also ignore callbacks from a superseded load.
+
+## Auth cache
+
+`isAdmin(uid)` in `src/firebase/authStore.js` caches its Firestore lookup in `sessionStorage["uke-admin:{uid}"]` with a 24h TTL. Subsequent `observeAuth` fires within the tab skip the Firestore round-trip (previously ~500-1500ms after Google login on mobile). `signOutTeacher()` purges every cached entry so a fresh sign-in (possibly a different account) always re-checks.
+
+## Mobile paint perf
+
+`.panel`, `.note-pick-sheet-panel`, and the fullscreen glass surfaces have `backdrop-filter: none !important` on `≤760px`. Stacked blur layers on mobile GPUs cause paint stalls that show up as jank on scroll, stop/pause, and modal open. The mini-player keeps its blur — single small bar, low cost. Solid dark background reads fine.
 
 ---
 
@@ -307,6 +343,7 @@ Do this proactively whenever writing CSS that sets `display: block/flex/inline-f
 | `notationEditor.test.js` | buildNotationConfig, buildNoteRows, updateNoteField, stampNoteTime, computeMeasureMap, exportToNotationJson, etc. |
 | `songBuilder.test.js` | buildSong — lyrics, chords, notation integration |
 | `tabModel.test.js` | midiFromPitch, positionsForMidi, pickBestPosition, computeTabPositions (smart fingering + per-note overrides) |
+| `tabRenderer.test.js` | renderTab / renderCombined / renderTabRowBody — empty guard, structure, T-A-B label per row, rest handling, bar-line x alignment with `layoutStaff`, multi-row wrap, `includeLabel` flag, optional pre-computed positions param on `renderCombined` |
 
 **CI:** `.github/workflows/test.yml` — runs `npm test` and `npm run test:coverage` on push/PR to `main`.
 
@@ -314,16 +351,18 @@ Do this proactively whenever writing CSS that sets `display: block/flex/inline-f
 
 ## Git Workflow
 
-This project uses a Claude worktree branch (`claude/eloquent-mirzakhani-9f55c3`) that pushes directly to `main`:
+The repo works directly on `main`. Typical commit flow:
 
 ```bash
-git status                                              # see what changed
-git add <file> [<file>...]                              # stage specific files
-git commit -m "short description"                       # create commit
-git push origin claude/eloquent-mirzakhani-9f55c3:main # push to GitHub main
+git status                          # see what changed
+git add <file> [<file>...]          # stage specific files
+git commit -m "short description"   # create commit
+git push origin main                # push to GitHub
 ```
 
 **Rules:**
 - Never `git push` without explicit user approval.
 - Never amend published commits — always create a new commit.
 - Never use `--no-verify` or `--force` unless explicitly instructed.
+- Never `git add -A` / `git add .` — stage specific files so nothing sensitive slips in.
+- After any code change that could affect tests, run `npm test` before committing (16+ test files, ~470+ cases; the full suite finishes in ~3s).

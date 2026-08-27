@@ -1,7 +1,27 @@
+# Dependencies / build output
 node_modules/
 coverage/
-.DS_Store
 
-# Firebase service account keys — never commit
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor swap / backup files
+*.swp
+*.swo
+*~
+
+# Personal IDE / agent configs — not needed to run the app
+.vscode/
+.idea/
+.claude/
+
+# Environment files (defensive — none currently in repo)
+.env
+.env.*
+
+# Firebase service account keys — NEVER commit (used by migration script only,
+# generated per-teacher via Firebase console → Project settings → Service accounts)
 serviceAccount*.json
 *-service-account*.json
+firebase-adminsdk-*.json
