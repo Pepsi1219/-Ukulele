@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="th" data-theme="dark">
+<html lang="th" data-theme="light">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" />
@@ -218,27 +218,52 @@
                 </div>
               </div>
             </div>
-          </div>
-        </div>
 
-        <div class="metronome-card">
-          <div class="metronome-head">
-            <div>
-              <p class="muted">Metronome</p>
-              <h3><span id="bpmValue">100</span> BPM</h3>
-            </div>
-            <div class="metro-head-right">
-              <div id="metroVisual" class="metro-visual"></div>
-              <select id="metroSoundSelect" class="metro-sound-select"></select>
-              <button id="metroToggleBtn" class="icon-btn" type="button">
-                <i class="fa-solid fa-play"></i>
-                เปิด
+            <!-- Metronome trigger + modal — same wrapper pattern as
+                 speed-gear-wrap so the popup positioning + backdrop-click
+                 rules already in place cover both. -->
+            <div class="speed-gear-wrap metro-gear-wrap">
+              <button id="metroGearBtn" class="speed-gear-btn metro-gear-btn" type="button" aria-haspopup="dialog" aria-expanded="false" title="Metronome">
+                <i class="fa-solid fa-drum"></i>
+                <span id="metroGearLabel">100 BPM</span>
+                <i class="fa-solid fa-chevron-up speed-gear-caret"></i>
               </button>
+              <div id="metroModal" class="speed-modal metro-modal" hidden role="dialog" aria-label="Metronome">
+                <div class="speed-modal-header">
+                  <button id="metroModalClose" class="speed-modal-back" type="button" aria-label="ปิด">
+                    <i class="fa-solid fa-chevron-left"></i>
+                  </button>
+                  <span class="speed-modal-title">Metronome</span>
+                </div>
+                <!-- BPM display + pulse indicator -->
+                <div class="metro-modal-value-row">
+                  <div id="metroVisual" class="metro-visual"></div>
+                  <div class="speed-modal-value"><span id="bpmValue">100</span> BPM</div>
+                </div>
+                <!-- ± around the slider (finding request from user) -->
+                <div class="speed-modal-slider-row">
+                  <button id="bpmDecBtn" class="speed-step-btn" type="button" aria-label="ลด BPM">−</button>
+                  <input id="bpmSlider" class="range-input speed-slider" type="range" min="30" max="200" value="100" />
+                  <button id="bpmIncBtn" class="speed-step-btn" type="button" aria-label="เพิ่ม BPM">+</button>
+                </div>
+                <div class="metro-modal-controls">
+                  <select id="metroSoundSelect" class="metro-sound-select"></select>
+                  <button id="metroToggleBtn" class="icon-btn" type="button">
+                    <i class="fa-solid fa-play"></i>
+                    เปิด
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
-
-          <input id="bpmSlider" class="range-input" type="range" min="30" max="200" value="100" />
         </div>
+
+        <!-- Song-badge cloud — desktop-only decorative feature that fills
+             the empty space under loop-controls with an artistically-
+             scattered set of clickable song-title badges. Populated by
+             renderSongBadgeCloud() in script.js. Hidden on ≤1180px via
+             the media query in styles.css. -->
+        <div id="songBadgeCloud" class="song-badge-cloud" aria-label="รายชื่อเพลง (คลิกเพื่อเปลี่ยนเพลง)"></div>
       </section>
 
       <!-- Center Panel: Chord + Character -->

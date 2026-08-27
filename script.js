@@ -196,6 +196,10 @@ const state = {
   // ── Favorites ──
   favorites:       new Set(),   // Set of song IDs marked as favorites
   favFilterOn:     false,       // true = show only favorite songs in dropdown
+  // ── Per-song play counts (localStorage-backed) — drives song-badge
+  //    cloud ordering so frequently-played songs surface in the front
+  //    (top-left) cells. Object of { [songId]: number }. ──
+  songPlayCounts:  {},
   // ── Practice Log ──
   practiceLog:         [],      // array of { songId, songTitle, date, durationSec }
   practiceSessionStart: null,   // Date.now() when play started (null if paused/stopped)
@@ -225,6 +229,7 @@ const dom = {
 
   loadStatus:        document.getElementById("loadStatus"),
   songSelect:        document.getElementById("songSelect"),
+  songBadgeCloud:    document.getElementById("songBadgeCloud"),
   currentSongTitle:  document.getElementById("currentSongTitle"),
   playPauseBtn:      document.getElementById("playPauseBtn"),
   stopBtn:           document.getElementById("stopBtn"),
@@ -260,6 +265,12 @@ const dom = {
   speedIncBtn:       document.getElementById("speedIncBtn"),
   bpmSlider:         document.getElementById("bpmSlider"),
   bpmValue:          document.getElementById("bpmValue"),
+  bpmDecBtn:         document.getElementById("bpmDecBtn"),
+  bpmIncBtn:         document.getElementById("bpmIncBtn"),
+  metroGearBtn:      document.getElementById("metroGearBtn"),
+  metroGearLabel:    document.getElementById("metroGearLabel"),
+  metroModal:        document.getElementById("metroModal"),
+  metroModalClose:   document.getElementById("metroModalClose"),
   metroToggleBtn:    document.getElementById("metroToggleBtn"),
   metroVisual:       document.getElementById("metroVisual"),
   metroSoundSelect:  document.getElementById("metroSoundSelect"),
@@ -2771,6 +2782,108 @@ function renderSongSelect() {
     if (state.selectedSong && song.id === state.selectedSong.id) option.selected = true;
     dom.songSelect.appendChild(option);
   });
+
+  // Keep the desktop song-badge cloud in sync with the dropdown — it
+  // ignores the favorite filter on purpose (the cloud is a decorative
+  // "all songs" overview, not a filtered picker).
+  renderSongBadgeCloud();
+}
+
+// ─── Desktop-only song-badge cloud ─────────────────────────────────────
+// Fills the empty space under loop-controls with an artistically-
+// scattered set of clickable song badges. Positions are DETERMINISTIC
+// (seeded by song id) so the layout doesn't shuffle on every re-render —
+// only re-render on song-list changes (loadSongs) or selection changes
+// (to update the .active marker).
+
+// ─── Play-count tracking (localStorage-persisted) ──────────────────────
+const PLAY_COUNTS_KEY = "uke-song-plays";
+
+function loadSongPlayCounts() {
+  try {
+    const raw = localStorage.getItem(PLAY_COUNTS_KEY);
+    state.songPlayCounts = raw ? JSON.parse(raw) : {};
+    if (!state.songPlayCounts || typeof state.songPlayCounts !== "object") {
+      state.songPlayCounts = {};
+    }
+  } catch { state.songPlayCounts = {}; }
+}
+function saveSongPlayCounts() {
+  try {
+    localStorage.setItem(PLAY_COUNTS_KEY, JSON.stringify(state.songPlayCounts));
+  } catch { /* quota / private mode — non-fatal */ }
+}
+/** +1 to the play count for `id`. Called once per song load from onplay
+ *  (the flag countedThisLoad in loadSongAudio prevents pause+resume from
+ *  double-counting). Re-renders the badge cloud so the reorder is
+ *  visible immediately. */
+function incrementSongPlayCount(id) {
+  if (!id) return;
+  state.songPlayCounts[id] = (state.songPlayCounts[id] || 0) + 1;
+  saveSongPlayCounts();
+  renderSongBadgeCloud();
+}
+
+/** 32-bit hash → normalized [0, 1). Used as a per-song RNG stream so we
+ *  can pull position/rotation/size from the same id repeatedly. */
+function _songHash(id, salt) {
+  let h = 2166136261 ^ salt;
+  for (let i = 0; i < id.length; i++) {
+    h = Math.imul(h ^ id.charCodeAt(i), 16777619);
+  }
+  return ((h >>> 0) / 4294967296);
+}
+
+function renderSongBadgeCloud() {
+  const cloud = dom.songBadgeCloud;
+  if (!cloud) return;
+  cloud.innerHTML = "";
+  if (!state.songs.length) return;
+
+  const selectedId = state.selectedSong ? state.selectedSong.id : null;
+
+  // Order by play count DESC — frequently-played songs land first
+  // (grid fills left-to-right, top-to-bottom, so they appear in the
+  // top-left prominence area). Ties break by manifest index. We sort a
+  // COPY so state.songs (dropdown / prev-next navigation) keeps its
+  // original manifest order.
+  const orderedSongs = state.songs
+    .map((s, origIdx) => ({ s, origIdx, plays: state.songPlayCounts[s.id] || 0 }))
+    .sort((a, b) => b.plays - a.plays || a.origIdx - b.origIdx)
+    .map(x => x.s);
+
+  orderedSongs.forEach((song, i) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "song-badge";
+    if (song.id === selectedId) btn.classList.add("active");
+
+    // Only rotation + tint are deterministic per song id — the actual
+    // POSITION is handled by CSS Grid so it can never cluster / spill.
+    // Rotation is small (±6°) so the ellipsis text stays readable.
+    const rot = -6 + _songHash(song.id, 3) * 12;
+    const tint = ["a","b","c","d"][i % 4];
+
+    btn.dataset.tint = tint;
+    btn.dataset.songId = song.id;
+    btn.style.setProperty("--brot", `${rot}deg`);
+    btn.textContent = song.title;
+    btn.title = song.title;
+    // Browse-only click (no autoPlay) — same contract as the dropdown pick.
+    btn.addEventListener("click", () => selectSong(song.id));
+    cloud.appendChild(btn);
+  });
+}
+
+/** Just re-applies the .active marker without rebuilding the DOM. Called
+ *  from selectSong so the highlight follows without shuffling badges. */
+function updateSongBadgeCloudActive() {
+  const cloud = dom.songBadgeCloud;
+  if (!cloud) return;
+  const selectedId = state.selectedSong ? state.selectedSong.id : null;
+  cloud.querySelectorAll(".song-badge").forEach(el => {
+    el.classList.toggle("active", el.dataset.songId === selectedId);
+  });
 }
 
 /* =========================
@@ -2853,6 +2966,7 @@ async function selectSong(songId, options = {}) {
   state.selectedSong = song;
   dom.songSelect.value = song.id;
   updateFavoriteBtn();
+  updateSongBadgeCloudActive();
 
   // Show the mini-player IMMEDIATELY with the title (from manifest, no
   // network needed) so the user gets instant feedback.
@@ -2925,6 +3039,9 @@ function loadSongAudio(song, options = {}) {
   // Capture the Howl in a local so onload uses THIS instance even after a
   // later loadSongAudio call swaps state.sound (defensive — Howler's
   // unload() usually suppresses stale callbacks, but the closure is free).
+  // countedThisLoad prevents pause/resume from double-incrementing the
+  // play count — we count each song load exactly once, on first play.
+  let countedThisLoad = false;
   const thisSound = new Howl({
     src: [getMp3PathFor(song)],
     html5: true,
@@ -2970,6 +3087,13 @@ function loadSongAudio(song, options = {}) {
       applyPreservePitch();
       setCharPlaying(true);
       startPracticeTimer();
+      // Bump the play count for THIS song exactly once per load (a
+      // pause+resume keeps countedThisLoad true so we don't over-count).
+      // Drives song-badge-cloud ordering — most-played first.
+      if (!countedThisLoad) {
+        countedThisLoad = true;
+        incrementSongPlayCount(song.id);
+      }
       // Auto-sync metronome to song beat phase when playback starts
       if (state.metronomeOn) syncMetronomeToSong(Number(state.sound.seek()) || 0).catch(err => console.error("Metronome sync failed:", err));
     },
@@ -4240,11 +4364,40 @@ async function toggleMetronome() {
   }
 }
 
+/**
+ * Single source of truth for BPM changes. Callers (slider input, ± step
+ * buttons, per-song bpm restore) all funnel through here so slider,
+ * modal value, gear button label, and Tone.Transport stay in lockstep.
+ */
 function updateBpm(value) {
   const bpm = Math.min(Math.max(Number(value), 30), 200);
   dom.bpmSlider.value    = String(bpm);
   dom.bpmValue.textContent = String(bpm);
+  if (dom.metroGearLabel) dom.metroGearLabel.textContent = `${bpm} BPM`;
   if (Tone.Transport) Tone.Transport.bpm.rampTo(bpm, 0.05);
+}
+
+/** Nudge BPM by delta, clamped by updateBpm. Used by the ± buttons around
+ *  the slider inside the metronome modal. Step of 1 = fine control; users
+ *  who want faster changes can drag the slider itself. */
+function stepBpm(delta) {
+  const current = Number(dom.bpmSlider.value) || 100;
+  updateBpm(current + delta);
+}
+
+// ── Metronome modal (mirror pattern of speed modal, same wrapper class) ──
+function toggleMetroModal() {
+  if (!dom.metroModal) return;
+  const opening = dom.metroModal.hidden;
+  dom.metroModal.hidden = !opening;
+  if (dom.metroGearBtn) dom.metroGearBtn.setAttribute("aria-expanded", opening ? "true" : "false");
+  // Close the sibling speed modal so only one popup is open at a time.
+  if (opening && dom.speedModal && !dom.speedModal.hidden) closeSpeedModal();
+}
+function closeMetroModal() {
+  if (!dom.metroModal || dom.metroModal.hidden) return;
+  dom.metroModal.hidden = true;
+  if (dom.metroGearBtn) dom.metroGearBtn.setAttribute("aria-expanded", "false");
 }
 
 function flashMetronome() {
@@ -4302,9 +4455,37 @@ function bindEvents() {
     const btn = e.target.closest(".speed-preset-btn[data-speed]");
     if (btn) setSpeed(btn.dataset.speed);
   });
+
+  // Metronome gear + modal (same wrapper class as speed so the
+  // outside-click closer below covers both)
+  if (dom.metroGearBtn)    dom.metroGearBtn.addEventListener("click", toggleMetroModal);
+  if (dom.metroModalClose) dom.metroModalClose.addEventListener("click", closeMetroModal);
+  if (dom.bpmDecBtn)       dom.bpmDecBtn.addEventListener("click", () => stepBpm(-1));
+  if (dom.bpmIncBtn)       dom.bpmIncBtn.addEventListener("click", () => stepBpm(1));
+
+  // Outside-click closes whichever gear popup is open. Both wrappers
+  // carry the .speed-gear-wrap class so the same closest() check
+  // protects their own popup from closing on internal clicks.
   document.addEventListener("click", e => {
-    if (!dom.speedModal || dom.speedModal.hidden) return;
-    if (!e.target.closest(".speed-gear-wrap")) closeSpeedModal();
+    const insideWrap = e.target.closest(".speed-gear-wrap");
+    if (dom.speedModal && !dom.speedModal.hidden && insideWrap !== dom.speedGearBtn?.parentElement)  closeSpeedModal();
+    if (dom.metroModal && !dom.metroModal.hidden && insideWrap !== dom.metroGearBtn?.parentElement)  closeMetroModal();
+  });
+
+  // Escape closes whichever gear popup is open. Twin pattern → twin
+  // behavior. stopPropagation prevents the fullscreen/gate Escape
+  // handlers below from firing on the same event.
+  document.addEventListener("keydown", e => {
+    if (e.key !== "Escape") return;
+    if (dom.metroModal && !dom.metroModal.hidden) {
+      e.stopPropagation();
+      closeMetroModal();
+      return;
+    }
+    if (dom.speedModal && !dom.speedModal.hidden) {
+      e.stopPropagation();
+      closeSpeedModal();
+    }
   });
 
   dom.progressTrack.addEventListener("click", e => { seekFromPointer(e.clientX); });
@@ -4961,8 +5142,10 @@ async function handleEditorSave() {
    Init
 ========================= */
 async function initApp() {
-  // Restore saved theme
-  const savedTheme = localStorage.getItem("ukulele-theme") || "dark";
+  // Restore saved theme. Default is LIGHT — first visits and any user
+  // who has never touched the toggle land on light mode. applyTheme
+  // persists the choice back to localStorage so the toggle sticks.
+  const savedTheme = localStorage.getItem("ukulele-theme") || "light";
   applyTheme(savedTheme);
 
   // Restore saved Auto-Scroll preference (default: on)
@@ -4979,6 +5162,8 @@ async function initApp() {
   // Restore Favorites (per-device). Practice Log is fetched on-demand from
   // Firestore when a teacher opens the History panel — see openHistoryPanel().
   loadFavorites();
+  // Restore per-song play counts — drives song-badge cloud ordering.
+  loadSongPlayCounts();
 
   bindEvents();
   initLottieDancer();
