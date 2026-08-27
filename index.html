@@ -87,10 +87,6 @@
           <i class="fa-solid fa-house"></i>
         </button>
 
-        <button id="swapPanelsBtn" class="icon-btn secondary" type="button" aria-label="สลับตำแหน่ง Chord และ Lyrics" title="สลับ Chord ↔ Lyrics" aria-pressed="false">
-          <i class="fa-solid fa-arrow-right-arrow-left"></i>
-        </button>
-
         <button id="themeToggleBtn" class="icon-btn secondary" type="button" aria-label="Toggle theme">
           <i class="fa-solid fa-moon" id="themeIcon"></i>
         </button>
@@ -262,7 +258,14 @@
                     aria-pressed="false" aria-label="สลับแนวนอน/แนวตั้ง" title="สลับแนวนอน/แนวตั้ง">
               <i class="fa-solid fa-rotate"></i>
             </button>
-            <span id="currentChordLabel" class="status-pill accent">-</span>
+            <!-- Moved from the top header to free up mobile header space
+                 (was crowding onto a second row on narrow screens). The
+                 currentChordLabel pill that used to live here was removed
+                 — the big chord badge in .chord-stage already surfaces
+                 the current chord prominently, so the tiny pill was dup. -->
+            <button id="swapPanelsBtn" class="icon-btn secondary" type="button" aria-label="สลับตำแหน่ง Chord และ Lyrics" title="สลับ Chord ↔ Lyrics" aria-pressed="false">
+              <i class="fa-solid fa-arrow-right-arrow-left"></i>
+            </button>
           </div>
         </div>
 
@@ -400,6 +403,15 @@
                   aria-pressed="false" aria-label="สลับตำแหน่ง Chord ↔ Lyrics" title="สลับตำแหน่ง Chord ↔ Lyrics">
             <i class="fa-solid fa-arrow-right-arrow-left"></i>
           </button>
+          <!-- Same view picker as the main #notationToggleBtn — opens the
+               shared #notationViewModal (z:500 > fullscreen z:300). Sync'd
+               by syncNotationBtns so both buttons show the same icon /
+               state at the same time. -->
+          <button id="lyricsFsNotationToggleBtn" class="icon-btn secondary" type="button" hidden
+                  aria-haspopup="dialog" aria-expanded="false"
+                  title="เปลี่ยนโหมดการแสดงโน้ต">
+            <i class="fa-solid fa-music"></i>
+          </button>
           <button id="lyricsFullscreenAutoScroll" class="status-pill toggle-pill is-on icon-only" type="button" aria-pressed="true" aria-label="เปิด/ปิด Auto Scroll" title="เปิด/ปิด Auto Scroll">
             <i class="fa-solid fa-arrows-up-down"></i>
           </button>
@@ -427,7 +439,9 @@
                       aria-pressed="false" aria-label="สลับแนวนอน/แนวตั้ง" title="สลับแนวนอน/แนวตั้ง">
                 <i class="fa-solid fa-rotate"></i>
               </button>
-              <span id="lyricsFsChordLabel" class="status-pill accent">-</span>
+              <!-- #lyricsFsChordLabel removed — the big chord badge below
+                   already surfaces the current chord; the tiny pill was
+                   redundant. Matches the earlier #currentChordLabel removal. -->
             </div>
           </div>
           <div id="lyricsFsChordDisplay" class="lyrics-fs-chord-display">

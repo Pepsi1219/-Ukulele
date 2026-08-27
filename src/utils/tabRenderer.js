@@ -139,13 +139,20 @@ export function renderTab(model) {
  * directly below it (sharing x positions). Matches the classic "notation +
  * tab" lesson-sheet layout — students see the same passage in two forms,
  * beat-aligned.
+ *
+ * @param {{config:Object, notes:Array}} model
+ * @param {Array<{stringIdx:number, fret:number}|null>} [tabPositions]
+ *   Optional pre-computed positions (from computeTabPositions). Pass this
+ *   when the caller has already computed positions for another purpose
+ *   (e.g. the notation editor computes them for row chips) to skip the
+ *   duplicate compute.
  */
-export function renderCombined(model) {
+export function renderCombined(model, tabPositions) {
   if (!model || !Array.isArray(model.notes) || !model.notes.length) return "";
 
   const L = layoutStaff(model);
   const { config, keySteps, keySigW } = staffDrawContext(L);
-  const tabPositions = computeTabPositions(model);
+  const positions = tabPositions || computeTabPositions(model);
   const rowTotal = COMBINED_SYSTEM_H + ROW_GAP;
 
   let body = "";
@@ -153,7 +160,7 @@ export function renderCombined(model) {
     const rowY   = row.index * rowTotal;
     const tabY   = rowY + SYSTEM_H + COMBINED_GAP;
     body += renderStaffRowBody(row, L, config, keySteps, keySigW, rowY, row.index === 0);
-    body += renderTabRowBody(row, L, tabPositions, tabY, true);
+    body += renderTabRowBody(row, L, positions, tabY, true);
   }
 
   const height = L.numRows * rowTotal - ROW_GAP;

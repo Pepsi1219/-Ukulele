@@ -132,9 +132,11 @@ const state = {
   selectedSong: null,
   sound: null,
   isPlaying: false,
-  pendingAutoPlay: false,        // set by changeSong() → picked up in Howl onload/onloaderror
-                                  //   so prev/next kicks off playback automatically
-                                  //   (Spotify-style, matches user expectation).
+  // Auto-play intent is passed as an option through
+  // selectSong(id, {autoPlay}) → loadSongAudio(song, {autoPlay}) so it's
+  // captured in the Howl onload closure. NOT stored on state — the flag
+  // pattern leaked (needed cleanup on onload, onloaderror, stopSong, and
+  // any dropdown pick that landed mid-load) and caused real bugs.
   duration: 0,
   speed: 1,
   currentLyricIndex: -1,
@@ -263,7 +265,6 @@ const dom = {
   metroSoundSelect:  document.getElementById("metroSoundSelect"),
   chordDisplay:      document.getElementById("chordDisplay"),
   chordDiagram:      document.getElementById("chordDiagram"),
-  currentChordLabel: document.getElementById("currentChordLabel"),
   lyricsContainer:   document.getElementById("lyricsContainer"),
 
   // Theme
@@ -352,6 +353,7 @@ const dom = {
 
   // Lyrics Fullscreen
   notationToggleBtn:         document.getElementById("notationToggleBtn"),
+  lyricsFsNotationToggleBtn: document.getElementById("lyricsFsNotationToggleBtn"),
   notationViewModal:         document.getElementById("notationViewModal"),
   notationViewCancelBtn:     document.getElementById("notationViewCancelBtn"),
   ntTabModal:                document.getElementById("ntTabModal"),
@@ -369,7 +371,6 @@ const dom = {
   lyricsFullscreenAutoScroll:document.getElementById("lyricsFullscreenAutoScroll"),
   lyricsFsMain:              document.getElementById("lyricsFsMain"),
   lyricsFsSwapBtn:           document.getElementById("lyricsFsSwapBtn"),
-  lyricsFsChordLabel:        document.getElementById("lyricsFsChordLabel"),
   lyricsFsChordDisplay:      document.getElementById("lyricsFsChordDisplay"),
   lyricsFsChordDiagram:      document.getElementById("lyricsFsChordDiagram"),
   lyricsFsDiagramModeBtn:    document.getElementById("lyricsFsDiagramModeBtn"),
@@ -1238,8 +1239,18 @@ function syncNotationConfigControls() {
   if (dom.ntPickup)     dom.ntPickup.value     = c.pickupBeats;
 }
 
-/** Re-renders the live staff preview from the current config + note rows. */
-function renderNotationPreview() {
+/**
+ * Re-renders the live staff preview from the current config + note rows.
+ *
+ * Callers that also render note rows (via reRenderNotationRows) should
+ * pass their pre-computed model + tabPositions to skip the duplicate
+ * parseNotation + computeTabPositions work. Called with no args from
+ * standalone paths (applyNotationConfig) which don't have a model yet.
+ *
+ * @param {Object} [preModel]      pre-parsed notation model
+ * @param {Array}  [prePositions]  pre-computed tab positions (per note.idx)
+ */
+function renderNotationPreview(preModel, prePositions) {
   if (!dom.ntPreview) return;
   const hasNotes = state.notationRows.some(r => String(r.pitch).trim());
   if (!hasNotes) {
@@ -1249,13 +1260,13 @@ function renderNotationPreview() {
     updateNotationSummary(getCurrentPlaybackSeconds());
     return;
   }
-  const model = parseNotation({ config: state.notationConfig, notes: state.notationRows });
+  const model = preModel || parseNotation({ config: state.notationConfig, notes: state.notationRows });
   state.notationTimeline = buildNotationTimeline(state.notationRows);
   // Editor preview shows the combined "Notation + Tab" view so the teacher
   // sees the tab fingering their notation produces in real time. Same data,
   // two aligned views — matches the "notation and tab are paired data" UX
   // decision.
-  dom.ntPreview.innerHTML = renderCombined(model);
+  dom.ntPreview.innerHTML = renderCombined(model, prePositions);
   syncNotationPlaybackHighlight(getCurrentPlaybackSeconds(), true);
   updateNotationNowPlaying(getCurrentPlaybackSeconds());
   updateNotationSummary(getCurrentPlaybackSeconds());
@@ -1396,8 +1407,14 @@ function makeNotationInsertDivider(afterIdx) {
   return div;
 }
 
-/** Builds and inserts all note row elements into the editor lines list. */
-function renderNotationRows() {
+/**
+ * Builds and inserts all note row elements into the editor lines list.
+ *
+ * @param {Array} [prePositions]  optional pre-computed tab positions
+ *   (from reRenderNotationRows so it doesn't have to run
+ *   computeTabPositions once per render pipeline).
+ */
+function renderNotationRows(prePositions) {
   if (!dom.editorLinesList) return;
   dom.editorLinesList.innerHTML = "";
   dom.editorLinesList.appendChild(makeNotationInsertDivider(-1));
@@ -1415,11 +1432,11 @@ function renderNotationRows() {
   const mmap = computeMeasureMap(state.notationRows, state.notationConfig.timeSignature);
 
   // Per-note tab positions (auto + overrides) so each row can show the
-  // fingering that will actually render. We compute this once per re-render
-  // and index into it by note.idx (== source row order, since parseNotation
-  // preserves order and computeTabPositions maps 1:1 with model.notes).
-  const _tabModel = parseNotation({ config: state.notationConfig, notes: state.notationRows });
-  const _tabPositions = computeTabPositions(_tabModel);
+  // fingering that will actually render. When called from
+  // reRenderNotationRows we get positions passed in — otherwise fall back
+  // to computing here so direct calls still work.
+  const _tabPositions = prePositions ||
+    computeTabPositions(parseNotation({ config: state.notationConfig, notes: state.notationRows }));
 
   state.notationRows.forEach((row, i) => {
     const el = document.createElement("div");
@@ -1611,11 +1628,21 @@ function refreshNotationRowBadge(idx) {
   badge.textContent = hasTime ? formatEditorTime(row.time) : "--:--";
 }
 
-/** Re-renders note rows after a structural change and refreshes the preview. */
+/** Re-renders note rows after a structural change and refreshes the preview.
+ *  Owns the ONE model+positions compute per edit — see the finding that
+ *  the two child renders used to duplicate this work. */
 function reRenderNotationRows() {
   state.notationFocusIdx = -1;
-  renderNotationRows();
-  renderNotationPreview();
+  // Compute model + tab positions once; both child renders use them.
+  // Skip when there are no rows (renderNotationRows short-circuits and
+  // renderNotationPreview shows the empty-state hint).
+  let model = null, positions = null;
+  if (state.notationRows.length) {
+    model = parseNotation({ config: state.notationConfig, notes: state.notationRows });
+    positions = computeTabPositions(model);
+  }
+  renderNotationRows(positions);
+  renderNotationPreview(model, positions);
   updateEditorStampCount();
   updateNotationSummary(getCurrentPlaybackSeconds());
 }
@@ -1773,8 +1800,9 @@ function closeNtPitchModal() {
 function selectNtPitch(pitch) {
   if (_ntPitchTargetIdx < 0) return;
   state.notationRows = updateNoteField(state.notationRows, _ntPitchTargetIdx, { pitch });
+  // reRenderNotationRows already refreshes the preview — a second call
+  // would recompute parseNotation + computeTabPositions for no reason.
   reRenderNotationRows();
-  renderNotationPreview();
   closeNtPitchModal();
 }
 
@@ -1863,8 +1891,8 @@ function selectNtTabPosition(stringIdx, fret) {
     tabString: stringIdx,
     tabFret: fret,
   });
+  // reRenderNotationRows also refreshes the preview — see note in selectNtPitch.
   reRenderNotationRows();
-  renderNotationPreview();
   closeNtTabModal();
 }
 
@@ -1875,7 +1903,6 @@ function clearNtTabOverride() {
     tabFret: null,
   });
   reRenderNotationRows();
-  renderNotationPreview();
   closeNtTabModal();
 }
 
@@ -2650,11 +2677,43 @@ async function loadSongs() {
   showIdleState();
 }
 
+// sessionStorage key for cached Firestore payloads. Per-tab, survives
+// page reload but not tab close — good match for "session freshness".
+const SONG_CACHE_PREFIX = "uke-song:";
+
+/** Reads cached {lyrics,chords,notation} for a song id; null on miss. */
+function readSongCache(songId) {
+  try {
+    const raw = sessionStorage.getItem(SONG_CACHE_PREFIX + songId);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch { return null; }
+}
+/** Writes cache; silently ignores quota / private-mode errors. */
+function writeSongCache(songId, payloads) {
+  try {
+    sessionStorage.setItem(SONG_CACHE_PREFIX + songId, JSON.stringify(payloads));
+  } catch { /* quota / private mode — non-fatal */ }
+}
+/** Invalidates one cache entry — call after a successful save so the next
+ *  session-load fetches fresh from Firestore. */
+function invalidateSongCache(songId) {
+  try { sessionStorage.removeItem(SONG_CACHE_PREFIX + songId); } catch {}
+}
+
 /**
- * Hydrates one song's lyrics/chords/notation from Firestore on first use.
- * Subsequent calls are no-ops (cache-by-`_dataLoaded` flag on the song
- * object). Safe to call multiple times — the concurrent-fetch race is
- * avoided by stashing the in-flight promise on the song.
+ * Hydrates one song's lyrics/chords/notation.
+ *
+ * Two-level cache:
+ *   1. In-memory on the song object (`_dataLoaded`) — instant, survives
+ *      as long as the SPA is loaded.
+ *   2. sessionStorage — survives page reload within the tab; hit rate is
+ *      very high on repeat visits of the same song set.
+ *   3. Firestore — network fetch, only when both caches miss.
+ *
+ * The in-flight promise (`_loadingPromise`) is stashed on the song so
+ * concurrent calls (e.g. selectSong racing a prefetch) all await the
+ * same fetch instead of doubling network work.
  */
 async function ensureSongDataLoaded(song) {
   if (!song) return;
@@ -2663,14 +2722,20 @@ async function ensureSongDataLoaded(song) {
 
   song._loadingPromise = (async () => {
     try {
-      const { lyrics, chords, notation } = await fetchSongData(song.id);
+      // Cache tier 2: sessionStorage — cross-reload, per-tab.
+      let payloads = readSongCache(song.id);
+      if (!payloads) {
+        // Cache tier 3: Firestore network fetch.
+        payloads = await fetchSongData(song.id);
+        writeSongCache(song.id, payloads);
+      }
       // Re-run buildSong to apply the derivation logic (chords from lyrics
       // when explicit chords are absent, notation validation, etc.) and
       // copy the payload fields onto the existing song object so anything
       // holding a ref (state.selectedSong) sees the update.
       const hydrated = buildSong(
         { id: song.id, title: song.title, mp3: song.mp3, bpm: song.bpm },
-        lyrics, chords, notation,
+        payloads.lyrics, payloads.chords, payloads.notation,
       );
       song.lyrics   = hydrated.lyrics;
       song.chords   = hydrated.chords;
@@ -2754,7 +2819,6 @@ function showIdleState() {
 
   setEmptyState(dom.lyricsContainer, msg);
   setEmptyState(dom.chordDisplay, msg || "เลือกเพลงแล้วกด Play", "span");
-  dom.currentChordLabel.textContent = "-";
 
   resetProgress();
   dom.durationTime.textContent = "00:00";
@@ -2775,7 +2839,14 @@ function showIdleState() {
 /* =========================
    Player Functions
 ========================= */
-async function selectSong(songId) {
+/**
+ * @param {string} songId
+ * @param {{autoPlay?: boolean}} [options]  autoPlay:true kicks off playback
+ *   once the MP3 finishes loading. Only prev/next (changeSong) passes it —
+ *   dropdown picks and any other call site are browse-only by default.
+ */
+async function selectSong(songId, options = {}) {
+  const { autoPlay = false } = options;
   const song = state.songs.find(s => s.id === songId);
   if (!song) return;
 
@@ -2784,31 +2855,50 @@ async function selectSong(songId) {
   updateFavoriteBtn();
 
   // Show the mini-player IMMEDIATELY with the title (from manifest, no
-  // network needed) so the user gets instant feedback instead of waiting
-  // for Firestore + MP3 load. It stays visible while data + audio hydrate.
+  // network needed) so the user gets instant feedback.
   updateMiniPlayerForSong(song);
 
-  // Lazy-hydrate payloads from Firestore on first selection. Cached
-  // on the song object so re-selects are instant. Await BEFORE render
-  // so the panel doesn't flash empty then repaint with content.
+  if (!state.audioMode) {
+    showIdleState();
+    return;
+  }
+
+  // Kick BOTH loads in parallel — they're independent I/O ops:
+  //   • MP3 download (loadSongAudio → new Howl) uses only manifest fields
+  //     (title, mp3 path, bpm) which are always in memory.
+  //   • Firestore payloads (lyrics/chords/notation) affect rendering only.
+  // Previously we awaited Firestore FIRST, wasting the entire Firestore
+  // RTT before the MP3 download even started (~300-800ms on mobile 4G).
+  loadSongAudio(song, { autoPlay });
+
+  // When Firestore payloads arrive, repaint the notation/lyrics container
+  // so any empty-state that flashed briefly is replaced with real content.
+  // Skip both status + repaint when the song is already hydrated (repeat
+  // select in the same session, or first fetch already completed).
   if (!song._dataLoaded) {
-    setLoadStatus("loading", "กำลังโหลดเพลง...");
-    await ensureSongDataLoaded(song);
-    setLoadStatus("success", "พร้อมใช้งาน");
+    setLoadStatus("loading", "กำลังโหลดเนื้อร้อง/คอร์ด...");
+    try {
+      await ensureSongDataLoaded(song);
+    } finally {
+      setLoadStatus("success", "พร้อมใช้งาน");
+    }
     // User may have picked a different song while this one was loading —
     // bail so we don't clobber the new selection with stale render.
     if (state.selectedSong !== song) return;
-  }
-
-  // Only proceed to load audio + render content if BOTH mode and song are picked
-  if (state.audioMode) {
-    loadSongAudio(song);
-  } else {
-    showIdleState();
+    // Repaint with real data. _lastRenderedSongId matches so the notation
+    // view choice is preserved (finding #4 fix).
+    renderLyrics(song.lyrics, song);
   }
 }
 
-function loadSongAudio(song) {
+/**
+ * @param {Object} song
+ * @param {{autoPlay?: boolean}} [options]  captured in the Howl.onload
+ *   closure so a later song's load cannot inherit this song's autoPlay
+ *   intent (the old shared-flag pattern leaked that way — bugs #1 & #2).
+ */
+function loadSongAudio(song, options = {}) {
+  const { autoPlay = false } = options;
   if (state.editorOpen) closeEditor();
   stopSong();
   unloadSound();
@@ -2832,14 +2922,20 @@ function loadSongAudio(song) {
   resetProgress();
   setChordDisplay(null);
 
-  state.sound = new Howl({
+  // Capture the Howl in a local so onload uses THIS instance even after a
+  // later loadSongAudio call swaps state.sound (defensive — Howler's
+  // unload() usually suppresses stale callbacks, but the closure is free).
+  const thisSound = new Howl({
     src: [getMp3PathFor(song)],
     html5: true,
     preload: true,
     rate: state.speed,
 
     onload: () => {
-      state.duration = state.sound.duration();
+      // If a newer song has since replaced state.sound, bail — don't
+      // touch UI that belongs to the newer load.
+      if (state.sound !== thisSound) return;
+      state.duration = thisSound.duration();
       dom.durationTime.textContent = formatTime(state.duration);
       dom.playPauseBtn.disabled = false;
       dom.stopBtn.disabled = false;
@@ -2848,15 +2944,14 @@ function loadSongAudio(song) {
       setLoopButtonsEnabled(true);
       if (dom.editorToggleBtn) dom.editorToggleBtn.disabled = false;
       applyPreservePitch();
-      // Auto-play if navigation (prev/next) requested it. Clear the flag
-      // either way so a later dropdown pick doesn't inherit it.
-      if (state.pendingAutoPlay) {
-        state.pendingAutoPlay = false;
-        state.sound.play();
-      }
+      // Auto-play only if this specific load asked for it — no shared
+      // flag means Stop / dropdown-pick / setAudioMode cannot accidentally
+      // trigger playback here.
+      if (autoPlay) thisSound.play();
     },
 
     onloaderror: (_, error) => {
+      if (state.sound !== thisSound) return;
       console.error("MP3 load error:", error);
       setLoadStatus("error", "โหลด MP3 ไม่สำเร็จ");
       dom.playPauseBtn.disabled = true;
@@ -2864,9 +2959,8 @@ function loadSongAudio(song) {
       dom.seekBackBtn.disabled = true;
       dom.seekFwdBtn.disabled = true;
       setChordDisplay("MP3?");
-      // Don't leave pendingAutoPlay set — it would trigger on the next
-      // song load, which is not what the user asked for.
-      state.pendingAutoPlay = false;
+      // No shared autoPlay flag to clear — the closure param is scoped
+      // to this Howl instance and dies with it.
     },
 
     onplay: () => {
@@ -2910,6 +3004,10 @@ function loadSongAudio(song) {
       if (state.metronomeOn && state.metroLoop) { state.metroLoop.stop(); Tone.Transport.stop(); }
     }
   });
+  // Register as the current sound only AFTER the callbacks are wired,
+  // so the `state.sound !== thisSound` staleness guards above (in
+  // onload / onloaderror) work correctly if callbacks race the swap.
+  state.sound = thisSound;
 }
 
 // Cycle to previous/next song in manifest order. Prev/next always
@@ -2918,14 +3016,13 @@ function loadSongAudio(song) {
 // auto-play; that's a browse action).
 function changeSong(delta) {
   if (!state.songs.length) return;
-  state.pendingAutoPlay = true;
   if (!state.selectedSong) {
-    selectSong(state.songs[0].id);
+    selectSong(state.songs[0].id, { autoPlay: true });
     return;
   }
   const idx = state.songs.findIndex(s => s.id === state.selectedSong.id);
   const newIdx = (idx + delta + state.songs.length) % state.songs.length;
-  selectSong(state.songs[newIdx].id);
+  selectSong(state.songs[newIdx].id, { autoPlay: true });
 }
 
 function applyPreservePitch() {
@@ -3069,6 +3166,19 @@ function stopAnimationLoop() {
    Mobile mini-player (Spotify-style)
 ========================= */
 
+// Cached mobile-breakpoint MQL — cheap read (`.matches` is O(1)) instead
+// of rebuilding a MediaQueryList inside the RAF tick (updateProgress runs
+// ~60×/sec). The 'change' listener keeps the boolean in sync when the
+// viewport crosses the breakpoint mid-session (rotation / dev-tools).
+const _mobileMQ = window.matchMedia("(max-width: 760px)");
+let _isMobileViewport = _mobileMQ.matches;
+if (_mobileMQ.addEventListener) {
+  _mobileMQ.addEventListener("change", e => { _isMobileViewport = e.matches; });
+} else if (_mobileMQ.addListener) {
+  // Legacy Safari <14 fallback (deprecated API but still needed on old iPads)
+  _mobileMQ.addListener(e => { _isMobileViewport = e.matches; });
+}
+
 /**
  * Sets the mini-player's title and reveals it. Called from loadSongAudio()
  * so it appears as soon as the user picks a song. It's a passive skin —
@@ -3118,10 +3228,9 @@ function updateProgress(currentSeconds) {
     if (dom.lyricsFsDurationTime)  dom.lyricsFsDurationTime.textContent = formatTime(duration);
   }
   // Mobile mini-player mirror — skip on desktop where the mini-player is
-  // hidden by CSS media query anyway; those DOM writes run 60×/sec and
-  // add up. `matchMedia` is cheap (native) and the result changes only
-  // on viewport resize, which is rare in this app.
-  if (window.matchMedia("(max-width: 760px)").matches) {
+  // hidden by CSS media query anyway. Uses the cached _isMobileViewport
+  // boolean so this hot path doesn't rebuild a MediaQueryList every frame.
+  if (_isMobileViewport) {
     if (dom.miniPlayerProgressFill) dom.miniPlayerProgressFill.style.width = `${percent}%`;
     if (dom.miniPlayerCurrent) dom.miniPlayerCurrent.textContent = formatTime(currentSeconds);
     if (dom.miniPlayerTotal)   dom.miniPlayerTotal.textContent   = formatTime(duration);
@@ -3138,11 +3247,21 @@ function updateTimedDisplays(currentSeconds) {
 /* =========================
    Lyrics Functions
 ========================= */
+// Tracks the last song id whose lyrics were rendered. Used to detect a
+// TRUE song change so the notation-view reset below only fires then —
+// re-render for the same song (e.g. after handleEditorSave writes lyrics)
+// must preserve the teacher's current view choice (Tab / Both / Image).
+let _lastRenderedSongId = null;
+
 function renderLyrics(lyrics, song = null) {
-  // New song → default view. The view picker never routes through here —
-  // it re-renders via renderLyricsEmptyState() directly so it can preserve
-  // whatever the teacher just chose.
-  state.notationView = "notation";
+  // Reset the notation view to the default ONLY when the song identity
+  // actually changed. The view picker itself uses renderLyricsEmptyState()
+  // directly to preserve its choice.
+  const newSongId = song && song.id ? song.id : null;
+  if (newSongId !== _lastRenderedSongId) {
+    state.notationView = "notation";
+    _lastRenderedSongId = newSongId;
+  }
   dom.lyricsContainer.classList.remove("has-staff");
   state.activeStaffNoteIdx = -1;
   state.staffNoteTimes = [];
@@ -3227,34 +3346,44 @@ const NOTATION_VIEW_META = {
 };
 
 /**
- * Shows the single view-mode button whenever the song has anything to
+ * Shows the view-mode button(s) whenever the song has anything to
  * interactively render (staff, tab, or image). The button opens a modal
- * that lists the valid modes; its icon / title mirror the CURRENT view so
- * the teacher always knows which mode they're in without opening the modal.
+ * that lists the valid modes; icon / title mirror the CURRENT view.
+ *
+ * Applies to BOTH the main-panel button (#notationToggleBtn) and the
+ * fullscreen mirror (#lyricsFsNotationToggleBtn) — they share the same
+ * modal and the same state.notationView, so one helper drives them.
  */
 function syncNotationBtns(hasInteractive, hasImage) {
-  const btn = dom.notationToggleBtn;
-  if (!btn) return;
-
   const show = hasInteractive || hasImage;
-  btn.hidden = !show;
-  if (!show) return;
 
-  // If the currently stored view is not valid for this song (e.g. teacher
-  // just loaded a song that has no PNG while view was "image"), fall back
-  // to notation so the render dispatch has something safe to draw.
-  if (state.notationView === "image" && !hasImage) state.notationView = "notation";
-  if (state.notationView !== "image" && !hasInteractive) state.notationView = hasImage ? "image" : "notation";
+  // Fall back to a safe view when the stored one isn't available for this
+  // song (e.g. teacher loaded a song without a PNG while view was "image").
+  // Do it once here so the render dispatch and both buttons see the same
+  // corrected value.
+  if (show) {
+    if (state.notationView === "image" && !hasImage) state.notationView = "notation";
+    if (state.notationView !== "image" && !hasInteractive) state.notationView = hasImage ? "image" : "notation";
+  }
 
   const meta = NOTATION_VIEW_META[state.notationView] || NOTATION_VIEW_META.notation;
-  const iconEl = btn.querySelector("i");
-  if (iconEl) iconEl.className = `fa-solid ${meta.icon}`;
-  btn.title = meta.title;
-  btn.setAttribute("aria-label", meta.title);
-  // aria-pressed: "true" when we're not on the default (notation) view — this
-  // matches how the auto-scroll pill treats "toggled on".
-  btn.setAttribute("aria-pressed", state.notationView !== "notation" ? "true" : "false");
-  btn.classList.toggle("is-on", state.notationView !== "notation");
+  const notDefault = state.notationView !== "notation";
+
+  // Both buttons share the same visual treatment; apply once via a helper.
+  const applyTo = btn => {
+    if (!btn) return;
+    btn.hidden = !show;
+    if (!show) return;
+    const iconEl = btn.querySelector("i");
+    if (iconEl) iconEl.className = `fa-solid ${meta.icon}`;
+    btn.title = meta.title;
+    btn.setAttribute("aria-label", meta.title);
+    // aria-pressed:"true" when we're not on the default view.
+    btn.setAttribute("aria-pressed", notDefault ? "true" : "false");
+    btn.classList.toggle("is-on", notDefault);
+  };
+  applyTo(dom.notationToggleBtn);
+  applyTo(dom.lyricsFsNotationToggleBtn);
 }
 
 /**
@@ -3267,8 +3396,7 @@ function openNotationViewModal() {
   if (!modal) return;
   const song = state.selectedSong;
   const hasImage = !!(song && getNotationImagePath(song.id));
-  const hasInteractive = !!(song && (song.notation ||
-    (song.id && song.id.startsWith("lesson") && song.chords && song.chords.length)));
+  const hasInteractive = songHasInteractiveNotation(song);
 
   modal.querySelectorAll(".nvpick-option").forEach(opt => {
     const view = opt.dataset.view;
@@ -3280,12 +3408,16 @@ function openNotationViewModal() {
   });
 
   modal.hidden = false;
+  // Both the main and fullscreen buttons open this modal — reflect the
+  // open state on whichever exists.
   if (dom.notationToggleBtn) dom.notationToggleBtn.setAttribute("aria-expanded", "true");
+  if (dom.lyricsFsNotationToggleBtn) dom.lyricsFsNotationToggleBtn.setAttribute("aria-expanded", "true");
 }
 
 function closeNotationViewModal() {
   if (dom.notationViewModal) dom.notationViewModal.hidden = true;
   if (dom.notationToggleBtn) dom.notationToggleBtn.setAttribute("aria-expanded", "false");
+  if (dom.lyricsFsNotationToggleBtn) dom.lyricsFsNotationToggleBtn.setAttribute("aria-expanded", "false");
 }
 
 /**
@@ -3300,19 +3432,33 @@ function applyNotationView(view) {
   renderLyricsEmptyState(state.selectedSong);
 }
 
+/**
+ * Single source of truth for "does this song render interactive notation?".
+ * Used by renderLyricsEmptyState (dispatches the render) AND by
+ * openNotationViewModal (decides which options to enable). Keeping them in
+ * sync via one helper prevents the drift finding #3 flagged.
+ *
+ * True when the song has a real Notation/<id>.json payload OR (legacy
+ * fallback) when it's a lesson song whose Chords timeline is treated as a
+ * melody. The lesson-id gate is deliberate — regular songs with chord data
+ * must NOT be treated as melodies.
+ */
+function songHasInteractiveNotation(song) {
+  if (!song) return false;
+  if (song.notation) return true;
+  return !!(song.id && song.id.startsWith("lesson") &&
+            song.chords && song.chords.length);
+}
+
 function renderLyricsEmptyState(song) {
   const emptyMsg = `<p class="empty-state">ไม่มีเนื้อเพลง</p>`;
 
   // Interactive staff is available when the song has a Notation/<id>.json file,
   // or (legacy fallback) when it's a lesson whose Chords file holds melody notes.
+  // We still need `hasNotationFile` separately below to pick the right parser
+  // (parseNotation vs chordsToNotation).
   const hasNotationFile = !!(song && song.notation);
-  // Legacy fallback: lesson songs that pre-date the Notation JSON format stored
-  // their melody as the Chords timeline. chordsToNotation() converts that into a
-  // staff. Only apply this to songs whose id begins with "lesson" so that regular
-  // songs with chord data don't unexpectedly show a melody staff instead of lyrics.
-  const hasLegacyMelody = !hasNotationFile &&
-    !!(song && song.id.startsWith("lesson") && song.chords && song.chords.length);
-  const hasInteractive  = hasNotationFile || hasLegacyMelody;
+  const hasInteractive  = songHasInteractiveNotation(song);
 
   const notationPath   = song ? getNotationImagePath(song.id) : null;
   const hasImage       = !!notationPath;
@@ -3524,18 +3670,17 @@ function seekFromFsProgress(clientX) {
 function setChordDisplay(chord) {
   if (!chord) {
     setEmptyState(dom.chordDisplay, "รอคอร์ดแรก...", "span");
-    dom.currentChordLabel.textContent = "-";
     if (dom.chordDiagram) dom.chordDiagram.hidden = true;
     return;
   }
   dom.chordDisplay.innerHTML = "";
 
-  // Chord badge
+  // Chord badge (the big one in .chord-stage — the tiny #currentChordLabel
+  // pill was removed since it duplicated this indicator).
   const badge = document.createElement("div");
   badge.className = "chord-badge";
   badge.textContent = chord;
   dom.chordDisplay.appendChild(badge);
-  dom.currentChordLabel.textContent = chord;
 
   // Chord diagram — show when chord data exists, hide when unknown
   if (dom.chordDiagram) {
@@ -3569,7 +3714,8 @@ function setChordDisplay(chord) {
 function syncFullscreenChord(chord) {
   if (!dom.lyricsFsChordDisplay) return;
 
-  dom.lyricsFsChordLabel.textContent = chord || "-";
+  // #lyricsFsChordLabel pill removed — big chord badge below is the
+  // single source of visible chord state in fullscreen.
 
   if (chord) {
     dom.lyricsFsChordDisplay.innerHTML = "";
@@ -4284,9 +4430,12 @@ function bindEvents() {
   if (dom.lyricsPanelCollapseBtn) dom.lyricsPanelCollapseBtn.addEventListener("click", toggleLyricsPanelCollapse);
   if (dom.lyricsPanelExpandBtn)   dom.lyricsPanelExpandBtn.addEventListener("click",   toggleLyricsPanelCollapse);
 
-  // ── Notation toggle (header button) ──
+  // ── Notation toggle (main + fullscreen — both open the shared modal) ──
   if (dom.notationToggleBtn) {
     dom.notationToggleBtn.addEventListener("click", openNotationViewModal);
+  }
+  if (dom.lyricsFsNotationToggleBtn) {
+    dom.lyricsFsNotationToggleBtn.addEventListener("click", openNotationViewModal);
   }
 
   // ── Notation view picker modal ──
@@ -4790,6 +4939,10 @@ async function handleEditorSave() {
     } else {
       state.selectedSong.notation = parsed;
     }
+    // Bust the sessionStorage payload cache so a page reload sees fresh
+    // Firestore data instead of the pre-save snapshot. In-memory state
+    // is already correct because we set it directly above.
+    invalidateSongCache(state.selectedSong.id);
 
     btn.innerHTML = `<i class="fa-solid fa-check"></i><span class="btn-label"> บันทึกแล้ว</span>`;
   } catch (err) {
