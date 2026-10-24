@@ -8,6 +8,42 @@
  *   { songId, songTitle, totalSec, lastDate, sessionCount }
  */
 
+export const PRACTICE_TIME_ZONE = "Asia/Bangkok";
+
+/** Returns a YYYY-MM-DD calendar key for an instant in the requested timezone. */
+export function dateKeyInTimeZone(value, timeZone = PRACTICE_TIME_ZONE) {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const partValue = type => parts.find(part => part.type === type)?.value;
+  const year = partValue("year");
+  const month = partValue("month");
+  const day = partValue("day");
+  return year && month && day ? `${year}-${month}-${day}` : "";
+}
+
+/** True only for real calendar dates expressed as YYYY-MM-DD. */
+export function isValidDateKey(value) {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
+}
+
+/** Adds calendar days to a YYYY-MM-DD key without depending on browser timezone. */
+export function addDaysToDateKey(dateKey, days) {
+  if (!isValidDateKey(dateKey) || !Number.isFinite(days)) return "";
+  const [year, month, day] = dateKey.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day + Math.trunc(days)));
+  return date.toISOString().slice(0, 10);
+}
+
 // ─── Favorites ────────────────────────────────────────────────────────────────
 
 /**
@@ -109,10 +145,8 @@ export function recentSessions(log, n = 30) {
  * @returns {number}  seconds
  */
 export function totalSecInDays(log, today, days = 7) {
-  if (!Array.isArray(log) || !today) return 0;
-  const cutoff = new Date(today);
-  cutoff.setDate(cutoff.getDate() - (days - 1));
-  const cutoffStr = cutoff.toISOString().slice(0, 10);
+  if (!Array.isArray(log) || !isValidDateKey(today) || !Number.isFinite(days) || days < 1) return 0;
+  const cutoffStr = addDaysToDateKey(today, -(Math.floor(days) - 1));
   return log
     .filter(s => s && s.date >= cutoffStr && s.date <= today)
     .reduce((sum, s) => sum + (Number(s.durationSec) || 0), 0);

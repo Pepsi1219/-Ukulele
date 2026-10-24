@@ -182,8 +182,17 @@ export function keySignature(key) {
 export function normalizeConfig(cfg = {}) {
   cfg = cfg || {};  // guard against an explicit null (default only covers undefined)
   const rawTs = cfg.timeSignature;
+  const normalizeTimeSignaturePart = (value, fallback, maximum) => {
+    const numericValue = Number(value);
+    return Number.isFinite(numericValue)
+      ? Math.min(maximum, Math.max(1, Math.floor(numericValue)))
+      : fallback;
+  };
   const timeSignature = Array.isArray(rawTs) && rawTs.length === 2
-    ? [Math.max(1, Number(rawTs[0]) || 4), Math.max(1, Number(rawTs[1]) || 4)]
+    ? [
+      normalizeTimeSignaturePart(rawTs[0], 4, 32),
+      normalizeTimeSignaturePart(rawTs[1], 4, 64),
+    ]
     : [4, 4];
 
   // measuresPerRow / pickupBeats: default only when not a finite number, so an
@@ -195,8 +204,8 @@ export function normalizeConfig(cfg = {}) {
     clef:           cfg.clef === "bass" ? "bass" : "treble",
     key:            isKnownKey(cfg.key) ? cfg.key : "C",
     timeSignature,
-    measuresPerRow: Number.isFinite(mpr)    ? Math.max(1, Math.floor(mpr)) : 3,
-    pickupBeats:    Number.isFinite(pickup) ? Math.max(0, pickup)          : 0,
+    measuresPerRow: Number.isFinite(mpr)    ? Math.min(12, Math.max(1, Math.floor(mpr))) : 3,
+    pickupBeats:    Number.isFinite(pickup) ? Math.min(32, Math.max(0, pickup))           : 0,
   };
 }
 

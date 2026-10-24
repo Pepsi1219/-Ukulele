@@ -20,7 +20,8 @@
  * @module notationEditor
  */
 
-import { normalizeConfig, parseDuration } from "./notationModel.js";
+import { normalizeConfig, parseDuration, parsePitch } from "./notationModel.js";
+import { isValidTabPositionForMidi, midiFromPitch } from "./tabModel.js";
 
 /** Normalises a Notation object's config (with defaults) for editing. */
 export function buildNotationConfig(notationObj) {
@@ -217,8 +218,8 @@ export function exportToNotationJson(config, rows) {
       if (r.tabString != null && r.tabFret != null) {
         const tabString = Number(r.tabString);
         const tabFret   = Number(r.tabFret);
-        if (Number.isFinite(tabString) && Number.isFinite(tabFret) &&
-            tabString >= 0 && tabString <= 3 && tabFret >= 0 && tabFret <= 15) {
+        const midi = midiFromPitch(parsePitch(note.pitch));
+        if (isValidTabPositionForMidi(midi, { stringIdx: tabString, fret: tabFret })) {
           note.tabString = tabString;
           note.tabFret   = tabFret;
         }

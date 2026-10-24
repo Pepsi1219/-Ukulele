@@ -54,6 +54,18 @@
       "title": "Lesson 2: E F G",
       "mp3": "songs/lesson2-e-f-g.mp3",
       "bpm": 85
+    },
+    {
+      "id": "lesson2-beach-blues",
+      "title": "Lesson 2: Beach Blues",
+      "mp3": "songs/lesson2-beach-blues.mp3",
+      "bpm": 90
+    },
+    {
+      "id": "lesson2-open-fields",
+      "title": "Lesson 2: Open Fields",
+      "mp3": "songs/lesson2-open-fields.mp3",
+      "bpm": 80
     }
   ]
 }

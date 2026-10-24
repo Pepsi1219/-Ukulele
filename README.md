@@ -9,7 +9,7 @@ npm install
 npm test                 # unit tests (vitest, ~3s)
 
 # Serve locally
-npx serve .              # then open http://localhost:3000
+npm run dev              # then open the local URL shown in the terminal
 ```
 
 Open `index.html` in a browser to run — there is no build step.

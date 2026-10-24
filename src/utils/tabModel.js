@@ -93,6 +93,14 @@ export function positionsForMidi(midi, maxFret = MAX_FRET) {
   return out;
 }
 
+/** True only when a string/fret pair can physically produce the MIDI pitch. */
+export function isValidTabPositionForMidi(midi, position) {
+  if (!position || !Number.isInteger(position.stringIdx) || !Number.isInteger(position.fret)) return false;
+  return positionsForMidi(midi).some(candidate =>
+    candidate.stringIdx === position.stringIdx && candidate.fret === position.fret
+  );
+}
+
 /**
  * Hand-movement cost between two positions. String moves are weighted heavier
  * than fret moves because sliding along one string is physically easier for
@@ -132,8 +140,10 @@ export function pickBestPosition(positions, prev) {
  */
 function hasValidOverride(n) {
   return n.tabString != null && n.tabFret != null &&
-         n.tabString >= 0 && n.tabString < UKE_OPEN_MIDI.length &&
-         n.tabFret >= 0 && n.tabFret <= MAX_FRET;
+    isValidTabPositionForMidi(midiFromNote(n), {
+      stringIdx: n.tabString,
+      fret: n.tabFret,
+    });
 }
 
 /**

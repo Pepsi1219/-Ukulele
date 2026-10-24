@@ -4,6 +4,7 @@
   "description": "Ukulele Practice App — chord sync, lyrics, metronome",
   "type": "module",
   "scripts": {
+    "dev": "npx serve .",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"
