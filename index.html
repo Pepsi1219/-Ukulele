@@ -24,7 +24,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
         crossorigin="anonymous"
         referrerpolicy="no-referrer" />
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles.css?v=2" />
 </head>
 
 <body>
@@ -574,6 +574,10 @@
     <!-- Notation config + live preview — only visible on the notation tab -->
     <div id="editorNotationConfig" class="editor-notation-config" hidden>
       <div class="ntcfg-header-row">
+        <button id="ntImportChordsBtn" class="chip ntcfg-open-btn" type="button"
+                title="แปลงรากคอร์ดเป็นโน้ต octave 4 พร้อม timestamp">
+          <i class="fa-solid fa-file-import"></i> สร้างโน้ตจากคอร์ด
+        </button>
         <button id="ntConfigOpenBtn" class="chip ntcfg-open-btn" type="button">
           <i class="fa-solid fa-sliders"></i> ตั้งค่า
         </button>
@@ -740,6 +744,32 @@
     </div>
   </div>
   <!-- ===== /Notation Config Modal ===== -->
+
+  <!-- ===== Chord-to-Notation Import Confirmation Modal ===== -->
+  <div id="ntChordImportConfirmModal" class="ntchord-confirm-overlay" hidden
+       role="dialog" aria-modal="true" aria-labelledby="ntChordImportConfirmTitle">
+    <div class="ntchord-confirm-panel">
+      <div class="ntcfg-modal-header">
+        <span id="ntChordImportConfirmTitle" class="ntcfg-modal-title">
+          <i class="fa-solid fa-file-import"></i> สร้างโน้ตจากคอร์ด
+        </span>
+        <button id="ntChordImportCancelBtn" class="icon-btn" type="button" aria-label="ยกเลิก">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div class="ntchord-confirm-body">
+        <p id="ntChordImportSummary"></p>
+        <p id="ntChordImportDetails"></p>
+      </div>
+      <div class="ntcfg-modal-footer ntchord-confirm-footer">
+        <button id="ntChordImportCancelActionBtn" class="chip" type="button">ยกเลิก</button>
+        <button id="ntChordImportConfirmBtn" class="chip ntcfg-save-btn" type="button">
+          <i class="fa-solid fa-check"></i> ยืนยันและสร้างโน้ต
+        </button>
+      </div>
+    </div>
+  </div>
+  <!-- ===== /Chord-to-Notation Import Confirmation Modal ===== -->
 
   <!-- ===== Pitch Picker Modal ===== -->
   <div id="ntPitchModal" class="ntpitch-overlay" hidden role="dialog" aria-modal="true" aria-label="เลือกโน้ต">

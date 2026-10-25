@@ -3,6 +3,7 @@ import { describe, it, expect } from "vitest";
 import {
   buildNotationConfig,
   buildNoteRows,
+  chordRowsToNoteRows,
   updateNoteField,
   stampNoteTime,
   shiftNoteTime,
@@ -67,6 +68,36 @@ describe("buildNoteRows", () => {
     expect(rows[0].tabFret).toBe(0);
     expect(rows[1].tabString).toBe(3);
     expect(rows[1].tabFret).toBe(3);
+  });
+});
+
+describe("chordRowsToNoteRows", () => {
+  it("maps chord roots to octave-four pitches and preserves timestamps", () => {
+    expect(chordRowsToNoteRows([
+      { chord: "F", time: 1.25 },
+      { chord: "F#m7", time: 2.5 },
+      { chord: "Bb7", time: 3 },
+      { chord: "D/G", time: 4 },
+    ])).toEqual([
+      { pitch: "F4", dur: "quarter", time: 1.25, tabString: null, tabFret: null },
+      { pitch: "F#4", dur: "quarter", time: 2.5, tabString: null, tabFret: null },
+      { pitch: "Bb4", dur: "quarter", time: 3, tabString: null, tabFret: null },
+      { pitch: "D4", dur: "quarter", time: 4, tabString: null, tabFret: null },
+    ]);
+  });
+
+  it("keeps unstamped chords and skips rows without a valid chord name", () => {
+    expect(chordRowsToNoteRows([
+      { chord: "A", time: null },
+      { chord: "", time: 2 },
+      { chord: "N.C.", time: 3 },
+    ])).toEqual([
+      { pitch: "A4", dur: "quarter", time: null, tabString: null, tabFret: null },
+    ]);
+  });
+
+  it("returns an empty array for non-array input", () => {
+    expect(chordRowsToNoteRows(null)).toEqual([]);
   });
 });
 

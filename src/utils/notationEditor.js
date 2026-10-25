@@ -45,6 +45,32 @@ export function buildNoteRows(notationObj) {
   }));
 }
 
+/** Converts chord rows to octave-four note rows, keeping each chord's time. */
+export function chordRowsToNoteRows(chordRows) {
+  if (!Array.isArray(chordRows)) return [];
+
+  return chordRows.flatMap(row => {
+    const chord = String(row && row.chord != null ? row.chord : "")
+      .trim()
+      .replace(/♯/g, "#")
+      .replace(/♭/g, "b");
+    const match = /^([A-G])([#b]?)/i.exec(chord);
+    if (!match) return [];
+
+    const time = row.time != null && Number.isFinite(Number(row.time))
+      ? Number(row.time)
+      : null;
+
+    return [{
+      pitch: `${match[1].toUpperCase()}${match[2]}4`,
+      dur: "quarter",
+      time,
+      tabString: null,
+      tabFret: null,
+    }];
+  });
+}
+
 /** Returns a new rows array with `patch` merged into the row at `idx`. Pure. */
 export function updateNoteField(rows, idx, patch) {
   if (!Array.isArray(rows) || idx < 0 || idx >= rows.length) return rows;

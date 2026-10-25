@@ -76,6 +76,7 @@ import { buildChordRows,
          findLyricContextAt }      from "./src/utils/chordEditor.js";
 import { buildNotationConfig,
          buildNoteRows,
+         chordRowsToNoteRows,
          buildNotationTimeline,
          updateNoteField,
          stampNoteTime,
@@ -313,6 +314,13 @@ const dom = {
   ntMeasPerRow:       document.getElementById("ntMeasPerRow"),
   ntPickup:           document.getElementById("ntPickup"),
   ntConfigOpenBtn:    document.getElementById("ntConfigOpenBtn"),
+  ntImportChordsBtn:  document.getElementById("ntImportChordsBtn"),
+  ntChordImportConfirmModal: document.getElementById("ntChordImportConfirmModal"),
+  ntChordImportSummary: document.getElementById("ntChordImportSummary"),
+  ntChordImportDetails: document.getElementById("ntChordImportDetails"),
+  ntChordImportConfirmBtn: document.getElementById("ntChordImportConfirmBtn"),
+  ntChordImportCancelBtn: document.getElementById("ntChordImportCancelBtn"),
+  ntChordImportCancelActionBtn: document.getElementById("ntChordImportCancelActionBtn"),
   ntConfigModal:      document.getElementById("ntConfigModal"),
   ntPitchModal:       document.getElementById("ntPitchModal"),
   ntPitchCancelBtn:   document.getElementById("ntPitchCancelBtn"),
@@ -867,6 +875,48 @@ function handleEditorImport() {
   }
 }
 
+let pendingChordNotationRows = null;
+
+/** Opens a custom confirmation modal for importing chord roots as notes. */
+function handleChordToNotationImport() {
+  const imported = chordRowsToNoteRows(state.chordRows);
+  pendingChordNotationRows = imported.length ? imported : null;
+
+  if (!imported.length) {
+    dom.ntChordImportSummary.textContent = "ไม่พบชื่อคอร์ดที่แปลงเป็นโน้ตได้";
+    dom.ntChordImportDetails.textContent = "กลับไปเพิ่มคอร์ดในแท็บคอร์ดก่อน แล้วลองอีกครั้ง";
+    dom.ntChordImportConfirmBtn.hidden = true;
+  } else {
+    const unstamped = imported.filter(row => row.time === null).length;
+    const skipped = state.chordRows.length - imported.length;
+    let summary = `จะแปลงรากคอร์ด ${imported.length} รายการเป็นโน้ต octave 4 และคง timestamp เดิม`;
+    if (unstamped) summary += `\n${unstamped} โน้ตยังไม่มี timestamp`;
+    if (skipped) summary += `\nข้าม ${skipped} แถวที่ไม่มีชื่อคอร์ดที่ใช้ได้`;
+    if (state.notationRows.length) {
+      summary += `\n\nโน้ตเดิม ${state.notationRows.length} รายการจะถูกแทนที่`;
+    }
+    dom.ntChordImportSummary.textContent = summary;
+    dom.ntChordImportDetails.textContent = "ระบบจะคำนวณตำแหน่ง Tab ให้อัตโนมัติ";
+    dom.ntChordImportConfirmBtn.hidden = false;
+  }
+
+  dom.ntChordImportConfirmModal.hidden = false;
+  dom.ntChordImportCancelBtn.focus();
+}
+
+function closeChordToNotationConfirm() {
+  pendingChordNotationRows = null;
+  dom.ntChordImportConfirmModal.hidden = true;
+  dom.ntImportChordsBtn?.focus();
+}
+
+function confirmChordToNotationImport() {
+  if (!pendingChordNotationRows) return;
+  state.notationRows = pendingChordNotationRows;
+  closeChordToNotationConfirm();
+  reRenderNotationRows();
+}
+
 /**
  * Updates the live lyric banner shown above the chord list.
  * Reads `state.editorRows` to find the lyric line at `currentSeconds`.
@@ -1081,7 +1131,9 @@ function renderChordRows() {
   dom.editorLinesList.innerHTML = "";
 
   // Top insert divider
-  dom.editorLinesList.appendChild(makeChordInsertDivider(-1));
+  const topDivider = makeChordInsertDivider(-1);
+  topDivider.classList.toggle("is-empty", state.chordRows.length === 0);
+  dom.editorLinesList.appendChild(topDivider);
 
   if (!state.chordRows.length) {
     const empty     = document.createElement("p");
@@ -1428,7 +1480,9 @@ function makeNotationInsertDivider(afterIdx) {
 function renderNotationRows(prePositions) {
   if (!dom.editorLinesList) return;
   dom.editorLinesList.innerHTML = "";
-  dom.editorLinesList.appendChild(makeNotationInsertDivider(-1));
+  const topDivider = makeNotationInsertDivider(-1);
+  topDivider.classList.toggle("is-empty", state.notationRows.length === 0);
+  dom.editorLinesList.appendChild(topDivider);
 
   if (!state.notationRows.length) {
     const empty       = document.createElement("p");
@@ -1971,6 +2025,26 @@ function wireNotationConfigControls() {
       closeNtConfigModal(true);
     }
   });
+  if (dom.ntChordImportCancelBtn) {
+    dom.ntChordImportCancelBtn.addEventListener("click", closeChordToNotationConfirm);
+  }
+  if (dom.ntChordImportCancelActionBtn) {
+    dom.ntChordImportCancelActionBtn.addEventListener("click", closeChordToNotationConfirm);
+  }
+  if (dom.ntChordImportConfirmBtn) {
+    dom.ntChordImportConfirmBtn.addEventListener("click", confirmChordToNotationImport);
+  }
+  if (dom.ntChordImportConfirmModal) {
+    dom.ntChordImportConfirmModal.addEventListener("click", e => {
+      if (e.target === dom.ntChordImportConfirmModal) closeChordToNotationConfirm();
+    });
+  }
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape" && dom.ntChordImportConfirmModal && !dom.ntChordImportConfirmModal.hidden) {
+      e.stopImmediatePropagation();
+      closeChordToNotationConfirm();
+    }
+  });
 
   // Wire chord picker modal
   buildChordPickGrid();
@@ -2106,6 +2180,7 @@ function handleEditorExport() {
  */
 function handleEditorKeydown(e) {
   if (dom.ntConfigModal   && !dom.ntConfigModal.hidden)   return;
+  if (dom.ntChordImportConfirmModal && !dom.ntChordImportConfirmModal.hidden) return;
   if (dom.ntPitchModal    && !dom.ntPitchModal.hidden)    return;
   if (dom.ntTabModal      && !dom.ntTabModal.hidden)      return;
   if (dom.chordPickModal  && !dom.chordPickModal.hidden)  return;
@@ -4532,6 +4607,7 @@ function bindEvents() {
   if (dom.editorTabLyrics) dom.editorTabLyrics.addEventListener("click", () => switchEditorTab("lyrics"));
   if (dom.editorTabChords) dom.editorTabChords.addEventListener("click", () => switchEditorTab("chords"));
   if (dom.editorTabNotation) dom.editorTabNotation.addEventListener("click", () => switchEditorTab("notation"));
+  if (dom.ntImportChordsBtn) dom.ntImportChordsBtn.addEventListener("click", handleChordToNotationImport);
   wireNotationConfigControls();
   if (dom.editorImportBtn)    dom.editorImportBtn.addEventListener("click", handleEditorImport);
   if (dom.chordAutoScrollBtn) dom.chordAutoScrollBtn.addEventListener("click", () => {
