@@ -3978,6 +3978,51 @@ select option { font-family: inherit; }
   min-height: 0;
 }
 
+.lyrics-fs-view-toggle {
+  display: inline-flex;
+  flex-shrink: 0;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: rgba(128, 128, 128, 0.1);
+}
+.lyrics-fs-view-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: var(--muted);
+  background: transparent;
+  cursor: pointer;
+}
+.lyrics-fs-view-btn.is-active {
+  color: var(--accent);
+  background: rgba(251, 191, 36, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(251, 191, 36, 0.38);
+}
+.lyrics-fs-view-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.lyrics-fs-main.fs-view-lyrics .lyrics-fs-chord-col,
+.lyrics-fs-main.fs-view-chords .lyrics-fs-container {
+  display: none;
+}
+.lyrics-fs-main.fs-view-lyrics .lyrics-fs-container {
+  flex: 1;
+}
+.lyrics-fs-main.fs-view-chords .lyrics-fs-chord-col {
+  width: 100%;
+  flex: 1;
+  border: 0;
+}
+
 /* ── Chord column ── */
 .lyrics-fs-chord-col {
   width: clamp(280px, 28vw, 420px);
@@ -4186,6 +4231,15 @@ select option { font-family: inherit; }
 }
 
 @media (max-width: 900px) {
+  .lyrics-fs-header { flex-wrap: wrap; gap: 8px; }
+  .lyrics-fs-header-song { flex: 1 1 100%; }
+  .lyrics-fs-header .lyrics-title-actions {
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 6px;
+  }
+  .lyrics-fs-view-btn { width: 32px; height: 32px; }
   .lyrics-fs-main { flex-direction: column; }
   .lyrics-fs-chord-col {
     width: 100%;

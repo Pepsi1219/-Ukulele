@@ -181,6 +181,7 @@ const state = {
                                   // persisted, until the user explicitly chooses teacher mode again
   lyricsFullscreen: false,       // true when lyrics are displayed in fullscreen overlay
   lyricsFsSwapped: false,        // true = chord column on right side in fullscreen
+  lyricsFsView: "both",          // "both" | "lyrics" | "chords"
   lyricsFontScale: 1.0,          // multiplier for lyrics text size (0.75–3.0) — shared by normal panel + fullscreen
   activeStaffNoteIdx: -1,        // data-idx of the highlighted note in the SVG staff (-1 = none)
   staffNoteTimes: [],            // [{time, idx}] for the current staff — drives highlight sync
@@ -3782,6 +3783,7 @@ function updateCurrentLyric(currentSeconds) {
 function openLyricsFullscreen() {
   state.lyricsFullscreen = true;
   dom.lyricsFullscreen.hidden = false;
+  setLyricsFsView(state.lyricsFsView);
   setMiniPlayerHidden(true);
 
   // Clone lyrics content into fullscreen container
@@ -3816,6 +3818,20 @@ function syncFullscreenLyrics() {
       const label = el.dataset.section;
       if (label) handleSectionClick(label);
     });
+  });
+}
+
+function setLyricsFsView(view) {
+  if (!["both", "lyrics", "chords"].includes(view)) return;
+  state.lyricsFsView = view;
+  if (dom.lyricsFsMain) {
+    dom.lyricsFsMain.classList.remove("fs-view-both", "fs-view-lyrics", "fs-view-chords");
+    dom.lyricsFsMain.classList.add(`fs-view-${view}`);
+  }
+  dom.lyricsFullscreen.querySelectorAll(".lyrics-fs-view-btn").forEach(btn => {
+    const isActive = btn.dataset.view === view;
+    btn.classList.toggle("is-active", isActive);
+    btn.setAttribute("aria-pressed", String(isActive));
   });
 }
 
@@ -4730,6 +4746,11 @@ function bindEvents() {
   }
   if (dom.lyricsFullscreenAutoScroll) {
     dom.lyricsFullscreenAutoScroll.addEventListener("click", toggleAutoScroll);
+  }
+  if (dom.lyricsFullscreen) {
+    dom.lyricsFullscreen.querySelectorAll(".lyrics-fs-view-btn").forEach(btn => {
+      btn.addEventListener("click", () => setLyricsFsView(btn.dataset.view));
+    });
   }
   if (dom.lyricsFullscreenContainer) {
     dom.lyricsFullscreenContainer.addEventListener("scroll", () => {

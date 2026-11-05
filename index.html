@@ -269,7 +269,7 @@
       <!-- Center Panel: Chord + Character -->
       <section class="panel chord-panel" id="chordPanel">
         <div class="section-title">
-          <h2>คอร์ดอูคูเลเล่</h2>
+          <h2>คอร์ด</h2>
           <div class="chord-panel-actions">
             <button id="chordPanelCollapseBtn" class="icon-btn secondary panel-collapse-btn"
                     type="button" aria-label="ย่อพาเนลคอร์ด" title="ย่อพาเนลคอร์ด">
@@ -428,6 +428,20 @@
                   aria-pressed="false" aria-label="สลับตำแหน่ง Chord ↔ Lyrics" title="สลับตำแหน่ง Chord ↔ Lyrics">
             <i class="fa-solid fa-arrow-right-arrow-left"></i>
           </button>
+          <div class="lyrics-fs-view-toggle" role="group" aria-label="เลือกเนื้อหาที่แสดงเต็มจอ">
+            <button class="lyrics-fs-view-btn" type="button" data-view="both"
+                    aria-label="แสดงทั้งเนื้อเพลงและคอร์ด" aria-pressed="true" title="แสดงทั้งเนื้อเพลงและคอร์ด">
+              <i class="fa-solid fa-table-columns" aria-hidden="true"></i>
+            </button>
+            <button class="lyrics-fs-view-btn" type="button" data-view="lyrics"
+                    aria-label="แสดงเนื้อเพลงอย่างเดียว" aria-pressed="false" title="แสดงเนื้อเพลงอย่างเดียว">
+              <i class="fa-solid fa-align-left" aria-hidden="true"></i>
+            </button>
+            <button class="lyrics-fs-view-btn" type="button" data-view="chords"
+                    aria-label="แสดงคอร์ดอย่างเดียว" aria-pressed="false" title="แสดงคอร์ดอย่างเดียว">
+              <i class="fa-solid fa-guitar" aria-hidden="true"></i>
+            </button>
+          </div>
           <!-- Same view picker as the main #notationToggleBtn — opens the
                shared #notationViewModal (z:500 > fullscreen z:300). Sync'd
                by syncNotationBtns so both buttons show the same icon /
@@ -454,7 +468,7 @@
         <!-- Chord column — mirrors the main chord panel content -->
         <div class="lyrics-fs-chord-col">
           <div class="lyrics-fs-chord-header">
-            <h3>คอร์ดอูคูเลเล่</h3>
+            <h3>คอร์ด</h3>
             <div class="lyrics-fs-chord-actions">
               <button id="lyricsFsDiagramModeBtn" class="icon-btn secondary" type="button"
                       aria-pressed="false" aria-label="สลับโหมดคอร์ด/โน้ต" title="สลับโหมดคอร์ด/โน้ต">
